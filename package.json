@@ -15,7 +15,8 @@
         "build": "grunt build",
         "dev": "grunt dev",
         "build-dev": "grunt build-dev",
-        "docs": "grunt docs"
+        "docs": "grunt docs",
+        "package": "node build.js"
     },
     "contributors": [
         {
@@ -26,6 +27,7 @@
         }
     ],
     "dependencies": {
+        "@inquirer/prompts": "^7.6.0",
         "@node-red-contrib-themes/theme-collection": "^4.0.11",
         "acorn": "8.14.1",
         "acorn-walk": "8.3.4",
@@ -34,6 +36,7 @@
         "basic-auth": "2.0.1",
         "bcryptjs": "3.0.2",
         "body-parser": "1.20.3",
+        "chalk": "4.1.2",
         "cheerio": "1.0.0-rc.10",
         "clone": "2.1.2",
         "content-type": "1.0.5",
@@ -72,6 +75,7 @@
         "nopt": "5.0.0",
         "oauth2orize": "1.12.0",
         "on-headers": "1.0.2",
+        "os-name": "^6.1.0",
         "passport": "0.7.0",
         "passport-http-bearer": "1.0.1",
         "passport-oauth2-client-password": "0.1.2",

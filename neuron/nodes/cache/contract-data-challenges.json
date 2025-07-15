@@ -106,6 +106,19 @@
       ]
     },
     {
+      "contract": "0x0bc478F79C6191A9cEF1e97f0212c99c734DD6dB",
+      "peerID": "Device name",
+      "stdOutTopic": "0.06141853",
+      "stdInTopic": "6141852",
+      "stdErrTopic": "6141851",
+      "services": [
+        {
+          "serviceID": "0",
+          "price": "1"
+        }
+      ]
+    },
+    {
       "contract": "0x50D4c6946b719cf99902590CaF79eCeA76980867",
       "peerID": "Device name",
       "stdOutTopic": "0.06141879",
@@ -197,5 +210,5 @@
       ]
     }
   ],
-  "lastUpdated": "2025-07-10T22:05:30.656Z"
+  "lastUpdated": "2025-07-11T09:45:47.598Z"
 }

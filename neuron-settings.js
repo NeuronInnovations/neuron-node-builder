@@ -13,13 +13,20 @@
  **/
 
 // Load environment variables from .env file
-require('dotenv').config({
-    path: require('path').resolve(__dirname, '.env')
-});
+// require('dotenv').config({
+//     path: require('path').resolve(__dirname, '.env')
+// });
 
 // Import required modules
 const fs = require('fs');
 const path = require('path');
+
+// Load environment variables from .env file (NEURON_ENV_PATH is set in index.js if running from the binary)
+const envPath = process.env.NEURON_ENV_PATH || require('path').resolve(__dirname, '.env');
+
+require('dotenv').config({
+    path: envPath
+});
 
 // Validate required Hedera credentials
 const requiredEnvVars = [
@@ -170,13 +177,13 @@ if (missingVars.length > 0) {
 
     // Create the setup page
     const setupPagePath = require('path').resolve(__dirname, 'neuron/theme/setup.html');
-    const setupPageDir = require('path').dirname(setupPagePath);
+    // const setupPageDir = require('path').dirname(setupPagePath);
     
-    if (!fs.existsSync(setupPageDir)) {
-        fs.mkdirSync(setupPageDir, { recursive: true });
-    }
+    // if (!fs.existsSync(setupPageDir)) {
+    //     fs.mkdirSync(setupPageDir, { recursive: true });
+    // }
     
-    fs.writeFileSync(setupPagePath, setupHtml);
+    // fs.writeFileSync(setupPagePath, setupHtml);
     console.log('Setup wizard created at: ' + setupPagePath);
     console.log('Please visit: http://localhost:1880/neuron/theme/setup.html to configure your credentials');
 }
@@ -337,7 +344,6 @@ module.exports = {
     httpAdminMiddleware: function(req, res, next) {
         // Check if credentials are missing and redirect to setup if needed
         // Read .env file directly to avoid process.env caching issues
-        const envPath = require('path').resolve(__dirname, '.env');
         let envContent = '';
         
         if (require('fs').existsSync(envPath)) {
@@ -361,6 +367,7 @@ module.exports = {
         // Debug logging for redirect decisions
         if (req.path === '/') {
             console.log('🔍 Checking credentials for root path (direct file read):');
+            console.log('  Using .env file:', envPath);
             console.log('  HEDERA_OPERATOR_ID:', credentials.HEDERA_OPERATOR_ID ? '✅ Set' : '❌ Missing');
             console.log('  HEDERA_OPERATOR_KEY:', credentials.HEDERA_OPERATOR_KEY ? '✅ Set' : '❌ Missing');
             console.log('  HEDERA_OPERATOR_EVM:', credentials.HEDERA_OPERATOR_EVM ? '✅ Set' : '❌ Missing');
@@ -410,7 +417,6 @@ module.exports = {
                     }
                     
                     // Read existing .env file or create new one
-                    const envPath = path.resolve(__dirname, '.env');
                     let envContent = '';
                     
                     if (fs.existsSync(envPath)) {
@@ -447,7 +453,7 @@ module.exports = {
                     
                     // Reload environment variables
                     require('dotenv').config({
-                        path: path.resolve(__dirname, '.env'),
+                        path: envPath,
                         override: true // Force override of existing environment variables
                     });
                     
@@ -687,7 +693,7 @@ module.exports = {
          * See https://github.com/node-red-contrib-themes/theme-collection for
          * a collection of themes to chose from.
          */
-        theme: "dracula",
+        // theme: "dracula",
         
         /** To disable the 'Welcome to Node-RED' tour that is displayed the first
          * time you access the editor for each release of Node-RED, set this to false
