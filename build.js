@@ -1,212 +1,207 @@
+#!/usr/bin/env node
+
 const fs = require('fs');
-const { execSync } = require('child_process');
-const axios = require('axios');
-const { input } = require('@inquirer/prompts');
-const chalk = require('chalk');
 const path = require('path');
+const { execSync } = require('child_process');
+const chalk = require('chalk');
 
-async function build() {
-    const baseDirectory = path.dirname(__filename);
-
-    const directories = [
-        `${baseDirectory}/build/releases`,
-        `${baseDirectory}/build/bin`,
-        `${baseDirectory}/build/config`,
-    ];
-
-    console.log(chalk.grey(`Release directory: ${directories[0]}`));
-    console.log(chalk.grey(`Downloaded binary directory: ${directories[1]}`));
-    console.log(chalk.grey(`Config directory: ${directories[2]}`));
-
-    if (!fs.existsSync(directories[0])) {
-        fs.mkdirSync(directories[0], { recursive: true });
+class NodeBuildInstaller {
+    constructor() {
+        this.projectRoot = process.cwd();
+        this.buildDir = path.join(this.projectRoot, 'dist');
+        this.srcDir = path.join(this.projectRoot, 'src');
+        this.packageJson = this.loadPackageJson();
     }
 
-    if (!fs.existsSync(directories[1])) {
-        fs.mkdirSync(directories[1], { recursive: true });
-    }
-
-    if (!fs.existsSync(directories[2])) {
-        fs.mkdirSync(directories[2], { recursive: true });
-    }
-
-    const ghToken = process.env.GH_BUILD_TOKEN;
-    let obfGhToken = null;
-
-    if (process.env.GH_BUILD_TOKEN === undefined) {
-        console.log(chalk.yellow('ℹ️ You can set the environment variable GH_BUILD_TOKEN to set a default token'));
-    } else {
-        obfGhToken = ghToken.substring(0, 8) + '...' + ghToken.substring(ghToken.length - 4);
-    }
-
-    const tokenResponse = await input({
-        message: 'Provide GitHub token with access to neuron-wrapper',
-        default: obfGhToken,
-    });
-
-    const token = (tokenResponse === obfGhToken ? ghToken : tokenResponse);
-
-    async function getLatestTag() {
+    loadPackageJson() {
         try {
-            const response = await axios.get('https://api.github.com/repos/NeuronInnovations/neuron-nodered-sdk-wrapper/releases', {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${token}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
+            const packagePath = path.join(this.projectRoot, 'package.json');
+            return JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+        } catch (error) {
+            console.error(chalk.red('Error loading package.json:'), error.message);
+            process.exit(1);
+        }
+    }
+
+    log(message, type = 'info') {
+        const colors = {
+            info: chalk.blue,
+            success: chalk.green,
+            warning: chalk.yellow,
+            error: chalk.red
+        };
+        console.log(colors[type](`[${type.toUpperCase()}] ${message}`));
+    }
+
+    async clean() {
+        this.log('Cleaning build directory...');
+        if (fs.existsSync(this.buildDir)) {
+            fs.rmSync(this.buildDir, { recursive: true, force: true });
+        }
+        fs.mkdirSync(this.buildDir, { recursive: true });
+        this.log('Build directory cleaned', 'success');
+    }
+
+    async installDependencies() {
+        this.log('Installing dependencies...');
+        try {
+            execSync('npm ci', { stdio: 'inherit', cwd: this.projectRoot });
+            this.log('Dependencies installed successfully', 'success');
+        } catch (error) {
+            this.log('Failed to install dependencies', 'error');
+            throw error;
+        }
+    }
+
+    async runTests() {
+        this.log('Running tests...');
+        try {
+            execSync('npm test', { stdio: 'inherit', cwd: this.projectRoot });
+            this.log('All tests passed', 'success');
+        } catch (error) {
+            this.log('Tests failed', 'error');
+            throw error;
+        }
+    }
+
+    async build() {
+        this.log('Building project...');
+        
+        // Copy source files
+        if (fs.existsSync(this.srcDir)) {
+            this.copyDirectory(this.srcDir, path.join(this.buildDir, 'src'));
+        }
+
+        // Copy package.json and other essential files
+        const filesToCopy = ['package.json', 'README.md', 'LICENSE'];
+        filesToCopy.forEach(file => {
+            const srcPath = path.join(this.projectRoot, file);
+            const destPath = path.join(this.buildDir, file);
+            if (fs.existsSync(srcPath)) {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        });
+
+        this.log('Project built successfully', 'success');
+    }
+
+    copyDirectory(src, dest) {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest, { recursive: true });
+        }
+
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+            
+            if (entry.isDirectory()) {
+                this.copyDirectory(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        }
+    }
+
+    async createInstaller() {
+        this.log('Creating installer package...');
+        
+        const installerScript = `#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+console.log('Installing ${this.packageJson.name} v${this.packageJson.version}...');
+
+// Installation logic here
+try {
+    // Install dependencies
+    execSync('npm install --production', { stdio: 'inherit' });
+    console.log('Installation completed successfully!');
+} catch (error) {
+    console.error('Installation failed:', error.message);
+    process.exit(1);
+}
+`;
+
+        fs.writeFileSync(path.join(this.buildDir, 'install.js'), installerScript);
+        
+        // Make installer executable on Unix systems
+        if (process.platform !== 'win32') {
+            fs.chmodSync(path.join(this.buildDir, 'install.js'), '755');
+        }
+
+        this.log('Installer created successfully', 'success');
+    }
+
+    async package() {
+        this.log('Creating distribution package...');
+        
+        const packageName = `${this.packageJson.name}-${this.packageJson.version}.tar.gz`;
+        const packagePath = path.join(this.projectRoot, packageName);
+        
+        try {
+            // Create tarball
+            execSync(`tar -czf "${packagePath}" -C "${this.buildDir}" .`, { stdio: 'inherit' });
+            this.log(`Package created: ${packageName}`, 'success');
+        } catch (error) {
+            this.log('Failed to create package', 'error');
+            throw error;
+        }
+    }
+
+    async run(tasks = ['clean', 'install', 'test', 'build', 'installer', 'package']) {
+        const startTime = Date.now();
+        this.log(`Starting build process for ${this.packageJson.name} v${this.packageJson.version}`);
+        
+        try {
+            for (const task of tasks) {
+                switch (task) {
+                    case 'clean':
+                        await this.clean();
+                        break;
+                    case 'install':
+                        await this.installDependencies();
+                        break;
+                    case 'test':
+                        await this.runTests();
+                        break;
+                    case 'build':
+                        await this.build();
+                        break;
+                    case 'installer':
+                        await this.createInstaller();
+                        break;
+                    case 'package':
+                        await this.package();
+                        break;
+                    default:
+                        this.log(`Unknown task: ${task}`, 'warning');
                 }
-            });
-
-            return response.data[0].tag_name;
-        } catch (error) {
-            console.error(chalk.red('Error fetching latest tag:'), error.message);
-
-            process.exit(0);
-        }
-    }
-
-    const tag = await input({
-        message: 'Provide neuron-wrapper dependency version/tag',
-        default: await getLatestTag(),
-    });
-
-    console.log(chalk.blue(`Building using neuron-wrapper tag: ${tag}`));
-
-    console.log(chalk.green.underline('Finding Assets'));
-
-    async function getAssets() {
-        try {
-            const response = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-nodered-sdk-wrapper/releases/tags/${tag}`, {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${token}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                }
-            });
-
-            return response.data.assets.map((asset) => {
-                return {
-                    id: asset.id,
-                    name: asset.name,
-                };
-            });
-        } catch (error) {
-            console.error(chalk.red('Error fetching assets:'), error.message);
-
-            process.exit(0);
-        }
-    }
-
-    const assets = await getAssets();
-
-    console.log(chalk.blue(`Found ${assets.length} assets`));
-
-    console.log(chalk.green.underline('Downloading Assets'));
-
-    async function downloadAsset(asset) {
-        try {
-            console.log(chalk.blue(`Downloading asset: ${asset.name}`));
-
-            const binDir = directories[1];
-
-            if (!fs.existsSync(binDir)) {
-                fs.mkdirSync(binDir, { recursive: true });
             }
-
-            const downloadResponse = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-nodered-sdk-wrapper/releases/assets/${asset.id}`, {
-                headers: {
-                    'Accept': 'application/octet-stream',
-                    'Authorization': `Bearer ${token}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                },
-                responseType: 'stream',
-            });
-
-            const filePath = path.join(binDir, asset.name);
-            const writer = fs.createWriteStream(filePath);
-
-            downloadResponse.data.pipe(writer);
-
-            return new Promise((resolve, reject) => {
-                writer.on('finish', () => {
-                    console.log(chalk.blue(`Downloaded ${asset.name} to ${filePath}`));
-                    resolve(filePath);
-                });
-                writer.on('error', reject);
-            });
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            this.log(`Build completed successfully in ${duration}s`, 'success');
+            
         } catch (error) {
-            console.error(chalk.red('Error downloading asset:'), error.message);
-
-            process.exit(0);
+            this.log(`Build failed: ${error.message}`, 'error');
+            process.exit(1);
         }
     }
-
-    for (const asset of assets) {
-        await downloadAsset(asset);
-    }
-
-    console.log(chalk.green.underline('Building Executables'));
-
-    async function buildExecutable(target, bin, output) {
-        try {
-            console.log(chalk.blue(`Building ${target}`));
-
-            const binPath = path.join(directories[1], bin);
-
-            if (!fs.existsSync(binPath)) {
-                console.error(chalk.red(`Binary ${bin} not found`));
-
-                process.exit(0);
-            }
-
-            const outputPath = path.join(directories[0], output);
-
-            console.log(chalk.grey(`Using binary: ${binPath}`));
-            console.log(chalk.grey(`Output: ${outputPath}`));
-
-            const pkgConfig = {
-                scripts: [
-                    "../../packages/node_modules/node-red/**",
-                ],
-                assets: [
-                    "../../neuron/**",
-                    "../../packages/node_modules/@node-red/**",
-                    "../../packages/node_modules/node-red/**",
-                    "../../flows.json",
-                    `../../build/bin/${bin}`,
-                    "../../neuron-settings.js",
-                    "../../.env.example",
-                ],
-            }
-
-            const configPath = path.join(directories[2], `pkg-${target}.json`);
-
-            fs.writeFileSync(configPath, JSON.stringify(pkgConfig, null, 2));
-
-            const command = `pkg --config ${configPath} -t ${target} -o ${outputPath} index.js`;
-
-            console.log(chalk.grey(`Running: ${command}`));
-
-            execSync(command);
-
-            console.log(chalk.blue(`Built ${target}`));
-        } catch (error) {
-            console.error(chalk.red('Error building executable:'), error.message);
-
-            process.exit(0);
-        }
-    }
-
-    const targets = {
-        'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        // 'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
-        // 'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
-    };
-
-    for (const target of Object.keys(targets)) {
-        buildExecutable(target, targets[target].bin, targets[target].output);
-    }
-
-    console.log(chalk.bold.red(`⚠️ Don't forget to commit the binary assets (build/bin folder) to GitHub before creating the release!`));
 }
 
-build();
+// CLI handling
+if (require.main === module) {
+    const args = process.argv.slice(2);
+    const builder = new NodeBuildInstaller();
+    
+    if (args.length === 0) {
+        builder.run();
+    } else {
+        builder.run(args);
+    }
+}
+
+module.exports = NodeBuildInstaller;
