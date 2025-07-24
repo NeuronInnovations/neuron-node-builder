@@ -12,15 +12,20 @@
  *
  **/
 
-// Load environment variables with configurable path
-const envPath = process.env.NEURON_ENV_PATH || require('path').resolve(__dirname, '.env');
-require('dotenv').config({
-    path: envPath
-});
 // Import required modules
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const os = require('os');
+
+// Load environment variables from .env
+// const envPath = path.resolve(process.env.NEURON_ENV_PATH) || path.resolve(__dirname, '.env');
+const envPath = path.resolve(__dirname, '.env');
+require('dotenv').config({
+    path: envPath
+});
+
+process.env.NEURON_ENV_PATH = envPath;
 
 // Validate required Hedera credentials
 const requiredEnvVars = [
@@ -33,154 +38,22 @@ const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || p
 
 if (missingVars.length > 0) {
     console.log('⚠️  Missing Hedera credentials detected. Starting setup wizard...');
-    
-    // Create a simple setup HTML file
-    const setupHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <title>Neuron - Hedera Credentials Setup</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1e1e1e; color: #ffffff; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { background: #2d2d2d; padding: 40px; border-radius: 15px; max-width: 600px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid #404040; }
-        h1 { color: #4CAF50; text-align: center; margin-bottom: 30px; font-size: 28px; }
-        .subtitle { text-align: center; color: #b0b0b0; margin-bottom: 30px; font-size: 16px; }
-        .notice { background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; color: #4CAF50; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }
-        .form-group { margin-bottom: 25px; }
-        label { display: block; margin-bottom: 8px; color: #e0e0e0; font-weight: 500; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 12px 15px; border: 2px solid #404040; border-radius: 8px; background: #1a1a1a; color: #ffffff; font-size: 14px; box-sizing: border-box; }
-        input[type="text"]:focus, input[type="password"]:focus { outline: none; border-color: #4CAF50; }
-        .help-text { font-size: 12px; color: #888; margin-top: 5px; }
-        .btn { background: #4CAF50; color: white; padding: 14px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; margin-top: 10px; }
-        .btn:hover { background: #45a049; }
-        .btn:disabled { background: #666; cursor: not-allowed; }
-        .status { padding: 15px; border-radius: 8px; margin: 20px 0; display: none; }
-        .status.success { background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; color: #4CAF50; }
-        .status.error { background: rgba(244, 67, 54, 0.1); border: 1px solid #f44336; color: #f44336; }
-        .loading { display: none; text-align: center; margin: 20px 0; }
-        .example { background: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Neuron Setup</h1>
-        <p class="subtitle">Configure your Hedera credentials to get started</p>
-        
-        <div class="notice">
-            <strong>Welcome to Neuron!</strong><br>
-            You've been automatically redirected here because your Hedera credentials need to be configured.
-        </div>
-        
-        <div class="example">
-            <h4>📋 What you need:</h4>
-            <pre>• Hedera Account ID (e.g., 0.0.123456)
-• Private Key (DER format)
-• EVM Address (0x format)</pre>
-        </div>
-        
-        <div class="example">
-            <h4>🔄 What happens after saving:</h4>
-            <pre>• Your credentials will be saved to the .env file
-• Environment variables will be reloaded automatically
-• You'll be redirected to the normal Node-RED interface
-• All Neuron nodes will be ready to use!</pre>
-        </div>
-        
-        <form id="credentialsForm">
-            <div class="form-group">
-                <label for="operatorId">Hedera Account ID *</label>
-                <input type="text" id="operatorId" name="operatorId" placeholder="0.0.123456" required>
-                <div class="help-text">Your Hedera account ID in the format 0.0.XXXXXX</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="operatorKey">Private Key *</label>
-                <input type="password" id="operatorKey" name="operatorKey" placeholder="Enter your private key" required>
-                <div class="help-text">Your Hedera private key in DER format (starts with 302e...)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="operatorEvm">EVM Address *</label>
-                <input type="text" id="operatorEvm" name="operatorEvm" placeholder="0x1234567890abcdef..." required>
-                <div class="help-text">Your Hedera account's EVM address (starts with 0x)</div>
-            </div>
-            
-            <button type="submit" class="btn" id="saveBtn">💾 Save Credentials & Continue</button>
-        </form>
-        
-        <div class="loading" id="loading">
-            <p>Saving credentials...</p>
-        </div>
-        
-        <div class="status" id="status"></div>
-    </div>
-
-    <script>
-        document.getElementById('credentialsForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const credentials = {
-                HEDERA_OPERATOR_ID: formData.get('operatorId'),
-                HEDERA_OPERATOR_KEY: formData.get('operatorKey'),
-                HEDERA_OPERATOR_EVM: formData.get('operatorEvm')
-            };
-            
-            console.log('📤 Sending credentials:', {
-                HEDERA_OPERATOR_ID: credentials.HEDERA_OPERATOR_ID ? '✅ Set' : '❌ Empty',
-                HEDERA_OPERATOR_KEY: credentials.HEDERA_OPERATOR_KEY ? '✅ Set' : '❌ Empty',
-                HEDERA_OPERATOR_EVM: credentials.HEDERA_OPERATOR_EVM ? '✅ Set' : '❌ Empty'
-            });
-            
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('saveBtn').disabled = true;
-            document.getElementById('status').style.display = 'none';
-            
-            try {
-                const response = await fetch('/neuron/setup/save-credentials', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(credentials)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showStatus('✅ Credentials saved successfully! Redirecting to Node-RED...', 'success');
-                    // Redirect immediately since we're reading the file directly
-                    window.location.href = '/';
-                } else {
-                    showStatus('❌ Error: ' + result.error, 'error');
-                }
-            } catch (error) {
-                showStatus('❌ Network error: ' + error.message, 'error');
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('saveBtn').disabled = false;
-            }
-        });
-        
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = 'status ' + type;
-            status.style.display = 'block';
-        }
-    </script>
-</body>
-</html>`;
 
     // Create the setup page
-    const setupPagePath = require('path').resolve(__dirname, 'neuron/theme/setup.html');
-    const setupPageDir = require('path').dirname(setupPagePath);
-    
-    if (!fs.existsSync(setupPageDir)) {
-        fs.mkdirSync(setupPageDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(setupPagePath, setupHtml);
+    const setupPagePath = path.resolve(__dirname, 'neuron/page/setup.html');
+
     console.log('Setup wizard created at: ' + setupPagePath);
-    console.log('Please visit: http://localhost:1880/neuron/theme/setup.html to configure your credentials');
+    console.log('Please visit: http://localhost:1880/neuron/page/setup.html to configure your credentials');
 }
+
+// Ensure user path exists
+const userPath = path.resolve(os.homedir(), '.neuron-node-builder');
+
+if (!fs.existsSync(userPath)) {
+    fs.mkdirSync(userPath, { recursive: true });
+}
+
+process.env.NEURON_USER_PATH = userPath;
 
 module.exports = {
 
@@ -194,7 +67,7 @@ module.exports = {
      ******************************************************************************/
 
     /** The file containing the flows. If not set, defaults to flows_<hostname>.json **/
-    flowFile: 'flows.json',
+    flowFile: path.resolve(userPath, 'flows.json'),
 
     /** By default, credentials are encrypted in storage using a generated key. To
      * specify your own secret, set the following property.
@@ -215,12 +88,12 @@ module.exports = {
      * the user's home directory. To use a different location, the following
      * property can be used
      */
-    //userDir: '/home/nol/.node-red/',
+    userDir: path.resolve(userPath),
 
     /** Node-RED scans the `nodes` directory in the userDir to find local node files.
      * The following property can be used to specify an additional directory to scan.
      */
-    nodesDir: require('path').resolve(__dirname, "neuron/nodes"),
+    nodesDir: path.resolve(__dirname, "neuron/nodes"),
 
     /*******************************************************************************
      * Security
@@ -338,10 +211,10 @@ module.exports = {
     httpAdminMiddleware: function(req, res, next) {
         // Check if credentials are missing and redirect to setup if needed
         // Read .env file directly to avoid process.env caching issues
-        const envPath = require('path').resolve(__dirname, '.env');
+        const envPath = process.env.NEURON_ENV_PATH;
         let envContent = '';
         
-        if (require('fs').existsSync(envPath)) {
+        if (fs.existsSync(envPath)) {
             envContent = require('fs').readFileSync(envPath, 'utf-8');
         }
         
@@ -370,14 +243,14 @@ module.exports = {
         
         // If credentials are missing and this is not the setup page or API endpoint
         if (missingVars.length > 0 && 
-            !req.path.includes('/neuron/theme/setup.html') && 
+            !req.path.includes('/neuron/pages/setup.html') && 
             !req.path.includes('/neuron/setup/save-credentials') &&
-            !req.path.includes('/neuron/theme/') &&
+            !req.path.includes('/neuron/pages/') &&
             req.path !== '/favicon.ico') {
             
             console.log('🔄 Redirecting to setup page due to missing credentials');
             // Redirect to setup page
-            return res.redirect('/neuron/theme/setup.html');
+            return res.redirect('/neuron/pages/setup.html');
         }
         
         // Handle credential setup endpoint
@@ -411,7 +284,7 @@ module.exports = {
                     }
                     
                     // Read existing .env file or create new one
-                    const envPath = path.resolve(__dirname, '.env');
+                    const envPath = process.env.NEURON_ENV_PATH || path.resolve(__dirname, '.env');
                     let envContent = '';
                     
                     if (fs.existsSync(envPath)) {
@@ -448,7 +321,7 @@ module.exports = {
                     
                     // Reload environment variables
                     require('dotenv').config({
-                        path: path.resolve(__dirname, '.env'),
+                        path: envPath,
                         override: true // Force override of existing environment variables
                     });
                     
@@ -510,6 +383,10 @@ module.exports = {
 
         function getLatestUpdate() {
             return new Promise((resolve, reject) => {
+                resolve({
+                    version: "4.1.0",
+                    isMandatory: true
+                });
                 const url = 'https://raw.githubusercontent.com/NeuronInnovations/neuron-node-builder-installer/refs/heads/main/releases.json';
 
                 https.get(url, (res) => {

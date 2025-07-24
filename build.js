@@ -168,6 +168,7 @@ async function build() {
                     "../../packages/node_modules/node-red/**",
                 ],
                 assets: [
+                    "../../package.json",
                     "../../neuron/**",
                     "../../packages/node_modules/@node-red/**",
                     "../../packages/node_modules/node-red/**",

@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('node:os');
 
 // Resolve path to the .env file
-const envPath = path.resolve(process.cwd(), '.env');
+const envPath = path.resolve(os.homedir(), '.neuron-node-builder', '.env');
 
 console.log(`Using .env file: ${envPath}`);
 
