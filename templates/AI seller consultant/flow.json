@@ -1,16 +1,16 @@
 [
     {
-        "id": "3090f9fb3faa88c1",
+        "id": "829dacdf9e8f8df4",
         "type": "tab",
-        "label": "AI Seller",
+        "label": "Flow 2",
         "disabled": false,
         "info": "",
         "env": []
     },
     {
-        "id": "d482652f3771493a",
+        "id": "18020da412518ab6",
         "type": "group",
-        "z": "3090f9fb3faa88c1",
+        "z": "829dacdf9e8f8df4",
         "style": {
             "stroke": "#3e404a",
             "stroke-opacity": "1",
@@ -21,22 +21,26 @@
             "color": "#f8f8f2"
         },
         "nodes": [
-            "e831441b06b2e667",
-            "ef05a509f3d26090",
-            "f13f814740876530",
-            "5574b3f3093ed69f",
-            "42ad2b1b1c5012d8",
-            "a782466bc1b73d78"
+            "5544b9854d99132d",
+            "7b101db56c7a1f41",
+            "e6d422f9fe7f5683",
+            "34d095cae7bb1e9f",
+            "b37498805c241b8a",
+            "5599bc8b387767c2",
+            "e0d49dcf85037bf3",
+            "5440f5605188df91",
+            "a6be73bbc720ab2b",
+            "8e26ad3510025cbb"
         ],
-        "x": 54,
-        "y": 239,
-        "w": 932,
-        "h": 222
+        "x": 14,
+        "y": 119,
+        "w": 1332,
+        "h": 382
     },
     {
-        "id": "87e4ddd5e4bb566f",
+        "id": "623b790380aff487",
         "type": "group",
-        "z": "3090f9fb3faa88c1",
+        "z": "829dacdf9e8f8df4",
         "style": {
             "stroke": "#3e404a",
             "stroke-opacity": "1",
@@ -47,84 +51,86 @@
             "color": "#f8f8f2"
         },
         "nodes": [
-            "f92480e8bf3275bd",
-            "b11aeacfa727918c",
-            "773e8027d3a99aa3",
-            "bde131aaf31ed4f3",
-            "2c1ca62a56c53704",
-            "f36266ec8edaac8d",
-            "53fb93bcbb3f8d2d"
+            "bc837818ed2d3b01",
+            "baeac262b18179c4",
+            "94bccd97d3cf3fc3",
+            "a310729cdab6d0a2",
+            "a54c25213cd5b0f1",
+            "4e2ee10d85afab67",
+            "7ff7da9f5cb2dd06",
+            "2c576ef2ab5b8da6"
         ],
-        "x": 94,
-        "y": 579,
-        "w": 872,
-        "h": 242
+        "x": 114,
+        "y": 619,
+        "w": 892,
+        "h": 342
     },
     {
-        "id": "e831441b06b2e667",
+        "id": "5544b9854d99132d",
         "type": "ai-model",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
-        "name": "My Model",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "name": "My AI Model",
         "model": "microsoft/mai-ds-r1:free",
         "temperature": 0.7,
         "maxTokens": 1000,
-        "x": 660,
-        "y": 320,
+        "x": 1010,
+        "y": 200,
         "wires": [
             [
-                "f13f814740876530"
+                "e6d422f9fe7f5683"
             ]
         ]
     },
     {
-        "id": "ef05a509f3d26090",
+        "id": "7b101db56c7a1f41",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
         "name": "[ACTION] - Configure your OpenRouter API key and model",
         "info": "Go to https://openrouter.ai/ and register/sigin and create a new API KEY",
-        "x": 650,
-        "y": 280,
+        "x": 1030,
+        "y": 160,
         "wires": []
     },
     {
-        "id": "f13f814740876530",
+        "id": "e6d422f9fe7f5683",
         "type": "ai-agent",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
-        "name": "",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "name": "Ask my AI model",
         "systemPrompt": "You are a helpful AI assistant.",
         "responseType": "text",
-        "x": 900,
-        "y": 420,
+        "x": 1030,
+        "y": 320,
         "wires": [
             [
-                "5574b3f3093ed69f"
+                "34d095cae7bb1e9f",
+                "8e26ad3510025cbb"
             ]
         ]
     },
     {
-        "id": "5574b3f3093ed69f",
+        "id": "34d095cae7bb1e9f",
         "type": "neuron-p2p",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
         "name": "",
         "selectedNode": "",
         "description": "",
-        "x": 380,
-        "y": 420,
+        "x": 200,
+        "y": 320,
         "wires": [
             [
-                "e831441b06b2e667"
+                "e0d49dcf85037bf3"
             ]
         ]
     },
     {
-        "id": "42ad2b1b1c5012d8",
+        "id": "b37498805c241b8a",
         "type": "seller config",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
         "name": "Consultant Seller Config",
         "deviceRole": "Device role",
         "deviceName": "Device name",
@@ -133,38 +139,120 @@
         "deviceType": "Device Type",
         "price": "1",
         "description": "",
-        "evmAddress": "EVM address not initialized yet",
-        "balance": "Not initialized yet",
+        "evmAddress": "0x1967a5bc55b3bd3541b58a556e2aecee0e4ef055",
+        "balance": "5.72 USDC",
         "buyerEvmAddress": [],
         "buyerDevices": [],
-        "publicKey": "Not initialized yet",
-        "stdInTopic": "StdIn topic not initialized yet",
-        "stdOutTopic": "StdOut topic not initialized yet",
-        "stdErrTopic": "StdErr topic not initialized yet",
-        "x": 250,
-        "y": 320,
+        "publicKey": "02a8a44d24a7e0b209481743904f62fe92315a1d7d5bed213b582ea39d074ad920",
+        "stdInTopic": "0.0.6614200",
+        "stdOutTopic": "0.0.6614201",
+        "stdErrTopic": "0.0.6614199",
+        "x": 170,
+        "y": 180,
         "wires": [
             []
         ]
     },
     {
-        "id": "a782466bc1b73d78",
+        "id": "5599bc8b387767c2",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
-        "g": "d482652f3771493a",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
         "name": "[ACTION] Double click and select \"Consultant Seller Config\"",
         "info": "",
-        "x": 300,
-        "y": 380,
+        "x": 260,
+        "y": 280,
         "wires": []
     },
     {
-        "id": "f92480e8bf3275bd",
+        "id": "e0d49dcf85037bf3",
+        "type": "json",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 610,
+        "y": 320,
+        "wires": [
+            [
+                "5440f5605188df91"
+            ]
+        ]
+    },
+    {
+        "id": "5440f5605188df91",
+        "type": "function",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "name": "Extract buyer's question",
+        "func": "msg.payload = msg.payload.text;\nmsg.othermessage = true;\nif(!msg.payload){\n    return null;\n}\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 730,
+        "y": 260,
+        "wires": [
+            [
+                "5544b9854d99132d",
+                "a6be73bbc720ab2b"
+            ]
+        ]
+    },
+    {
+        "id": "a6be73bbc720ab2b",
+        "type": "ui_template",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "group": "5a98357c2bababf3",
+        "name": "Seller Chat UI",
+        "order": 0,
+        "width": "6",
+        "height": "15",
+        "format": "<style>\n  .chat-container-alt {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n    display: flex;\n    flex-direction: column;\n    height: 100%;\n    background-color: #f8f9fa;\n    border-radius: 8px;\n    overflow: hidden;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    margin-top: 10px;\n  }\n\n  .message-panel-alt {\n    flex-grow: 1;\n    overflow-y: auto;\n    padding: 16px;\n    background-color: #ffffff;\n  }\n\n  .message-alt {\n    max-width: 80%;\n    padding: 10px 14px;\n    margin-bottom: 12px;\n    border-radius: 10px;\n    line-height: 1.4;\n    position: relative;\n    word-wrap: break-word;\n    animation: fadeInAlt 0.3s ease-out;\n    background-color: #e9ecef;\n    color: #212529;\n  }\n\n  .message-alt-other {\n    background-color: #007bff;\n    color: #ffffff;\n  }\n\n  @keyframes fadeInAlt {\n    from {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n\n    to {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .timestamp-alt {\n    font-size: 11px;\n    opacity: 0.6;\n    margin-top: 4px;\n    text-align: right;\n  }\n\n  .input-area-alt {\n    display: flex;\n    padding: 12px;\n    background-color: #ffffff;\n    border-top: 1px solid #dee2e6;\n  }\n\n  #chat-input-alt {\n    flex-grow: 1;\n    padding: 10px 14px;\n    border: 1px solid #ced4da;\n    border-radius: 20px;\n    outline: none;\n    font-size: 14px;\n  }\n\n  #chat-input-alt:focus {\n    border-color: #007bff;\n  }\n\n  #send-button-alt {\n    margin-left: 10px;\n    padding: 10px 20px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 20px;\n    cursor: pointer;\n    font-size: 14px;\n  }\n\n  #send-button-alt:hover {\n    background-color: #0069d9;\n  }\n\n  #send-button-alt:disabled {\n    background-color: #adb5bd;\n    cursor: not-allowed;\n  }\n</style>\n\n<div class=\"chat-container-alt\">\n  <div id=\"message-panel-alt\" class=\"message-panel-alt\"></div>\n  <div class=\"input-area-alt\">\n    <input type=\"text\" id=\"chat-input-alt\" placeholder=\"Type your message...\" autocomplete=\"off\" />\n    <button id=\"send-button-alt\" disabled>Send</button>\n  </div>\n</div>\n\n<script>\n  (function(scope) {\n  const messagePanel = document.getElementById('message-panel-alt');\n  const chatInput = document.getElementById('chat-input-alt');\n  const sendButton = document.getElementById('send-button-alt');\n\n  function formatTimestamp(date = new Date()) {\n    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n  }\n\n  function scrollToBottom() {\n    messagePanel.scrollTop = messagePanel.scrollHeight;\n  }\n\n  function addMessage(text, isOther = false) {\n    const messageElement = document.createElement('div');\n    messageElement.className = \"message-alt\" + (isOther ? \" message-alt-other\" : \"\");\n    messageElement.innerHTML = `\n      ${text}\n      <div class=\"timestamp-alt\">${formatTimestamp()}</div>\n    `;\n    messagePanel.appendChild(messageElement);\n    scrollToBottom();\n  }\n\n  function updateSendButton() {\n    sendButton.disabled = chatInput.value.trim() === '';\n  }\n\n  function sendMessage() {\n    const messageText = chatInput.value.trim();\n    if (!messageText) return;\n    addMessage(messageText, false); // user messages are default style\n\n    if (typeof scope.send === 'function') {\n      scope.send({ payload: messageText });\n    }\n\n    chatInput.value = '';\n    updateSendButton();\n    chatInput.focus();\n  }\n\n  sendButton.addEventListener('click', sendMessage);\n  chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });\n  chatInput.addEventListener('input', updateSendButton);\n\n\n\nscope.$watch('msg', function(msg) {\n  if (!msg) return;\n  try {\n    const text = typeof msg.payload === 'object' \n      ? JSON.stringify(msg.payload) \n      : String(msg.payload);\n\n    const isOther = (msg.othermessage === true || msg.othermessage === \"true\");\n    addMessage(text, isOther);\n  } catch (err) {\n    console.error(\"Error showing message:\", err, msg);\n  }\n});\n\n\n  chatInput.focus();\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1060,
+        "y": 460,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "8e26ad3510025cbb",
+        "type": "function",
+        "z": "829dacdf9e8f8df4",
+        "g": "18020da412518ab6",
+        "name": "UI formating",
+        "func": "\nmsg.othermessage = false;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1250,
+        "y": 320,
+        "wires": [
+            [
+                "a6be73bbc720ab2b"
+            ]
+        ]
+    },
+    {
+        "id": "bc837818ed2d3b01",
         "type": "debug",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "buyer node",
-        "active": true,
+        "active": false,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
@@ -172,15 +260,15 @@
         "targetType": "full",
         "statusVal": "",
         "statusType": "auto",
-        "x": 850,
-        "y": 720,
+        "x": 890,
+        "y": 760,
         "wires": []
     },
     {
-        "id": "b11aeacfa727918c",
+        "id": "baeac262b18179c4",
         "type": "ui_template",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "group": "d6928ace43c87da0",
         "name": "Buyer Chat UI",
         "order": 0,
@@ -192,19 +280,19 @@
         "resendOnRefresh": true,
         "templateScope": "local",
         "className": "",
-        "x": 240,
-        "y": 720,
+        "x": 260,
+        "y": 760,
         "wires": [
             [
-                "53fb93bcbb3f8d2d"
+                "7ff7da9f5cb2dd06"
             ]
         ]
     },
     {
-        "id": "773e8027d3a99aa3",
+        "id": "94bccd97d3cf3fc3",
         "type": "buyer config",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "Consultant Buyer Config",
         "sellerEvmAddress": "[]",
         "sellerDevices": [],
@@ -217,71 +305,83 @@
         "stdInTopic": "StdIn topic not intialised",
         "stdOutTopic": "StdOut topic not intialised",
         "stdErrTopic": "StdErr topic not intialised",
-        "x": 230,
-        "y": 660,
+        "x": 250,
+        "y": 700,
         "wires": [
             []
         ]
     },
     {
-        "id": "bde131aaf31ed4f3",
+        "id": "a310729cdab6d0a2",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "[ACTION] - Double click and select \"Chat Buyer Config\"\"",
         "info": "",
-        "x": 610,
-        "y": 680,
+        "x": 630,
+        "y": 720,
         "wires": []
     },
     {
-        "id": "2c1ca62a56c53704",
+        "id": "a54c25213cd5b0f1",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "[IMPORTANT] - You need to access your router and add portforwarding for ports 61336-61346",
         "info": "",
-        "x": 520,
-        "y": 780,
+        "x": 540,
+        "y": 820,
         "wires": []
     },
     {
-        "id": "f36266ec8edaac8d",
+        "id": "4e2ee10d85afab67",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "[ACTION] - After Deploying, double click to add EVM of \"Consultant Seller Config\"",
         "info": "After deploying, find the EVM of Consultant Seller Config by double clicking on it. After adding EVM address, re-deploy your flow",
-        "x": 450,
-        "y": 620,
+        "x": 470,
+        "y": 660,
         "wires": []
     },
     {
-        "id": "53fb93bcbb3f8d2d",
+        "id": "7ff7da9f5cb2dd06",
         "type": "neuron-p2p",
-        "z": "3090f9fb3faa88c1",
-        "g": "87e4ddd5e4bb566f",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "",
         "selectedNode": "",
         "description": "",
-        "x": 580,
-        "y": 720,
+        "x": 600,
+        "y": 760,
         "wires": [
             [
-                "b11aeacfa727918c",
-                "f92480e8bf3275bd"
+                "baeac262b18179c4",
+                "bc837818ed2d3b01"
             ]
         ]
     },
     {
-        "id": "9387bf20db039336",
+        "id": "2c576ef2ab5b8da6",
         "type": "comment",
-        "z": "3090f9fb3faa88c1",
+        "z": "829dacdf9e8f8df4",
+        "g": "623b790380aff487",
         "name": "Go to http://localhost:1880/ui to view chat interface",
         "info": "",
-        "x": 470,
-        "y": 840,
+        "x": 530,
+        "y": 920,
         "wires": []
+    },
+    {
+        "id": "5a98357c2bababf3",
+        "type": "ui_group",
+        "name": "Seller",
+        "tab": "ef656de5cefe0a4d",
+        "order": 2,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
     },
     {
         "id": "d6928ace43c87da0",

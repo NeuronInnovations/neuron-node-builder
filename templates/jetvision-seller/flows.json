@@ -1,0 +1,217 @@
+[
+    {
+        "id": "3708b2fe6d66a116",
+        "type": "subflow",
+        "name": "Jetvision Sensor",
+        "info": "**AirSquitter JSON Poller & Normaliser**\r\nThis subflow polls a Jetvision AirSquitter (or Radarcape) receiver at a configurable IP address and interval. It retrieves aircraftlist.json, normalises the data into a consistent schema, and only emits when the dataset changes.\r\n\r\n**Inputs**\r\n(none) – Subflow starts automatically when deployed\r\n(optional) You can add a Subflow Input wired into the tick function to force an immediate refresh.\r\n\r\n**Outputs**\r\nOutput 1 – A message emitted only when the JSON has changed.\r\n    msg.payload → Object with the following structure:\r\n\r\n{\r\n  \"ts\": 1692612345678,\r\n  \"count\": 8,\r\n  \"aircraft\": [\r\n    {\r\n      \"hex\": \"489223\",            // ICAO24 hex address\r\n      \"callsign\": \"EXS741K\",      // Flight ID / callsign\r\n      \"registration\": \"G-JZHR\",   // Aircraft registration\r\n      \"aircraftType\": \"B738\",     // ICAO aircraft type designator\r\n      \"operator\": \"EXS\",          // Operator / airline\r\n      \"modeSCategory\": \"A3\",      // Mode-S category\r\n      \"lat\": 52.79411,            // Latitude (deg)\r\n      \"lon\": 1.71555,             // Longitude (deg)\r\n      \"altBaro\": 37000,           // Barometric altitude (ft, 1013 hPa)\r\n      \"altGeom\": 37925,           // Geometric altitude (ft)\r\n      \"altQNH\": 35008,            // Barometric altitude corrected with QNH\r\n      \"groundSpeed\": 475,         // Knots\r\n      \"track\": 109,               // Track/course (deg true)\r\n      \"trueTrack\": 129,           // True track (deg)\r\n      \"heading\": 110,             // Heading (deg)\r\n      \"verticalRate\": 0,          // Feet per minute\r\n      \"distanceNm\": 187.1,        // Distance to receiver (nm)\r\n      \"squawk\": \"2276\",           // Squawk code\r\n      \"spi\": false,               // Special position identification flag\r\n      \"alert\": 0,                 // Alert flag\r\n      \"positionSource\": \"A\",      // Position source: A=ADS-B, M=MLAT\r\n      \"availability\": \"AM\",       // Data availability flag\r\n      \"geometryDataAvail\": \"A\",   // Geometry data flag\r\n      \"locationAvail\": 6,         // Location availability flag\r\n      \"signalDbm\": -80,           // Signal strength (dBm)\r\n      \"lastSeenUnix\": 1755794341, // Last seen UNIX time (s)\r\n      \"nsCounter\": 243443065,     // Nanosecond counter\r\n      \"mop\": 2,                   // Mode of operation\r\n      \"pic\": 11,                  // Position integrity category\r\n      \"nacp\": 9,                  // Navigation accuracy\r\n      \"sil\": 3,                   // Source integrity level\r\n      \"sda\": 2,                   // System design assurance\r\n      \"temperatureC\": -58,        // Outside air temp (°C)\r\n      \"windSpeedKt\": 38,          // Wind speed (kt)\r\n      \"windDirDeg\": 309,          // Wind direction (deg)\r\n      \"qnhHPa\": 1012.8,           // Static pressure QNH (hPa)\r\n      \"origin\": \"EGGP\",           // Origin ICAO code\r\n      \"destination\": \"LBBG\",      // Destination ICAO code\r\n      \"country\": \"U.K.\",          // Country of registration\r\n      \"trueCourseMode\": 1,        // Course mode flag\r\n      \"apEmergency\": false,       // Autopilot emergency flag\r\n      \"seenTs\": 1692612345678,    // Timestamp of this normalisation\r\n      \r\n      \"... plus all original AirSquitter fields\" \r\n    }\r\n  ]\r\n}\r\n\r\nEnvironment Properties\r\n\r\nsensorIP (string) → IP address of the AirSquitter, e.g. 192.168.1.117\r\n\r\nintervalSecs (number) → Polling interval in seconds",
+        "category": "",
+        "in": [],
+        "out": [
+            {
+                "x": 1290,
+                "y": 500,
+                "wires": [
+                    {
+                        "id": "43858c83f747b948",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [
+            {
+                "name": "sensorIP",
+                "type": "str",
+                "value": "192.168.1.107"
+            },
+            {
+                "name": "intervalSecs",
+                "type": "num",
+                "value": "1",
+                "ui": {
+                    "type": "input",
+                    "opts": {
+                        "types": [
+                            "num"
+                        ]
+                    }
+                }
+            }
+        ],
+        "meta": {},
+        "color": "#3FADB5",
+        "outputLabels": [
+            "JSON"
+        ],
+        "icon": "font-awesome/fa-plane"
+    },
+    {
+        "id": "43858c83f747b948",
+        "type": "function",
+        "z": "3708b2fe6d66a116",
+        "name": "Normalize and change-detect",
+        "func": "// Input: msg.payload is an array of aircraft objects from AirSquitter\n// Output 1: only when the normalised snapshot changed since last cycle\n// Output 2: always (loop driver with msg.delay + msg.url)\n\nconst list = Array.isArray(msg.payload)\n  ? msg.payload\n  : (Array.isArray(msg.payload?.aircraft) ? msg.payload.aircraft : []);\n\nconst now = Date.now();\n\nconst aircraft = list.map(a => ({\n  // --- Identification ---\n  hex: a.hex ?? null,                     // ICAO24 address\n  callsign: a.fli ?? null,                // Flight ID / callsign\n  registration: a.reg ?? null,            // Aircraft registration\n  aircraftType: a.typ ?? null,            // Type/model (ICAO code)\n  operator: a.opr ?? null,                // Operator (airline, carrier)\n  modeSCategory: a.cat ?? null,           // Mode-S category\n\n  // --- Position & motion ---\n  lat: a.lat ?? null,\n  lon: a.lon ?? null,\n  altBaro: a.alt ?? null,                 // barometric altitude (ft, 1013 hPa)\n  altGeom: a.altg ?? null,                // geometric altitude (ft)\n  altQNH: a.alts ?? null,                 // altitude corrected with QNH\n  groundSpeed: a.spd ?? null,             // ground speed (knots)\n  track: a.trk ?? null,                   // course over ground (degrees true)\n  trueTrack: a.tru ?? null,               // true track (degrees)\n  heading: a.hdgs ?? null,                // heading (degrees)\n  verticalRate: a.vrt ?? null,            // vertical rate (ft/min)\n  distanceNm: a.dis ?? null,              // slant distance to receiver (nm)\n\n  // --- Transponder / codes ---\n  squawk: a.squ ?? null,                  // squawk code\n  spi: a.spi ?? null,                     // special position identification flag\n  alert: a.alr ?? null,                   // alert flag\n\n  // --- Data source / status ---\n  positionSource: a.src ?? null,          // 'A'=ADS-B, 'M'=MLAT\n  availability: a.ava ?? null,            // availability flag\n  geometryDataAvail: a.gda ?? null,       // geometry data availability\n  locationAvail: a.lla ?? null,           // location availability\n\n  // --- Signal & quality ---\n  signalDbm: a.dbm ?? null,               // signal strength (dBm)\n  lastSeenUnix: a.uti ?? null,            // UNIX timestamp (sec)\n  nsCounter: a.ns ?? null,                // ns subcounter\n  mop: a.mop ?? null,                     // mode of operation\n  pic: a.pic ?? null,                     // position integrity category\n  nacp: a.nacp ?? null,                   // navigation accuracy category\n  sil: a.sil ?? null,                     // source integrity level\n  sda: a.sda ?? null,                     // system design assurance\n\n  // --- Environment ---\n  temperatureC: a.tmp ?? null,            // temperature (°C)\n  windSpeedKt: a.wsp ?? null,             // wind speed (kt)\n  windDirDeg: a.wdi ?? null,              // wind direction (deg)\n  qnhHPa: a.qnhs ?? null,                 // QNH (hPa)\n\n  // --- Flight plan metadata ---\n  origin: a.org ?? null,                  // origin ICAO\n  destination: a.dst ?? null,             // destination ICAO\n  country: a.cou ?? null,                 // country of registration\n\n  // --- Extra flags ---\n  trueCourseMode: a.tcm ?? null,          // course mode flag\n  apEmergency: a.ape ?? null,             // autopilot emergency flag\n\n  // --- Processing timestamp ---\n  seenTs: now,\n\n  // --- Preserve all original fields too ---\n  ...a\n}));\n\nconst out = {\n  ts: now,\n  count: aircraft.length,\n  aircraft\n};\n\n// --- Change detection ---\nconst snapshot = JSON.stringify(out);\nconst last = context.get(\"lastSnapshot\");\nconst changed = last !== snapshot;\nif (changed) {\n  context.set(\"lastSnapshot\", snapshot);\n}\n\n// --- Build outputs ---\nconst emitMsg = changed ? { ...msg, payload: out } : null;\nconst loopMsg = { delay: msg.delay, url: msg.url };\n\nreturn [emitMsg, loopMsg];\n",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1020,
+        "y": 580,
+        "wires": [
+            [],
+            [
+                "7d6a56abdffad2dc"
+            ]
+        ]
+    },
+    {
+        "id": "3e05ad74a7d2d208",
+        "type": "inject",
+        "z": "3708b2fe6d66a116",
+        "name": "injectStart",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 270,
+        "y": 640,
+        "wires": [
+            [
+                "44a76c450763d74e"
+            ]
+        ]
+    },
+    {
+        "id": "44a76c450763d74e",
+        "type": "function",
+        "z": "3708b2fe6d66a116",
+        "name": "Tick: set URL and delay",
+        "func": "const ip = String(env.get(\"sensorIP\") || \"192.168.1.001\").trim();\nconst secs = Number(env.get(\"intervalSecs\") || 1);\n\nmsg.url = `http://${ip}/aircraftlist.json`;     // used by HTTP Request\nmsg.delay = Math.max(250, Math.round(secs * 1000)); // used by Delay loop (ms)\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 510,
+        "y": 640,
+        "wires": [
+            [
+                "5ebbbf2f6cc6e876"
+            ]
+        ]
+    },
+    {
+        "id": "5ebbbf2f6cc6e876",
+        "type": "http request",
+        "z": "3708b2fe6d66a116",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 750,
+        "y": 580,
+        "wires": [
+            [
+                "43858c83f747b948"
+            ]
+        ]
+    },
+    {
+        "id": "7d6a56abdffad2dc",
+        "type": "delay",
+        "z": "3708b2fe6d66a116",
+        "name": "intervalSec",
+        "pauseType": "delayv",
+        "timeout": "1",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 590,
+        "y": 780,
+        "wires": [
+            [
+                "44a76c450763d74e"
+            ]
+        ]
+    },
+    {
+        "id": "68e64fbbc16a3c1a",
+        "type": "subflow:3708b2fe6d66a116",
+        "z": "65a82d2522ab3d05",
+        "name": "",
+        "x": 500,
+        "y": 380,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "50cc1372bc3c7662",
+        "type": "neuron-p2p",
+        "z": "65a82d2522ab3d05",
+        "name": "",
+        "selectedNode": "",
+        "description": "",
+        "x": 780,
+        "y": 380,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "f507a91bf61ef14c",
+        "type": "seller config",
+        "z": "65a82d2522ab3d05",
+        "name": "Seller",
+        "deviceRole": "",
+        "deviceName": "",
+        "smartContract": "jetvision",
+        "serialNumber": "",
+        "deviceType": "",
+        "price": 0,
+        "description": "",
+        "evmAddress": "EVM address not initialized yet",
+        "balance": "Not initialized yet",
+        "buyerEvmAddress": [],
+        "buyerDevices": [],
+        "publicKey": "Not initialized yet",
+        "stdInTopic": "StdIn topic not initialized yet",
+        "stdOutTopic": "StdOut topic not initialized yet",
+        "stdErrTopic": "StdErr topic not initialized yet",
+        "x": 770,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    }
+]
