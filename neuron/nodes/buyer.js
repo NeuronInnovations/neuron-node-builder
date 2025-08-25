@@ -218,8 +218,16 @@ module.exports = function (RED) {
     }
 
     function NeuronBuyerNode(config) {
+        // --- Periodic balance check for low balance warning ---
+
+        // --- Exponential balance check using shared helper ---
+        const { startExponentialBalanceCheck } = require('./balance-check-helper');
+        let cleanupBalanceCheck = null;
+
         RED.nodes.createNode(this, config);
         const node = this;
+
+
         
         // Store template-to-instance mapping for subflow nodes
         if (this._alias) {
@@ -247,6 +255,9 @@ module.exports = function (RED) {
 
         node.on('close', function (removed, done) {
             console.log(`Closing buyer node ${node.id}.`);
+
+            // Clean up exponential balance check timeout
+            if (cleanupBalanceCheck) cleanupBalanceCheck();
 
             // Clean up connection monitor
             try {
@@ -539,7 +550,7 @@ module.exports = function (RED) {
                         } catch (error) {
                             console.error(`Connection monitoring failed for buyer node ${node.id}:`, error.message);
                         }
-                    }, 2000); // 2 second delay
+                    }, 5000); // 5 second delay
 
                     console.log(`Node ${node.id}: Go process started successfully via ProcessManager.`);
                 } catch (error) {
@@ -551,7 +562,16 @@ module.exports = function (RED) {
                 node.error(`Node ${node.id}: No device information available to spawn process.`);
                 node.status({ fill: "red", shape: "ring", text: "No device info" });
             }
-
+            cleanupBalanceCheck = startExponentialBalanceCheck({
+                node,
+                hederaService,
+                getAccountId: () => node.deviceInfo && node.deviceInfo.accountId,
+                onLowBalance: (balanceHbars) => node.status({ fill: "yellow", shape: "ring", text: `Low balance: ${balanceHbars} HBAR` }),
+                onZeroBalance: (balanceHbars) => node.status({ fill: "red", shape: "ring", text: `Balance: ${balanceHbars} HBAR` }),
+                onError: () => node.status({ fill: "red", shape: "ring", text: "Balance check failed" }),
+                initialDelayMs: 5000,
+                maxDelayMs: 5 * 60 * 1000
+            });
         })();
 
         node.on('input', async function (msg) {
