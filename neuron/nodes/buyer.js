@@ -2,6 +2,7 @@
 require('../services/NeuronEnvironment').load();
 const waitForEnvReady = require('../services/WaitForEnvReady');
 
+
 const path = require('path');
 const fs = require('fs');
 const WebSocket = require('ws');
@@ -47,9 +48,17 @@ process.on('SIGTERM', globalProcessCleanup);
 process.on('exit', globalProcessCleanup);
 
 module.exports = function (RED) {
-    // --- LEGACY VARIABLES CLEANUP (ProcessManager handles process management now) ---
 
-    // --- INTERNAL CLEANUP LOGIC (accessible by globalProcessCleanup) ---
+    const { getSystemHealth } = require('../services/HealthMonitor');
+    RED.httpAdmin.get('/neuron/health', async function (req, res) {
+        try {
+            const health = await getSystemHealth();
+            res.json(health);
+        } catch (err) {
+            res.status(500).json({ healthy: false, error: err.message });
+        }
+    });
+
     performCleanup = () => {
         console.log('Terminating buyer processes via ProcessManager cleanup...');
 
