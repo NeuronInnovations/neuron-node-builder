@@ -582,6 +582,7 @@ module.exports = {
             ],
             scripts: [
                 require("path").resolve(__dirname, "neuron/theme/balance-service.js")
+               ,require("path").resolve(__dirname, "public/health-indicator.js")
             ]
         },     
         palette: {
