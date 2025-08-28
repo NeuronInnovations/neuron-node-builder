@@ -101,14 +101,14 @@ jobs:
           # Leave p12_file and p12_password empty for ad-hoc signing
           
           # For code signing with certificate (uncomment and configure):
-          # p12_file: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          # p12_password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          p12_file: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          p12_password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           
           # For notarization (uncomment and configure):
-          # notarize: true
-          # staple: true
-          # app_store_connect_api_issuer: ${{ secrets.APP_STORE_CONNECT_ISSUER }}
-          # app_store_connect_api_key: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          notarize: true
+          staple: true
+          app_store_connect_api_issuer: ${{ secrets.APP_STORE_CONNECT_ISSUER }}
+          app_store_connect_api_key: ${{ secrets.APP_STORE_CONNECT_KEY }}
 
       - name: Upload signed macOS executable
         uses: actions/upload-artifact@v4
