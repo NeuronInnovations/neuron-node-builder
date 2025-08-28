@@ -108,7 +108,17 @@ jobs:
           # Create p12 file from base64 secret
           echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
           
-          # Sign the executable
+          # Debug: Test if the p12 file is valid
+          echo "Testing p12 file validity..."
+          if openssl pkcs12 -info -in /tmp/certificate.p12 -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null; then
+            echo "✅ P12 file is valid and password is correct"
+          else
+            echo "❌ P12 file is invalid or password is incorrect"
+            echo "Please check your MACOS_CERTIFICATE_PASSWORD secret"
+            exit 1
+          fi
+          
+          # Sign the executable with certificate
           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
             --p12-file /tmp/certificate.p12 \
             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
@@ -116,6 +126,8 @@ jobs:
           
           # Clean up sensitive files
           rm -f /tmp/certificate.p12
+          
+
 
       - name: Upload signed macOS executable
         uses: actions/upload-artifact@v4
