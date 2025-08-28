@@ -97,23 +97,25 @@ jobs:
           echo "Contents of downloaded artifact:"
           ls -la latest-macos-x64 || echo "latest-macos-x64 not found"
 
-      - name: Sign macOS executable
-        uses: indygreg/apple-code-sign-action@v1
-        with:
-          input_path: /tmp/sign/latest-macos-x64
-          output_path: /tmp/sign/latest-macos-x64-signed
-          # For ad-hoc signing (no certificate required)
-          # Leave p12_file and p12_password empty for ad-hoc signing
-          
-          # For code signing with certificate (uncomment and configure):
-          p12_file: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          p12_password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          
-          # For notarization (uncomment and configure):
-          notarize: true
-          staple: true
-          app_store_connect_api_issuer: ${{ secrets.APP_STORE_CONNECT_ISSUER }}
-          app_store_connect_api_key: ${{ secrets.APP_STORE_CONNECT_KEY }}
+             - name: Sign macOS executable (Manual)
+         run: |
+           cd /tmp/sign
+           # Download rcodesign for macOS
+           curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-macos-universal.tar.gz"
+           tar -xzf /tmp/rcodesign.tar.gz -C /tmp
+           chmod +x /tmp/apple-codesign-0.28.0-macos-universal/rcodesign
+           
+           # Create p12 file from base64 secret
+           echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
+           
+           # Sign the executable
+           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+             --p12-file /tmp/certificate.p12 \
+             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+             latest-macos-x64 latest-macos-x64-signed
+           
+           # Clean up sensitive files
+           rm -f /tmp/certificate.p12
 
       - name: Upload signed macOS executable
         uses: actions/upload-artifact@v4
@@ -122,17 +124,7 @@ jobs:
           path: /tmp/sign/latest-macos-x64-signed
           retention-days: 30
 
-      - name: Sign macOS executable (Alternative)
-        if: failure()
-        run: |
-          cd /tmp/sign
-          # Download rcodesign to a shorter path
-          curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-x86_64-unknown-linux-musl.tar.gz"
-          tar -xzf /tmp/rcodesign.tar.gz -C /tmp
-          /tmp/apple-codesign-0.28.0-x86_64-unknown-linux-musl/rcodesign sign \
-            --p12-file "${{ secrets.MACOS_CERTIFICATE_P12 }}" \
-            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-            latest-macos-x64 latest-macos-x64-signed
+      
 
   create-release:
     name: Create Release
