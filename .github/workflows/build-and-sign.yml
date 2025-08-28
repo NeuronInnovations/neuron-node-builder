@@ -76,46 +76,67 @@ jobs:
   sign-macos:
     name: Sign macOS Executable
     needs: build-and-sign
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     
     steps:
+      - name: Set up short working directory
+        run: |
+          mkdir -p /tmp/sign
+          cd /tmp/sign
       - name: Download macOS executable
         uses: actions/download-artifact@v4
         with:
           name: macos-executable
-          path: ./
+          path: /tmp/sign
 
       - name: Debug - List downloaded files
         run: |
+          cd /tmp/sign
           echo "Contents of current directory:"
           ls -la
           echo "Contents of downloaded artifact:"
           ls -la latest-macos-x64 || echo "latest-macos-x64 not found"
 
-      - name: Sign macOS executable
-        uses: indygreg/apple-code-sign-action@v1
-        with:
-          input_path: latest-macos-x64
-          output_path: latest-macos-x64-signed
-          # For ad-hoc signing (no certificate required)
-          # Leave p12_file and p12_password empty for ad-hoc signing
+      - name: Sign macOS executable (Manual)
+        run: |
+          cd /tmp/sign
+          # Download rcodesign for macOS
+          curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-macos-universal.tar.gz"
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp
+          chmod +x /tmp/apple-codesign-0.28.0-macos-universal/rcodesign
           
-          # For code signing with certificate (uncomment and configure):
-          # p12_file: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          # p12_password: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          # Create p12 file from base64 secret
+          echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
           
-          # For notarization (uncomment and configure):
-          # notarize: true
-          # staple: true
-          # app_store_connect_api_issuer: ${{ secrets.APP_STORE_CONNECT_ISSUER }}
-          # app_store_connect_api_key: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          # Debug: Test if the p12 file is valid
+          echo "Testing p12 file validity..."
+          if openssl pkcs12 -info -in /tmp/certificate.p12 -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null; then
+            echo "✅ P12 file is valid and password is correct"
+          else
+            echo "❌ P12 file is invalid or password is incorrect"
+            echo "Please check your MACOS_CERTIFICATE_PASSWORD secret"
+            exit 1
+          fi
+          
+          # Sign the executable with certificate
+          /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+            --p12-file /tmp/certificate.p12 \
+            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+            latest-macos-x64 latest-macos-x64-signed
+          
+          # Clean up sensitive files
+          rm -f /tmp/certificate.p12
+          
+
 
       - name: Upload signed macOS executable
         uses: actions/upload-artifact@v4
         with:
           name: macos-executable-signed
-          path: latest-macos-x64-signed
+          path: /tmp/sign/latest-macos-x64-signed
           retention-days: 30
+
+      
 
   create-release:
     name: Create Release
