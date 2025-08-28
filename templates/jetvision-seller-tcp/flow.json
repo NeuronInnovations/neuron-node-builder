@@ -1,0 +1,248 @@
+[
+    {
+        "id": "9bc28812a4083c5a",
+        "type": "tab",
+        "label": "Jetvision flow1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "d4a0f029f99bf480",
+        "type": "group",
+        "z": "9bc28812a4083c5a",
+        "style": {
+            "stroke": "#3e404a",
+            "stroke-opacity": "1",
+            "fill": "#21222c",
+            "fill-opacity": "0.5",
+            "label": true,
+            "label-position": "nw",
+            "color": "#f8f8f2"
+        },
+        "nodes": [
+            "255d280e50f32562",
+            "79559f424d470f90",
+            "d9546d63685f80b3",
+            "64debdcce7d26d07",
+            "4edcaf8f60608bfd",
+            "5b097ee833db958e",
+            "da5d25531df537ce",
+            "1a7b91e5b1547360",
+            "edcfe8c38b56f062",
+            "35b66b4f0d223b7b"
+        ],
+        "x": 94,
+        "y": 199,
+        "w": 1192,
+        "h": 322
+    },
+    {
+        "id": "79559f424d470f90",
+        "type": "seller config",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "Jetvision seller config",
+        "deviceRole": "Home Sensor",
+        "deviceName": "Jetvision",
+        "smartContract": "jetvision",
+        "serialNumber": "serial number",
+        "deviceType": "Sensor",
+        "price": "1",
+        "description": "",
+        "evmAddress": "EVM address not initialized yet",
+        "balance": "Not initialized yet",
+        "buyerEvmAddress": [],
+        "buyerDevices": [],
+        "publicKey": "Not initialized yet",
+        "stdInTopic": "StdIn topic not initialized yet",
+        "stdOutTopic": "StdOut topic not initialized yet",
+        "stdErrTopic": "StdErr topic not initialized yet",
+        "x": 320,
+        "y": 280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "d9546d63685f80b3",
+        "type": "neuron-p2p",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "",
+        "selectedNode": "",
+        "description": "",
+        "x": 820,
+        "y": 400,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "255d280e50f32562",
+        "type": "comment",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "seller listening to local udp  5005 and sends data to all connected buyers",
+        "info": "",
+        "x": 480,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "64debdcce7d26d07",
+        "type": "comment",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "[ACTION] Double click and select \"Jetvision Seller Config\"",
+        "info": "",
+        "x": 870,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "4edcaf8f60608bfd",
+        "type": "ui_worldmap",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "group": "4eb2894bf837a945",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "lat": "",
+        "lon": "",
+        "zoom": "",
+        "layer": "OSMG",
+        "cluster": "",
+        "maxage": "",
+        "usermenu": "hide",
+        "layers": "hide",
+        "panit": "true",
+        "panlock": "false",
+        "zoomlock": "false",
+        "hiderightclick": "true",
+        "coords": "none",
+        "showgrid": "false",
+        "showruler": "false",
+        "allowFileDrop": "false",
+        "path": "/worldmap",
+        "overlist": "DR,CO,RA,DN,HM",
+        "maplist": "OSMG,OSMC,EsriC,EsriS,EsriT,EsriDG,UKOS",
+        "mapname": "",
+        "mapurl": "",
+        "mapopt": "",
+        "mapwms": false,
+        "x": 1080,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "5b097ee833db958e",
+        "type": "function",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "Translate to worldmap data format",
+        "func": "var bearing = msg.payload.hdgs;\nif (!bearing) {\n    bearing = msg.payload.trk;\n}\nmsg.payload = {\n    name: msg.payload.hex,\n    lat: msg.payload.lat,\n    lon: msg.payload.lon,\n    icon: \"plane\",\n    iconSize: 32,\n    label: msg.payload.fli,\n    bearing: bearing,\n    speed: msg.payload.spd,\n    alt: msg.payload.alt,\n}\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 480,
+        "wires": [
+            [
+                "4edcaf8f60608bfd"
+            ]
+        ]
+    },
+    {
+        "id": "da5d25531df537ce",
+        "type": "comment",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "View map -  http://localhost:1880/worldmap/",
+        "info": "",
+        "x": 1090,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "1a7b91e5b1547360",
+        "type": "comment",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "[ACTION] Double click and update your JETVISION port",
+        "info": "",
+        "x": 320,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "edcfe8c38b56f062",
+        "type": "function",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "convert tcp chunks to json objects",
+        "func": "\n// Keep buffer across TCP chunks\nlet buffer = context.get(\"buffer\") || \"\";\n\n// Append new chunk\nbuffer += msg.payload.toString(\"utf-8\");\n\nlet results = [];\n\ntry {\n    // Try parsing buffer as JSON\n    let arr = JSON.parse(buffer);\n\n    if (Array.isArray(arr)) {\n        // Emit each object separately\n        results = arr.map(obj => ({ payload: obj }));\n        buffer = \"\";  // clear once successfully parsed\n    }\n} catch (e) {\n    // Not complete JSON yet, wait for next chunk\n}\n\ncontext.set(\"buffer\", buffer);\n\nreturn results;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 400,
+        "wires": [
+            [
+                "d9546d63685f80b3",
+                "5b097ee833db958e"
+            ]
+        ]
+    },
+    {
+        "id": "35b66b4f0d223b7b",
+        "type": "tcp in",
+        "z": "9bc28812a4083c5a",
+        "g": "d4a0f029f99bf480",
+        "name": "",
+        "server": "client",
+        "host": "192.168.0.42",
+        "port": "30002",
+        "datamode": "stream",
+        "datatype": "utf8",
+        "newline": "\\n",
+        "topic": "",
+        "trim": false,
+        "base64": false,
+        "tls": "",
+        "x": 220,
+        "y": 400,
+        "wires": [
+            [
+                "edcfe8c38b56f062"
+            ]
+        ]
+    },
+    {
+        "id": "4eb2894bf837a945",
+        "type": "ui_group",
+        "name": "Default",
+        "tab": "ef656de5cefe0a4d",
+        "order": 2,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ef656de5cefe0a4d",
+        "type": "ui_tab",
+        "name": "Home",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    }
+]

@@ -231,6 +231,10 @@ module.exports = function (RED) {
     function NeuronSellerNode(config) {
         RED.nodes.createNode(this, config);
         const node = this;
+
+        // --- Exponential balance check using shared helper ---
+        const { startExponentialBalanceCheck } = require('./balance-check-helper');
+        let cleanupBalanceCheck = null;
         
         // Store template-to-instance mapping for subflow nodes
         if (this._alias) {
@@ -257,7 +261,8 @@ module.exports = function (RED) {
         node.goProcess = null;
 
         node.on('close', function (removed, done) {
-            //console.log(`Closing seller node ${node.id}, removed: ${removed}`);
+            // Clean up exponential balance check timeout
+            if (cleanupBalanceCheck) cleanupBalanceCheck();
 
             // Clean up connection monitor
             try {
@@ -268,7 +273,6 @@ module.exports = function (RED) {
 
             if (removed) {
                 // Node is being deleted - stop the process
-                // console.log(`Seller node ${node.id} is being deleted - stopping process`);
                 processManager.stopProcess(node.id)
                     .then(() => {
                         console.log(`Process stopped for deleted seller node ${node.id}`);
@@ -469,7 +473,7 @@ module.exports = function (RED) {
                 }
             }
 
-            if (node.deviceInfo) {
+            if (node.deviceInfo) {         
                 let initialBuyerEvmAddresses = [];
                 try {
                     initialBuyerEvmAddresses = safeParseBuyerAddresses(config.buyerEvmAddress);
@@ -516,6 +520,16 @@ module.exports = function (RED) {
                     node.error(`Go process startup failed: ${error.message}`);
                     node.status({ fill: "red", shape: "ring", text: "Process failed" });
                 }
+                       cleanupBalanceCheck = startExponentialBalanceCheck({
+                    node,
+                    hederaService,
+                    getAccountId: () => node.deviceInfo && node.deviceInfo.accountId,
+                    onLowBalance: (balanceHbars) => node.status({ fill: "yellow", shape: "ring", text: `Low balance: ${balanceHbars} HBAR` }),
+                    onZeroBalance: (balanceHbars) => node.status({ fill: "red", shape: "ring", text: `Balance: ${balanceHbars} HBAR` }),
+                    onError: () => node.status({ fill: "red", shape: "ring", text: "Balance check failed" }),
+                    initialDelayMs: 5000,
+                    maxDelayMs: 5 * 60 * 1000
+                });
             } else {
                 node.error(`Node ${node.id}: No device information available to spawn process.`);
                 node.status({ fill: "red", shape: "ring", text: "No device info" });
