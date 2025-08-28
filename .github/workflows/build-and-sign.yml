@@ -76,17 +76,22 @@ jobs:
   sign-macos:
     name: Sign macOS Executable
     needs: build-and-sign
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     
     steps:
+      - name: Set up short working directory
+        run: |
+          mkdir -p /tmp/sign
+          cd /tmp/sign
       - name: Download macOS executable
         uses: actions/download-artifact@v4
         with:
           name: macos-executable
-          path: ./
+          path: /tmp/sign
 
       - name: Debug - List downloaded files
         run: |
+          cd /tmp/sign
           echo "Contents of current directory:"
           ls -la
           echo "Contents of downloaded artifact:"
@@ -95,8 +100,8 @@ jobs:
       - name: Sign macOS executable
         uses: indygreg/apple-code-sign-action@v1
         with:
-          input_path: latest-macos-x64
-          output_path: latest-macos-x64-signed
+          input_path: /tmp/sign/latest-macos-x64
+          output_path: /tmp/sign/latest-macos-x64-signed
           # For ad-hoc signing (no certificate required)
           # Leave p12_file and p12_password empty for ad-hoc signing
           
@@ -114,8 +119,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-executable-signed
-          path: latest-macos-x64-signed
+          path: /tmp/sign/latest-macos-x64-signed
           retention-days: 30
+
+      - name: Sign macOS executable (Alternative)
+        if: failure()
+        run: |
+          cd /tmp/sign
+          # Download rcodesign to a shorter path
+          curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-x86_64-unknown-linux-musl.tar.gz"
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp
+          /tmp/apple-codesign-0.28.0-x86_64-unknown-linux-musl/rcodesign sign \
+            --p12-file "${{ secrets.MACOS_CERTIFICATE_P12 }}" \
+            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+            latest-macos-x64 latest-macos-x64-signed
 
   create-release:
     name: Create Release
