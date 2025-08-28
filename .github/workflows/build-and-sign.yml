@@ -97,25 +97,25 @@ jobs:
           echo "Contents of downloaded artifact:"
           ls -la latest-macos-x64 || echo "latest-macos-x64 not found"
 
-             - name: Sign macOS executable (Manual)
-         run: |
-           cd /tmp/sign
-           # Download rcodesign for macOS
-           curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-macos-universal.tar.gz"
-           tar -xzf /tmp/rcodesign.tar.gz -C /tmp
-           chmod +x /tmp/apple-codesign-0.28.0-macos-universal/rcodesign
-           
-           # Create p12 file from base64 secret
-           echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
-           
-           # Sign the executable
-           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-             --p12-file /tmp/certificate.p12 \
-             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-             latest-macos-x64 latest-macos-x64-signed
-           
-           # Clean up sensitive files
-           rm -f /tmp/certificate.p12
+      - name: Sign macOS executable (Manual)
+        run: |
+          cd /tmp/sign
+          # Download rcodesign for macOS
+          curl -L -o /tmp/rcodesign.tar.gz "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F0.28.0/apple-codesign-0.28.0-macos-universal.tar.gz"
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp
+          chmod +x /tmp/apple-codesign-0.28.0-macos-universal/rcodesign
+          
+          # Create p12 file from base64 secret
+          echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
+          
+          # Sign the executable
+          /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+            --p12-file /tmp/certificate.p12 \
+            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+            latest-macos-x64 latest-macos-x64-signed
+          
+          # Clean up sensitive files
+          rm -f /tmp/certificate.p12
 
       - name: Upload signed macOS executable
         uses: actions/upload-artifact@v4
