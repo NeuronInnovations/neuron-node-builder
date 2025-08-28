@@ -165,33 +165,44 @@
         ]
     },
     {
-        "id": "68e64fbbc16a3c1a",
+        "id": "8298f58cc4ff4f73",
+        "type": "tab",
+        "label": "Flow 2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "8ceacfa7ae822f26",
         "type": "subflow:3708b2fe6d66a116",
-        "z": "65a82d2522ab3d05",
+        "z": "8298f58cc4ff4f73",
         "name": "",
-        "x": 500,
-        "y": 380,
+        "x": 280,
+        "y": 280,
         "wires": [
-            []
+            [
+                "632a85d501df547b",
+                "5eb092a99ca488ab"
+            ]
         ]
     },
     {
-        "id": "50cc1372bc3c7662",
+        "id": "632a85d501df547b",
         "type": "neuron-p2p",
-        "z": "65a82d2522ab3d05",
+        "z": "8298f58cc4ff4f73",
         "name": "",
         "selectedNode": "",
         "description": "",
-        "x": 780,
-        "y": 380,
+        "x": 560,
+        "y": 280,
         "wires": [
             []
         ]
     },
     {
-        "id": "f507a91bf61ef14c",
+        "id": "1a617fbf558e9cff",
         "type": "seller config",
-        "z": "65a82d2522ab3d05",
+        "z": "8298f58cc4ff4f73",
         "name": "Seller",
         "deviceRole": "",
         "deviceName": "",
@@ -208,10 +219,26 @@
         "stdInTopic": "StdIn topic not initialized yet",
         "stdOutTopic": "StdOut topic not initialized yet",
         "stdErrTopic": "StdErr topic not initialized yet",
-        "x": 770,
-        "y": 300,
+        "x": 550,
+        "y": 200,
         "wires": [
             []
         ]
+    },
+    {
+        "id": "5eb092a99ca488ab",
+        "type": "debug",
+        "z": "8298f58cc4ff4f73",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 380,
+        "wires": []
     }
 ]
