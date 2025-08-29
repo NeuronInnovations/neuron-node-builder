@@ -165,7 +165,7 @@ jobs:
            
                        # Notarize the signed executable (optional but recommended)
             echo "Notarizing the signed executable..."
-            if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
+            if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" ]; then
               echo "Creating notarization request..."
               echo "Issuer ID: ${{ secrets.APP_STORE_CONNECT_ISSUER }}"
               
@@ -180,10 +180,23 @@ jobs:
               echo "Checking rcodesign notary-submit help..."
               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit --help
               
-              # Submit for notarization using key content directly
+              # Submit for notarization using the correct approach
+              # The --api-key should be the Key ID, not the key content
+              # We need to use --api-key-file with a JSON file or place the p8 file in the expected location
+              
+              # Create the expected directory structure
+              mkdir -p ~/.appstoreconnect/private_keys/
+              
+              # Use the Key ID from GitHub secrets
+              KEY_ID="${{ secrets.APP_STORE_CONNECT_KEY_ID }}"
+              
+              # Copy the p8 file to the expected location with the correct name
+              cp /tmp/app_store_connect.p8 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+              
+              # Submit for notarization
               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
                 --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
-                --api-key "$(cat /tmp/app_store_connect.p8)" \
+                --api-key "$KEY_ID" \
                 latest-macos-x64-signed
               
               # Staple the notarization ticket
@@ -197,6 +210,7 @@ jobs:
               echo "To enable notarization, add these GitHub secrets:"
               echo "- APP_STORE_CONNECT_ISSUER: Your App Store Connect API issuer ID"
               echo "- APP_STORE_CONNECT_KEY: Your App Store Connect API key (base64 encoded)"
+              echo "- APP_STORE_CONNECT_KEY_ID: Your App Store Connect API key ID"
             fi
           
 
