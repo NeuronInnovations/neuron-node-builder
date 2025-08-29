@@ -230,17 +230,38 @@ jobs:
                echo "Verifying code signature..."
                codesign --verify --verbose=4 latest-macos-x64-signed || echo "Code signature verification failed"
                
-               # Submit for notarization (try without staple first)
-               echo "Submitting for notarization..."
-               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
-                 --api-key-file /tmp/api_key.json \
-                 --wait \
-                 latest-macos-x64-signed
-               
-               # If notarization succeeds, staple the ticket
-               echo "Stapling notarization ticket..."
-               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
-                 latest-macos-x64-signed
+                               # Submit for notarization using macOS notarytool (more reliable)
+                echo "Submitting for notarization using notarytool..."
+                
+                # Convert the JSON API key to the format expected by notarytool
+                echo "Converting API key for notarytool..."
+                mkdir -p ~/.private_keys
+                cat > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 << EOF
+                $(cat /tmp/app_store_connect.p8)
+                EOF
+                chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+                
+                # Submit for notarization using notarytool
+                xcrun notarytool submit latest-macos-x64-signed \
+                  --apple-id "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
+                  --password "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+                  --team-id "M7TH45B8T7" \
+                  --wait || {
+                  echo "notarytool failed, trying rcodesign notary-submit..."
+                  # Fallback to rcodesign
+                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
+                    --api-key-file /tmp/api_key.json \
+                    --wait \
+                    latest-macos-x64-signed
+                }
+                
+                # Staple the notarization ticket
+                echo "Stapling notarization ticket..."
+                xcrun stapler staple latest-macos-x64-signed || {
+                  echo "stapler failed, trying rcodesign staple..."
+                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
+                    latest-macos-x64-signed
+                }
               
                              # Notarization and stapling completed in the previous command
               
