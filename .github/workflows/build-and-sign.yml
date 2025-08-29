@@ -144,15 +144,18 @@ jobs:
                 --p12-password "$P12_PASSWORD" \
                 latest-macos-x64 latest-macos-x64-signed || {
                 echo "Method 3 failed, trying method 4 with PEM..."
-                # Try method 4: Use PEM format if available
-                if [ -f /tmp/certificate.pem ]; then
-                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-                    --certificate /tmp/certificate.pem \
-                    latest-macos-x64 latest-macos-x64-signed
-                else
-                  echo "All methods failed"
-                  exit 1
-                fi
+                                 echo "Method 3 failed, trying method 4 with PEM..."
+                 # Try method 4: Use PEM format if available
+                 if [ -f /tmp/certificate.pem ]; then
+                   echo "Converting PEM to DER format..."
+                   openssl x509 -in /tmp/certificate.pem -outform DER -out /tmp/certificate.der
+                   /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                     --certificate-der-file /tmp/certificate.der \
+                     latest-macos-x64 latest-macos-x64-signed
+                 else
+                   echo "All methods failed"
+                   exit 1
+                 fi
               }
             }
           }
