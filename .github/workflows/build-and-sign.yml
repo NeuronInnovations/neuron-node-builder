@@ -122,26 +122,39 @@ jobs:
             exit 1
           fi
           
-                     # Sign the executable with Developer ID certificate
-           echo "Signing with Developer ID certificate..."
-           
-           # Extract certificate info to verify it's a Developer ID certificate
-           echo "Certificate information:"
-           openssl pkcs12 -in /tmp/certificate.p12 -info -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null | grep -i "subject\|issuer" || echo "Could not extract certificate info"
-           
-           # Sign with explicit Developer ID signing
-           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-             --p12-file /tmp/certificate.p12 \
-             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-             --code-signature-flags runtime \
-             latest-macos-x64 latest-macos-x64-signed
+                                # Sign the executable with Developer ID certificate
+            echo "Signing with Developer ID certificate..."
+            
+                         # Convert p12 to PEM format (contains both certificate and private key)
+             echo "Converting p12 to PEM format..."
+             openssl pkcs12 -in /tmp/certificate.p12 -out /tmp/certificate.pem -nodes -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"
+             
+             # Extract certificate and private key separately
+             echo "Extracting certificate and private key..."
+             openssl x509 -in /tmp/certificate.pem -out /tmp/certificate_only.pem
+             openssl pkey -in /tmp/certificate.pem -out /tmp/private_key.pem
+             
+             # Convert certificate to DER format
+             echo "Converting certificate to DER format..."
+             openssl x509 -in /tmp/certificate_only.pem -outform DER -out /tmp/certificate.der
+             
+             # Extract certificate info to verify it's a Developer ID certificate
+             echo "Certificate information:"
+             openssl x509 -in /tmp/certificate_only.pem -text -noout | grep -i "subject\|issuer" || echo "Could not extract certificate info"
+             
+             # Sign with both certificate and private key files
+             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+               --certificate-der-file /tmp/certificate.der \
+               --private-key /tmp/private_key.pem \
+               --code-signature-flags runtime \
+               latest-macos-x64 latest-macos-x64-signed
            
            # Verify the signature type
            echo "Verifying signature type after signing..."
            codesign -dv latest-macos-x64-signed
           
-                     # Clean up sensitive files
-           rm -f /tmp/certificate.p12
+                                             # Clean up sensitive files
+             rm -f /tmp/certificate.p12 /tmp/certificate.pem /tmp/certificate_only.pem /tmp/private_key.pem /tmp/certificate.der
            
                        # Notarize the signed executable (optional but recommended)
             echo "Notarizing the signed executable..."
