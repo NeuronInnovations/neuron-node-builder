@@ -122,43 +122,23 @@ jobs:
             exit 1
           fi
           
-          # Sign the executable with certificate (try different password formats)
-          echo "Attempting to sign with rcodesign..."
-          
-          # Try method 1: Direct password with p12
-          /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-            --p12-file /tmp/certificate.p12 \
-            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-            latest-macos-x64 latest-macos-x64-signed || {
-            echo "Method 1 failed, trying method 2..."
-            # Try method 2: Password with quotes
-            /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-              --p12-file /tmp/certificate.p12 \
-              --p12-password '"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"' \
-              latest-macos-x64 latest-macos-x64-signed || {
-              echo "Method 2 failed, trying method 3..."
-              # Try method 3: Environment variable
-              export P12_PASSWORD="${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"
-              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-                --p12-file /tmp/certificate.p12 \
-                --p12-password "$P12_PASSWORD" \
-                latest-macos-x64 latest-macos-x64-signed || {
-                echo "Method 3 failed, trying method 4 with PEM..."
-                                 echo "Method 3 failed, trying method 4 with PEM..."
-                 # Try method 4: Use PEM format if available
-                 if [ -f /tmp/certificate.pem ]; then
-                   echo "Converting PEM to DER format..."
-                   openssl x509 -in /tmp/certificate.pem -outform DER -out /tmp/certificate.der
-                   /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-                     --certificate-der-file /tmp/certificate.der \
-                     latest-macos-x64 latest-macos-x64-signed
-                 else
-                   echo "All methods failed"
-                   exit 1
-                 fi
-              }
-            }
-          }
+                     # Sign the executable with Developer ID certificate
+           echo "Signing with Developer ID certificate..."
+           
+           # Extract certificate info to verify it's a Developer ID certificate
+           echo "Certificate information:"
+           openssl pkcs12 -in /tmp/certificate.p12 -info -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null | grep -i "subject\|issuer" || echo "Could not extract certificate info"
+           
+           # Sign with explicit Developer ID signing
+           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+             --p12-file /tmp/certificate.p12 \
+             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+             --code-signature-flags runtime \
+             latest-macos-x64 latest-macos-x64-signed
+           
+           # Verify the signature type
+           echo "Verifying signature type after signing..."
+           codesign -dv latest-macos-x64-signed
           
                      # Clean up sensitive files
            rm -f /tmp/certificate.p12
