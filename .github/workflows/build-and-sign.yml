@@ -176,10 +176,14 @@ jobs:
               echo "P8 file size: $(ls -la /tmp/app_store_connect.p8 | awk '{print $5}') bytes"
               echo "P8 file first line: $(head -1 /tmp/app_store_connect.p8)"
               
-              # Submit for notarization using key file only
+              # Check rcodesign help for notary-submit
+              echo "Checking rcodesign notary-submit help..."
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit --help
+              
+              # Submit for notarization using key content directly
               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
                 --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
-                --api-key-file /tmp/app_store_connect.p8 \
+                --api-key "$(cat /tmp/app_store_connect.p8)" \
                 latest-macos-x64-signed
               
               # Staple the notarization ticket
