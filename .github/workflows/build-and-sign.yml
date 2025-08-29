@@ -142,12 +142,24 @@ jobs:
              echo "Certificate information:"
              openssl x509 -in /tmp/certificate_only.pem -text -noout | grep -i "subject\|issuer" || echo "Could not extract certificate info"
              
-             # Sign with both certificate and private key files
+             # Check rcodesign sign help to understand the correct flags
+             echo "Checking rcodesign sign help..."
+             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign --help
+             
+             # Try signing with p12 file directly (rcodesign might support this)
+             echo "Trying to sign with p12 file directly..."
              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-               --certificate-der-file /tmp/certificate.der \
-               --private-key /tmp/private_key.pem \
+               --p12-file /tmp/certificate.p12 \
+               --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
                --code-signature-flags runtime \
-               latest-macos-x64 latest-macos-x64-signed
+               latest-macos-x64 latest-macos-x64-signed || {
+               echo "P12 signing failed, trying alternative approach..."
+               # Alternative: Try with just the certificate (adhoc signing)
+               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                 --certificate-der-file /tmp/certificate.der \
+                 --code-signature-flags runtime \
+                 latest-macos-x64 latest-macos-x64-signed
+             }
            
            # Verify the signature type
            echo "Verifying signature type after signing..."
