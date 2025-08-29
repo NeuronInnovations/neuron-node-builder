@@ -167,13 +167,19 @@ jobs:
             echo "Notarizing the signed executable..."
             if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
               echo "Creating notarization request..."
+              echo "Issuer ID: ${{ secrets.APP_STORE_CONNECT_ISSUER }}"
+              
               # Create p8 file from base64 secret
               echo "${{ secrets.APP_STORE_CONNECT_KEY }}" | base64 -d > /tmp/app_store_connect.p8
               
-              # Submit for notarization
+              # Debug: Check if the p8 file was created correctly
+              echo "P8 file size: $(ls -la /tmp/app_store_connect.p8 | awk '{print $5}') bytes"
+              echo "P8 file first line: $(head -1 /tmp/app_store_connect.p8)"
+              
+              # Submit for notarization with explicit key path
               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
                 --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
-                --api-key /tmp/app_store_connect.p8 \
+                --api-key-file /tmp/app_store_connect.p8 \
                 latest-macos-x64-signed
               
               # Staple the notarization ticket
