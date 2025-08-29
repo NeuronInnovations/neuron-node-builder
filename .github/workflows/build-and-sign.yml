@@ -180,30 +180,29 @@ jobs:
               echo "Checking rcodesign notary-submit help..."
               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit --help
               
-              # Submit for notarization using the correct approach
-              # The --api-key should be the Key ID, not the key content
-              # We need to use --api-key-file with a JSON file or place the p8 file in the expected location
+              # Use encode-app-store-connect-api-key command to create proper JSON
+              echo "Creating API key JSON using encode-app-store-connect-api-key..."
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign encode-app-store-connect-api-key \
+                --issuer-id "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
+                --key-id "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+                --key-file /tmp/app_store_connect.p8 \
+                --output /tmp/api_key.json
               
-              # Create the expected directory structure
-              mkdir -p ~/.appstoreconnect/private_keys/
+                             # Debug: Check what type of file we have
+               echo "Checking file type for notarization..."
+               file latest-macos-x64-signed
+               ls -la latest-macos-x64-signed
+               
+               # Submit for notarization with wait and staple using JSON file
+               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
+                 --api-key-file /tmp/api_key.json \
+                 --wait \
+                 --staple \
+                 latest-macos-x64-signed
               
-              # Use the Key ID from GitHub secrets
-              KEY_ID="${{ secrets.APP_STORE_CONNECT_KEY_ID }}"
+                             # Notarization and stapling completed in the previous command
               
-              # Copy the p8 file to the expected location with the correct name
-              cp /tmp/app_store_connect.p8 ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
-              
-              # Submit for notarization
-              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
-                --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
-                --api-key "$KEY_ID" \
-                latest-macos-x64-signed
-              
-              # Staple the notarization ticket
-              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
-                latest-macos-x64-signed
-              
-              rm -f /tmp/app_store_connect.p8
+              rm -f /tmp/app_store_connect.p8 /tmp/api_key.json
               echo "✅ Notarization completed!"
             else
               echo "⚠️ Skipping notarization (App Store Connect credentials not provided)"
