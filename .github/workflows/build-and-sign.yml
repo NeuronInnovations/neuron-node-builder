@@ -193,11 +193,24 @@ jobs:
                file latest-macos-x64-signed
                ls -la latest-macos-x64-signed
                
-               # Submit for notarization with wait and staple using JSON file
+               # Check if the file is code signed
+               echo "Checking code signature..."
+               codesign -dv latest-macos-x64-signed || echo "File is not code signed"
+               
+               # Check if the file has a valid code signature
+               echo "Verifying code signature..."
+               codesign --verify --verbose=4 latest-macos-x64-signed || echo "Code signature verification failed"
+               
+               # Submit for notarization (try without staple first)
+               echo "Submitting for notarization..."
                /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
                  --api-key-file /tmp/api_key.json \
                  --wait \
-                 --staple \
+                 latest-macos-x64-signed
+               
+               # If notarization succeeds, staple the ticket
+               echo "Stapling notarization ticket..."
+               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
                  latest-macos-x64-signed
               
                              # Notarization and stapling completed in the previous command
