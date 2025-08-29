@@ -183,10 +183,10 @@ jobs:
                              # Use encode-app-store-connect-api-key command to create proper JSON
                echo "Creating API key JSON using encode-app-store-connect-api-key..."
                /tmp/apple-codesign-0.28.0-macos-universal/rcodesign encode-app-store-connect-api-key \
+                 -o /tmp/api_key.json \
                  "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
                  "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-                 /tmp/app_store_connect.p8 \
-                 --output /tmp/api_key.json
+                 /tmp/app_store_connect.p8
               
                              # Debug: Check what type of file we have
                echo "Checking file type for notarization..."
