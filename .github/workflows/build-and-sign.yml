@@ -163,28 +163,31 @@ jobs:
                      # Clean up sensitive files
            rm -f /tmp/certificate.p12
            
-           # Notarize the signed executable (optional but recommended)
-           echo "Notarizing the signed executable..."
-           if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
-             echo "Creating notarization request..."
-             # Create p8 file from base64 secret
-             echo "${{ secrets.APP_STORE_CONNECT_KEY }}" | base64 -d > /tmp/app_store_connect.p8
-             
-             # Submit for notarization
-             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
-               --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
-               --api-key /tmp/app_store_connect.p8 \
-               latest-macos-x64-signed
-             
-             # Staple the notarization ticket
-             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
-               latest-macos-x64-signed
-             
-             rm -f /tmp/app_store_connect.p8
-             echo "✅ Notarization completed!"
-           else
-             echo "⚠️ Skipping notarization (App Store Connect credentials not provided)"
-           fi
+                       # Notarize the signed executable (optional but recommended)
+            echo "Notarizing the signed executable..."
+            if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
+              echo "Creating notarization request..."
+              # Create p8 file from base64 secret
+              echo "${{ secrets.APP_STORE_CONNECT_KEY }}" | base64 -d > /tmp/app_store_connect.p8
+              
+              # Submit for notarization
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
+                --api-issuer "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
+                --api-key /tmp/app_store_connect.p8 \
+                latest-macos-x64-signed
+              
+              # Staple the notarization ticket
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
+                latest-macos-x64-signed
+              
+              rm -f /tmp/app_store_connect.p8
+              echo "✅ Notarization completed!"
+            else
+              echo "⚠️ Skipping notarization (App Store Connect credentials not provided)"
+              echo "To enable notarization, add these GitHub secrets:"
+              echo "- APP_STORE_CONNECT_ISSUER: Your App Store Connect API issuer ID"
+              echo "- APP_STORE_CONNECT_KEY: Your App Store Connect API key (base64 encoded)"
+            fi
           
 
 
