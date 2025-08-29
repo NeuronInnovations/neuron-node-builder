@@ -108,6 +108,10 @@ jobs:
           # Create p12 file from base64 secret
           echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
           
+          # Alternative: Convert p12 to pem format (rcodesign might handle this better)
+          echo "Converting p12 to pem format..."
+          openssl pkcs12 -in /tmp/certificate.p12 -out /tmp/certificate.pem -nodes -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" || echo "PEM conversion failed, continuing with p12"
+          
           # Debug: Test if the p12 file is valid
           echo "Testing p12 file validity..."
           if openssl pkcs12 -info -in /tmp/certificate.p12 -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null; then
@@ -118,11 +122,40 @@ jobs:
             exit 1
           fi
           
-          # Sign the executable with certificate
+          # Sign the executable with certificate (try different password formats)
+          echo "Attempting to sign with rcodesign..."
+          
+          # Try method 1: Direct password with p12
           /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
             --p12-file /tmp/certificate.p12 \
             --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-            latest-macos-x64 latest-macos-x64-signed
+            latest-macos-x64 latest-macos-x64-signed || {
+            echo "Method 1 failed, trying method 2..."
+            # Try method 2: Password with quotes
+            /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+              --p12-file /tmp/certificate.p12 \
+              --p12-password '"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"' \
+              latest-macos-x64 latest-macos-x64-signed || {
+              echo "Method 2 failed, trying method 3..."
+              # Try method 3: Environment variable
+              export P12_PASSWORD="${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                --p12-file /tmp/certificate.p12 \
+                --p12-password "$P12_PASSWORD" \
+                latest-macos-x64 latest-macos-x64-signed || {
+                echo "Method 3 failed, trying method 4 with PEM..."
+                # Try method 4: Use PEM format if available
+                if [ -f /tmp/certificate.pem ]; then
+                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                    --certificate /tmp/certificate.pem \
+                    latest-macos-x64 latest-macos-x64-signed
+                else
+                  echo "All methods failed"
+                  exit 1
+                fi
+              }
+            }
+          }
           
           # Clean up sensitive files
           rm -f /tmp/certificate.p12
