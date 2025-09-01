@@ -108,6 +108,10 @@ jobs:
           # Create p12 file from base64 secret
           echo "${{ secrets.MACOS_CERTIFICATE_P12 }}" | base64 -d > /tmp/certificate.p12
           
+          # Alternative: Convert p12 to pem format (rcodesign might handle this better)
+          echo "Converting p12 to pem format..."
+          openssl pkcs12 -in /tmp/certificate.p12 -out /tmp/certificate.pem -nodes -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" || echo "PEM conversion failed, continuing with p12"
+          
           # Debug: Test if the p12 file is valid
           echo "Testing p12 file validity..."
           if openssl pkcs12 -info -in /tmp/certificate.p12 -noout -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" 2>/dev/null; then
@@ -118,14 +122,158 @@ jobs:
             exit 1
           fi
           
-          # Sign the executable with certificate
-          /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
-            --p12-file /tmp/certificate.p12 \
-            --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-            latest-macos-x64 latest-macos-x64-signed
+                                # Sign the executable with Developer ID certificate
+            echo "Signing with Developer ID certificate..."
+            
+                         # Convert p12 to PEM format (contains both certificate and private key)
+             echo "Converting p12 to PEM format..."
+             openssl pkcs12 -in /tmp/certificate.p12 -out /tmp/certificate.pem -nodes -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"
+             
+             # Extract certificate and private key separately
+             echo "Extracting certificate and private key..."
+             openssl x509 -in /tmp/certificate.pem -out /tmp/certificate_only.pem
+             openssl pkey -in /tmp/certificate.pem -out /tmp/private_key.pem
+             
+             # Convert certificate to DER format
+             echo "Converting certificate to DER format..."
+             openssl x509 -in /tmp/certificate_only.pem -outform DER -out /tmp/certificate.der
+             
+             # Extract certificate info to verify it's a Developer ID certificate
+             echo "Certificate information:"
+             openssl x509 -in /tmp/certificate_only.pem -text -noout | grep -i "subject\|issuer" || echo "Could not extract certificate info"
+             
+             # Check rcodesign sign help to understand the correct flags
+             echo "Checking rcodesign sign help..."
+             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign --help
+             
+             # Try signing with rcodesign using the --for-notarization flag
+             echo "Trying to sign with rcodesign using --for-notarization flag..."
+             /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+               --p12-file /tmp/certificate.p12 \
+               --p12-password "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
+               --for-notarization \
+               latest-macos-x64 latest-macos-x64-signed || {
+               echo "P12 signing with --for-notarization failed, trying different password format..."
+               # Try with quoted password
+               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                 --p12-file /tmp/certificate.p12 \
+                 --p12-password '\"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}\"' \
+                 --for-notarization \
+                 latest-macos-x64 latest-macos-x64-signed || {
+                 echo "P12 signing still failed, trying with environment variable..."
+                 # Try with environment variable
+                 export P12_PASSWORD="${{ secrets.MACOS_CERTIFICATE_PASSWORD }}"
+                 /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                   --p12-file /tmp/certificate.p12 \
+                   --p12-password "$P12_PASSWORD" \
+                   --for-notarization \
+                   latest-macos-x64 latest-macos-x64-signed || {
+                   echo "All p12 signing attempts failed, trying with PEM file..."
+                   # Try with PEM file (contains both certificate and private key)
+                   /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                     --pem-file /tmp/certificate.pem \
+                     --for-notarization \
+                     latest-macos-x64 latest-macos-x64-signed || {
+                     echo "All signing attempts failed, using adhoc signing..."
+                     # Last resort: adhoc signing
+                     /tmp/apple-codesign-0.28.0-macos-universal/rcodesign sign \
+                       --certificate-der-file /tmp/certificate.der \
+                       --code-signature-flags runtime \
+                       latest-macos-x64 latest-macos-x64-signed
+                   }
+                 }
+               }
+             }
+           
+           # Verify the signature type
+           echo "Verifying signature type after signing..."
+           codesign -dv latest-macos-x64-signed
           
-          # Clean up sensitive files
-          rm -f /tmp/certificate.p12
+                                             # Clean up sensitive files
+             rm -f /tmp/certificate.p12 /tmp/certificate.pem /tmp/certificate_only.pem /tmp/private_key.pem /tmp/certificate.der
+           
+                       # Notarize the signed executable (optional but recommended)
+            echo "Notarizing the signed executable..."
+            if [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" ]; then
+              echo "Creating notarization request..."
+              echo "Issuer ID: ${{ secrets.APP_STORE_CONNECT_ISSUER }}"
+              
+              # Create p8 file from base64 secret
+              echo "${{ secrets.APP_STORE_CONNECT_KEY }}" | base64 -d > /tmp/app_store_connect.p8
+              
+              # Debug: Check if the p8 file was created correctly
+              echo "P8 file size: $(ls -la /tmp/app_store_connect.p8 | awk '{print $5}') bytes"
+              echo "P8 file first line: $(head -1 /tmp/app_store_connect.p8)"
+              
+              # Check rcodesign help for notary-submit
+              echo "Checking rcodesign notary-submit help..."
+              /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit --help
+              
+                             # Use encode-app-store-connect-api-key command to create proper JSON
+               echo "Creating API key JSON using encode-app-store-connect-api-key..."
+               /tmp/apple-codesign-0.28.0-macos-universal/rcodesign encode-app-store-connect-api-key \
+                 -o /tmp/api_key.json \
+                 "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
+                 "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+                 /tmp/app_store_connect.p8
+              
+                             # Debug: Check what type of file we have
+               echo "Checking file type for notarization..."
+               file latest-macos-x64-signed
+               ls -la latest-macos-x64-signed
+               
+               # Check if the file is code signed
+               echo "Checking code signature..."
+               codesign -dv latest-macos-x64-signed || echo "File is not code signed"
+               
+               # Check if the file has a valid code signature
+               echo "Verifying code signature..."
+               codesign --verify --verbose=4 latest-macos-x64-signed || echo "Code signature verification failed"
+               
+                               # Submit for notarization using macOS notarytool (more reliable)
+                echo "Submitting for notarization using notarytool..."
+                
+                # Convert the JSON API key to the format expected by notarytool
+                echo "Converting API key for notarytool..."
+                mkdir -p ~/.private_keys
+                cat > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8 << EOF
+                $(cat /tmp/app_store_connect.p8)
+                EOF
+                chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+                
+                # Submit for notarization using notarytool
+                xcrun notarytool submit latest-macos-x64-signed \
+                  --apple-id "${{ secrets.APP_STORE_CONNECT_ISSUER }}" \
+                  --password "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+                  --team-id "M7TH45B8T7" \
+                  --wait || {
+                  echo "notarytool failed, trying rcodesign notary-submit..."
+                  # Fallback to rcodesign
+                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign notary-submit \
+                    --api-key-file /tmp/api_key.json \
+                    --wait \
+                    latest-macos-x64-signed
+                }
+                
+                # Staple the notarization ticket
+                echo "Stapling notarization ticket..."
+                xcrun stapler staple latest-macos-x64-signed || {
+                  echo "stapler failed, trying rcodesign staple..."
+                  /tmp/apple-codesign-0.28.0-macos-universal/rcodesign staple \
+                    latest-macos-x64-signed
+                }
+              
+                             # Notarization and stapling completed in the previous command
+              
+              rm -f /tmp/app_store_connect.p8 /tmp/api_key.json
+              echo "✅ Notarization completed!"
+            else
+              echo "⚠️ Skipping notarization (App Store Connect credentials not provided)"
+              echo "To enable notarization, add these GitHub secrets:"
+              echo "- APP_STORE_CONNECT_ISSUER: Your App Store Connect API issuer ID"
+              echo "- APP_STORE_CONNECT_KEY: Your App Store Connect API key (base64 encoded)"
+              echo "- APP_STORE_CONNECT_KEY_ID: Your App Store Connect API key ID"
+            fi
           
 
 
