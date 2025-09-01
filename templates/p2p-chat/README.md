@@ -1,71 +1,51 @@
-# Neuron P2P Chat Demo
-This flow demonstrates how to build a **decentralized peer-to-peer (P2P) chat application** inside Node-RED using the [Neuron-Node-Builder](https://github.com/NeuronInnovations/neuron-node-builder) custom nodes.  
-It showcases how a **Seller node** can broadcast chat messages into the Neuron network, while a **Buyer node** subscribes and exchanges data securely via Hedera Hashgraph and the Neuron P2P SDK.
+This flow demonstrates how to configure a **Seller Node** for a **P2P chat application** in the **Neuron-Node-Builder** ecosystem. When deployed, it acts as a server, waiting for buyers to connect and exchange messages directly through the Neuron P2P network.
 
 ---
 
-## 🔹 How It Works
+### 📌 What the Flow Does
 
-### Seller Config
-- Creates a **Hedera account** for the seller.  
-- Automatically generates three topics:
-  - `stdin` → inbound control messages.  
-  - `stdout` → outbound chat messages.  
-  - `stderr` → error logs.  
-- Configures the seller with an **EVM address**, **device type**, and **contract binding**.  
-- Once deployed, the seller can broadcast messages over the Neuron P2P network.
-
-### Buyer Config
-- Initializes a **Hedera buyer account** and its own topics.  
-- Lets you **add Seller EVM addresses** to connect directly to chosen sellers.  
-- On deployment, the buyer subscribes to the sellers’ outbound streams and joins their chat session.
-
-### Neuron P2P Node
-- Acts as the **communication bridge** between Buyers and Sellers.  
-- You must **open each Neuron P2P node** in the flow and select the relevant **Buyer Config** or **Seller Config** to link them properly.  
-- Handles **secure P2P networking, discovery, and message delivery**.  
-- Requires **port forwarding (61336–61346)** on your router to allow external peers to connect.
-
-### Chat Messaging
-- Seller messages are passed into the **Neuron P2P node** and distributed to connected buyers.  
-- Buyers can also send chat messages upstream, enabling **two-way conversation**.  
-- The included **debug node** displays all received chat messages in the Node-RED debug sidebar.
+* **Initializes a Seller Config node** that automatically creates a Hedera account and messaging topics (`stdin`, `stdout`, `stderr`) for the seller.
+* **Sets up the Seller's identity** and binds it to a specific smart contract for the chat application.
+* **Establishes a Neuron P2P** connection, which listens for incoming peer-to-peer messages from buyers.
+* **Provides a custom chat UI** in the Node-RED dashboard to view all incoming messages from connected buyers in real time.
+* **Displays all incoming data streams** from buyers in the Debug panel for monitoring.
+* **Requires port forwarding** to allow peer-to-peer connections from external clients.
 
 ---
 
-## ⚙️ Setup Instructions
+### ⚙️ Flow Components
 
-1. **Deploy the Seller Node**
-   - Open the **Seller Config** node.  
-   - Configure your seller details (device type, smart contract, etc.).  
-   - Deploy to initialize the seller account and topics.  
-
-2. **Deploy the Buyer Node**
-   - Open the **Buyer Config** node.  
-   - Add the **Seller’s EVM address**.  
-   - Deploy to connect to the seller’s data streams.  
-
-3. **Link P2P Nodes**
-   - Open each **Neuron P2P node** in the flow.  
-   - Select the appropriate **Buyer Config** or **Seller Config** so that they are bound to the right accounts.  
-
-4. **Enable Networking**
-   - Configure your router to forward **ports 61336–61346** to your Node-RED machine.  
-
-5. **Test the Chat**
-   - Go to http://localhost:1880/ui
-   - Send messages via the Seller or Buyer.  
-   - Check the **debug sidebar** to confirm message exchange.  
+* **🔹 Seller Config**
+    * Creates a **seller account** on Hedera.
+    * Manages the device's role, name, and smart contract binding.
+    * Sets up Hedera topics for messaging, preparing the seller to receive buyer data streams.
+* **🔹 Neuron P2P**
+    * Establishes secure, direct peer-to-peer connections.
+    * Receives messages/data directly from connected buyers.
+    * Wires received data into the debug panel and the custom chat UI for inspection.
+* **🔹 UI Template (Seller Chat UI)**
+    * Provides a simple chat interface in the dashboard.
+    * Displays incoming messages from connected buyers.
+* **🔹 Debug Node**
+    * Prints **all messages received from buyers** into the editor's sidebar.
 
 ---
 
-## 🌍 Use Cases
-- Decentralized **real-time chat applications**.  
-- **IoT device messaging** without central servers.  
-- Testing **Hedera-based peer-to-peer applications**.  
-- Learning and prototyping with Neuron’s Buyer/Seller model.  
+### 🚀 How to Use
+
+1.  Import this flow into Neuron-Node-Builder.
+2.  Open the **Seller Config** node and provide a **Device Role**, **Device Name**, etc.
+3.  Open the **Neuron P2P** node and select the **Chat Seller Config** from the dropdown menu to link it.
+4.  Configure your router for **port forwarding (61336–61346)** to allow buyers to connect.
+5.  **Deploy the flow**. This will create the seller account and make it ready to receive connections.
+6.  To test the flow, you will need to **set up a separate Buyer flow**, and configure it to connect to this seller by using this seller's EVM address.
 
 ---
 
-## 🔗 Repository
-👉 Full SDK and example flows: [Neuron-Node-Builder on GitHub](https://github.com/NeuronInnovations/neuron-node-builder)  
+### 🧩 Example Use Case
+
+This flow allows you to act as a **data seller** in a decentralized chat marketplace.
+It's ideal for:
+* **Hosting a P2P service** that can be subscribed to by multiple buyers.
+* Demonstrating how a seller can receive and process data requests from a decentralized network.
+* Verifying peer-to-peer data delivery from the seller's perspective.

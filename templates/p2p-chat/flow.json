@@ -1,16 +1,16 @@
 [
     {
-        "id": "c3f5136b6650f867",
+        "id": "0b55db20e344c455",
         "type": "tab",
-        "label": "AI example",
+        "label": "P2P chat demo",
         "disabled": false,
         "info": "",
         "env": []
     },
     {
-        "id": "df7896b0c2d47c86",
+        "id": "dee1acd36cd7a507",
         "type": "group",
-        "z": "c3f5136b6650f867",
+        "z": "0b55db20e344c455",
         "style": {
             "stroke": "#3e404a",
             "stroke-opacity": "1",
@@ -21,205 +21,116 @@
             "color": "#f8f8f2"
         },
         "nodes": [
-            "e2aa6431bb8e65fc",
-            "040d0b0580014865",
-            "33090126d2172ea8",
-            "9bcc346653f238cf",
-            "74562a0ac4a9ee34",
-            "ed5bc5367bd6718f",
-            "c95f30b742ac8067",
-            "ee8637d594e209a4",
-            "c223936886787690",
-            "7bc52314aa610e4b"
+            "232a7d158c48660a",
+            "823299e6e516f388",
+            "6d69b70f57dfa90d",
+            "68d23e87d38c7499",
+            "dceb95d6c062242a"
         ],
-        "x": 14,
-        "y": 119,
-        "w": 1332,
-        "h": 382
+        "x": 74,
+        "y": 99,
+        "w": 912,
+        "h": 122
     },
     {
-        "id": "e2aa6431bb8e65fc",
-        "type": "ai-model",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "My AI Model",
-        "model": "microsoft/mai-ds-r1:free",
-        "temperature": 0.7,
-        "maxTokens": 1000,
-        "x": 1010,
-        "y": 200,
-        "wires": [
-            [
-                "33090126d2172ea8"
-            ]
-        ]
-    },
-    {
-        "id": "040d0b0580014865",
-        "type": "comment",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "[ACTION] - Configure your OpenRouter API key and model",
-        "info": "Go to https://openrouter.ai/ and register/sigin and create a new API KEY",
-        "x": 1030,
-        "y": 160,
+        "id": "232a7d158c48660a",
+        "type": "debug",
+        "z": "0b55db20e344c455",
+        "g": "dee1acd36cd7a507",
+        "name": "seller node",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 870,
+        "y": 180,
         "wires": []
     },
     {
-        "id": "33090126d2172ea8",
-        "type": "ai-agent",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "Ask my AI model",
-        "systemPrompt": "You are a helpful AI assistant.",
-        "responseType": "text",
-        "x": 1030,
-        "y": 320,
-        "wires": [
-            [
-                "9bcc346653f238cf",
-                "c223936886787690"
-            ]
-        ]
-    },
-    {
-        "id": "9bcc346653f238cf",
-        "type": "neuron-p2p",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "",
-        "selectedNode": "",
-        "description": "",
-        "x": 200,
-        "y": 320,
-        "wires": [
-            [
-                "ed5bc5367bd6718f"
-            ]
-        ]
-    },
-    {
-        "id": "74562a0ac4a9ee34",
-        "type": "comment",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "[ACTION] Double click and select \"Consultant Seller Config\"",
-        "info": "",
-        "x": 260,
-        "y": 280,
-        "wires": []
-    },
-    {
-        "id": "ed5bc5367bd6718f",
-        "type": "json",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "",
-        "property": "payload",
-        "action": "",
-        "pretty": false,
-        "x": 610,
-        "y": 320,
-        "wires": [
-            [
-                "c95f30b742ac8067"
-            ]
-        ]
-    },
-    {
-        "id": "c95f30b742ac8067",
-        "type": "function",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "Extract buyer's question",
-        "func": "msg.payload = msg.payload.text;\nmsg.othermessage = true;\nif(!msg.payload){\n    return null;\n}\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 730,
-        "y": 260,
-        "wires": [
-            [
-                "e2aa6431bb8e65fc",
-                "ee8637d594e209a4"
-            ]
-        ]
-    },
-    {
-        "id": "ee8637d594e209a4",
+        "id": "823299e6e516f388",
         "type": "ui_template",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "group": "5a98357c2bababf3",
+        "z": "0b55db20e344c455",
+        "g": "dee1acd36cd7a507",
+        "group": "5c67d128f7b79813",
         "name": "Seller Chat UI",
         "order": 0,
         "width": "6",
         "height": "15",
-        "format": "<style>\n  .chat-container-alt {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n    display: flex;\n    flex-direction: column;\n    height: 100%;\n    background-color: #f8f9fa;\n    border-radius: 8px;\n    overflow: hidden;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    margin-top: 10px;\n  }\n\n  .message-panel-alt {\n    flex-grow: 1;\n    overflow-y: auto;\n    padding: 16px;\n    background-color: #ffffff;\n  }\n\n  .message-alt {\n    max-width: 80%;\n    padding: 10px 14px;\n    margin-bottom: 12px;\n    border-radius: 10px;\n    line-height: 1.4;\n    position: relative;\n    word-wrap: break-word;\n    animation: fadeInAlt 0.3s ease-out;\n    background-color: #e9ecef;\n    color: #212529;\n  }\n\n  .message-alt-other {\n    background-color: #007bff;\n    color: #ffffff;\n  }\n\n  @keyframes fadeInAlt {\n    from {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n\n    to {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .timestamp-alt {\n    font-size: 11px;\n    opacity: 0.6;\n    margin-top: 4px;\n    text-align: right;\n  }\n\n  .input-area-alt {\n    display: flex;\n    padding: 12px;\n    background-color: #ffffff;\n    border-top: 1px solid #dee2e6;\n  }\n\n  #chat-input-alt {\n    flex-grow: 1;\n    padding: 10px 14px;\n    border: 1px solid #ced4da;\n    border-radius: 20px;\n    outline: none;\n    font-size: 14px;\n  }\n\n  #chat-input-alt:focus {\n    border-color: #007bff;\n  }\n\n  #send-button-alt {\n    margin-left: 10px;\n    padding: 10px 20px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 20px;\n    cursor: pointer;\n    font-size: 14px;\n  }\n\n  #send-button-alt:hover {\n    background-color: #0069d9;\n  }\n\n  #send-button-alt:disabled {\n    background-color: #adb5bd;\n    cursor: not-allowed;\n  }\n</style>\n\n<div class=\"chat-container-alt\">\n  <div id=\"message-panel-alt\" class=\"message-panel-alt\"></div>\n  <div class=\"input-area-alt\">\n    <input type=\"text\" id=\"chat-input-alt\" placeholder=\"Type your message...\" autocomplete=\"off\" />\n    <button id=\"send-button-alt\" disabled>Send</button>\n  </div>\n</div>\n\n<script>\n  (function(scope) {\n  const messagePanel = document.getElementById('message-panel-alt');\n  const chatInput = document.getElementById('chat-input-alt');\n  const sendButton = document.getElementById('send-button-alt');\n\n  function formatTimestamp(date = new Date()) {\n    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n  }\n\n  function scrollToBottom() {\n    messagePanel.scrollTop = messagePanel.scrollHeight;\n  }\n\n  function addMessage(text, isOther = false) {\n    const messageElement = document.createElement('div');\n    messageElement.className = \"message-alt\" + (isOther ? \" message-alt-other\" : \"\");\n    messageElement.innerHTML = `\n      ${text}\n      <div class=\"timestamp-alt\">${formatTimestamp()}</div>\n    `;\n    messagePanel.appendChild(messageElement);\n    scrollToBottom();\n  }\n\n  function updateSendButton() {\n    sendButton.disabled = chatInput.value.trim() === '';\n  }\n\n  function sendMessage() {\n    const messageText = chatInput.value.trim();\n    if (!messageText) return;\n    addMessage(messageText, false); // user messages are default style\n\n    if (typeof scope.send === 'function') {\n      scope.send({ payload: messageText });\n    }\n\n    chatInput.value = '';\n    updateSendButton();\n    chatInput.focus();\n  }\n\n  sendButton.addEventListener('click', sendMessage);\n  chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });\n  chatInput.addEventListener('input', updateSendButton);\n\n\n\nscope.$watch('msg', function(msg) {\n  if (!msg) return;\n  try {\n    const text = typeof msg.payload === 'object' \n      ? JSON.stringify(msg.payload) \n      : String(msg.payload);\n\n    const isOther = (msg.othermessage === true || msg.othermessage === \"true\");\n    addMessage(text, isOther);\n  } catch (err) {\n    console.error(\"Error showing message:\", err, msg);\n  }\n});\n\n\n  chatInput.focus();\n})(scope);\n</script>",
+        "format": "<style>\n  .chat-container-2 {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n    display: flex;\n    flex-direction: column;\n    height: 100%;\n    background-color: #f8f9fa;\n    border-radius: 8px;\n    overflow: hidden;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    margin-top: 10px;\n  }\n\n  .message-panel-2 {\n    flex-grow: 1;\n    overflow-y: auto;\n    padding: 16px;\n    background-color: #ffffff;\n  }\n\n  .message {\n    max-width: 80%;\n    padding: 10px 14px;\n    margin-bottom: 12px;\n    border-radius: 18px;\n    line-height: 1.4;\n    position: relative;\n    word-wrap: break-word;\n    animation: fadeIn 0.3s ease-out;\n  }\n\n  @keyframes fadeIn {\n    from {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n\n    to {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .user-message {\n    background-color: #007bff;\n    color: white;\n    margin-left: auto;\n    border-bottom-right-radius: 4px;\n  }\n\n  .other-message {\n    background-color: #e9ecef;\n    color: #212529;\n    margin-right: auto;\n    border-bottom-left-radius: 4px;\n  }\n\n  .timestamp {\n    font-size: 11px;\n    opacity: 0.8;\n    margin-top: 4px;\n    text-align: right;\n  }\n\n  .input-area {\n    display: flex;\n    padding: 12px;\n    background-color: #ffffff;\n    border-top: 1px solid #dee2e6;\n  }\n\n  #chat-input-2 {\n    flex-grow: 1;\n    padding: 10px 14px;\n    border: 1px solid #ced4da;\n    border-radius: 20px;\n    outline: none;\n    font-size: 14px;\n  }\n\n  #chat-input-2:focus {\n    border-color: #007bff;\n  }\n\n  #send-button-2 {\n    margin-left: 10px;\n    padding: 10px 20px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 20px;\n    cursor: pointer;\n    font-size: 14px;\n  }\n\n  #send-button-2:hover {\n    background-color: #0069d9;\n  }\n\n  #send-button-2:disabled {\n    background-color: #adb5bd;\n    cursor: not-allowed;\n  }\n\n  .typing-indicator {\n    display: flex;\n    padding: 8px 16px;\n    justify-content: flex-start;\n    gap: 4px;\n  }\n\n  .typing-dot {\n    width: 8px;\n    height: 8px;\n    background-color: #6c757d;\n    border-radius: 50%;\n    animation: typingAnimation 1.4s infinite ease-in-out;\n  }\n\n  .typing-dot:nth-child(1) {\n    animation-delay: 0s;\n  }\n\n  .typing-dot:nth-child(2) {\n    animation-delay: 0.2s;\n  }\n\n  .typing-dot:nth-child(3) {\n    animation-delay: 0.4s;\n  }\n\n  @keyframes typingAnimation {\n\n    0%,\n    60%,\n    100% {\n      transform: translateY(0);\n    }\n\n    30% {\n      transform: translateY(-4px);\n    }\n  }\n</style>\n\n<div class=\"chat-container-2\">\n  <div id=\"message-panel-2\" class=\"message-panel-2\"></div>\n  <div id=\"typing-indicator-2\" class=\"typing-indicator\" style=\"display: none;\">\n    <div class=\"typing-dot\"></div>\n    <div class=\"typing-dot\"></div>\n    <div class=\"typing-dot\"></div>\n  </div>\n  <div class=\"input-area\">\n    <input type=\"text\" id=\"chat-input-2\" placeholder=\"Type your message...\" autocomplete=\"off\" />\n    <button id=\"send-button-2\" disabled>Send</button>\n  </div>\n</div>\n\n<script>\n  (function(scope) {\n  const state = {\n    messageCount: 0,\n    isTyping: false,\n    pendingMessages: new Set()\n  };\n  \n  const messagePanel = document.getElementById('message-panel-2');\n  const chatInput = document.getElementById('chat-input-2');\n  const sendButton = document.getElementById('send-button-2');\n  const typingIndicator = document.getElementById('typing-indicator-2');\n  \n  function formatTimestamp(date = new Date()) {\n    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n  }\n  \n  function scrollToBottom() {\n    messagePanel.scrollTop = messagePanel.scrollHeight;\n  }\n  \n  function addMessage(text, sender, timestamp, messageId) {\n    const id = messageId || 'msg-' + state.messageCount++ + '-' + Date.now();\n    \n    if (state.pendingMessages.has(id)) return;\n    state.pendingMessages.add(id);\n    \n    const messageElement = document.createElement('div');\n    messageElement.className = `message ${sender}-message`;\n    messageElement.id = id;\n    messageElement.innerHTML = `\n      ${text}\n      <div class=\"timestamp\">${formatTimestamp(timestamp ? new Date(timestamp) : new Date())}</div>\n    `;\n    \n    messagePanel.appendChild(messageElement);\n    scrollToBottom();\n  }\n  \n  function updateSendButton() {\n    sendButton.disabled = chatInput.value.trim() === '';\n  }\n  \n  function sendMessage() {\n    const messageText = chatInput.value.trim();\n    if (!messageText) return;\n    \n    const timestamp = new Date();\n    const messageId = 'user-msg-2-' + Date.now();\n    \n    // Add to UI immediately with unique ID\n    addMessage(messageText, 'user', timestamp, messageId);\n    \n    // Send to Node-RED with a different ID to prevent echo\n    if (typeof scope.send === 'function') {\n      scope.send({ \n        payload: { \n          text: messageText, \n          sender: 'user',\n          timestamp: timestamp.toISOString(),\n          messageId: 'net-' + messageId, // Different prefix for network messages\n          instance: 'chat-2',\n          source: 'local' // Mark as locally originated\n        } \n      });\n    }\n    \n    chatInput.value = '';\n    updateSendButton();\n    chatInput.focus();\n  }\n  \n  // Event listeners\n  sendButton.addEventListener('click', sendMessage);\n  \n  chatInput.addEventListener('keypress', function(e) {\n    if (e.key === 'Enter') {\n      sendMessage();\n    }\n  });\n  \n  chatInput.addEventListener('input', updateSendButton);\n  \n  // Handle incoming messages\n  scope.$watch('msg', function(msg) {\n    if (!msg || !msg.payload) return;\n    \n    try {\n      // Skip locally originated messages that come back\n      if (msg.payload.source === 'local') return;\n      \n      // Handle typing indicator\n      if (msg.payload.typing !== undefined) {\n        typingIndicator.style.display = msg.payload.typing ? 'flex' : 'none';\n        scrollToBottom();\n        return;\n      }\n      \n      // Process message\n      let messageText, messageSender, timestamp, messageId;\n   \n      if (typeof msg.payload === 'string') {\n        const payload = JSON.parse(msg.payload);\n        messageText = payload.text;\n        messageSender = 'other';\n        timestamp = new Date();\n        messageId = 'other-msg-2-' + Date.now();\n      } \n      else if (typeof msg.payload === 'object') {\n        // Skip if this is a network echo of our own message\n        if (msg.payload.messageId && msg.payload.messageId.startsWith('net-user-msg-2-')) return;\n        \n        messageId = msg.payload.messageId || 'other-msg-2-' + Date.now();\n        messageText = msg.payload.text || '';\n        messageSender = msg.payload.sender === 'user' ? 'user' : 'other';\n        timestamp = msg.payload.timestamp || new Date();\n      }\n      \n      if (messageText && !state.pendingMessages.has(messageId)) {\n        addMessage(messageText, messageSender, timestamp, messageId);\n      }\n    } catch (error) {\n      console.error(\"Error processing message:\", error);\n    }\n  });\n  \n  // Focus input on load\n  chatInput.focus();\n\n})(scope);\n</script>",
         "storeOutMessages": true,
         "fwdInMessages": false,
         "resendOnRefresh": true,
         "templateScope": "local",
         "className": "",
-        "x": 1060,
-        "y": 460,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "c223936886787690",
-        "type": "function",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "UI formating",
-        "func": "\nmsg.othermessage = false;\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 1250,
-        "y": 320,
+        "x": 180,
+        "y": 180,
         "wires": [
             [
-                "ee8637d594e209a4"
+                "dceb95d6c062242a"
             ]
         ]
     },
     {
-        "id": "7bc52314aa610e4b",
+        "id": "6d69b70f57dfa90d",
+        "type": "comment",
+        "z": "0b55db20e344c455",
+        "g": "dee1acd36cd7a507",
+        "name": "[ACTION] - Double click and select \"Chat Seller Config\"\"",
+        "info": "",
+        "x": 550,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "68d23e87d38c7499",
         "type": "seller config",
-        "z": "c3f5136b6650f867",
-        "g": "df7896b0c2d47c86",
-        "name": "AI Seller Config",
+        "z": "0b55db20e344c455",
+        "g": "dee1acd36cd7a507",
+        "name": "Chat Seller Config",
         "deviceRole": "AI",
-        "deviceName": "AI Seller Config",
+        "deviceName": "seller",
         "smartContract": "chat",
-        "serialNumber": "cloud",
-        "deviceType": "cloud",
+        "serialNumber": "serial",
+        "deviceType": "type",
         "price": 0,
         "description": "",
-        "evmAddress": "EVM address not initialized yet",
-        "balance": "Not initialized yet",
+        "evmAddress": "0xd057510217a8cdb464843ed9abcb17f856854c0b",
+        "balance": "4.73 USDC",
         "buyerEvmAddress": [],
         "buyerDevices": [],
-        "publicKey": "Not initialized yet",
-        "stdInTopic": "StdIn topic not initialized yet",
-        "stdOutTopic": "StdOut topic not initialized yet",
-        "stdErrTopic": "StdErr topic not initialized yet",
-        "x": 160,
-        "y": 200,
+        "publicKey": "028bf470a8bfb7e29078286fbf9d3e0578157a5ae8b697d76cf50d6fffe3ecbf96",
+        "stdInTopic": "0.0.6650108",
+        "stdOutTopic": "0.0.6650109",
+        "stdErrTopic": "0.0.6650107",
+        "x": 190,
+        "y": 140,
         "wires": [
             []
         ]
     },
     {
-        "id": "5a98357c2bababf3",
+        "id": "dceb95d6c062242a",
+        "type": "neuron-p2p",
+        "z": "0b55db20e344c455",
+        "g": "dee1acd36cd7a507",
+        "name": "",
+        "selectedNode": "",
+        "description": "",
+        "x": 540,
+        "y": 180,
+        "wires": [
+            [
+                "232a7d158c48660a",
+                "823299e6e516f388"
+            ]
+        ]
+    },
+    {
+        "id": "5c67d128f7b79813",
         "type": "ui_group",
         "name": "Seller",
         "tab": "ef656de5cefe0a4d",
