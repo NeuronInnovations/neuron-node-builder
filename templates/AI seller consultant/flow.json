@@ -1,6 +1,6 @@
 [
     {
-        "id": "ca583f1ec0f09687",
+        "id": "8457586d179172d1",
         "type": "tab",
         "label": "Flow 2",
         "disabled": false,
@@ -8,9 +8,9 @@
         "env": []
     },
     {
-        "id": "6d6c09d8078c48c9",
+        "id": "86429136574a5d28",
         "type": "group",
-        "z": "ca583f1ec0f09687",
+        "z": "8457586d179172d1",
         "style": {
             "stroke": "#3e404a",
             "stroke-opacity": "1",
@@ -21,16 +21,16 @@
             "color": "#f8f8f2"
         },
         "nodes": [
-            "15ea30ca8b91e590",
-            "cf6eb92ecdf5890e",
-            "7ddfec4fd1ccdba8",
-            "091c84d948ee2183",
-            "f724d46336a12691",
-            "37b572aa01648314",
-            "d43ceaadf569133c",
-            "167d9a9c76cf8959",
-            "f8bcbfec1d043c1f",
-            "cbdebb0359f5a387"
+            "6754d3455b56d584",
+            "e6d8d9f317bea8ec",
+            "21ce5c1d0c40338c",
+            "25efbe773c7584c0",
+            "d4b6216d5c66463b",
+            "ed3d9525e6cdb44f",
+            "90e1208255c96276",
+            "3e3882d771232e9f",
+            "ef16649b591e0a28",
+            "27a7e06fb98f5983"
         ],
         "x": 14,
         "y": 119,
@@ -38,10 +38,10 @@
         "h": 382
     },
     {
-        "id": "15ea30ca8b91e590",
+        "id": "6754d3455b56d584",
         "type": "ai-model",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "My AI Model",
         "model": "microsoft/mai-ds-r1:free",
         "temperature": 0.7,
@@ -50,15 +50,15 @@
         "y": 200,
         "wires": [
             [
-                "7ddfec4fd1ccdba8"
+                "21ce5c1d0c40338c"
             ]
         ]
     },
     {
-        "id": "cf6eb92ecdf5890e",
+        "id": "e6d8d9f317bea8ec",
         "type": "comment",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "[ACTION] - Configure your OpenRouter API key and model",
         "info": "Go to https://openrouter.ai/ and register/sigin and create a new API KEY",
         "x": 1030,
@@ -66,10 +66,10 @@
         "wires": []
     },
     {
-        "id": "7ddfec4fd1ccdba8",
+        "id": "21ce5c1d0c40338c",
         "type": "ai-agent",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "Ask my AI model",
         "systemPrompt": "You are a helpful AI assistant.",
         "responseType": "text",
@@ -77,16 +77,16 @@
         "y": 320,
         "wires": [
             [
-                "091c84d948ee2183",
-                "cbdebb0359f5a387"
+                "25efbe773c7584c0",
+                "ef16649b591e0a28"
             ]
         ]
     },
     {
-        "id": "091c84d948ee2183",
+        "id": "25efbe773c7584c0",
         "type": "neuron-p2p",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "",
         "selectedNode": "",
         "description": "",
@@ -94,15 +94,15 @@
         "y": 320,
         "wires": [
             [
-                "d43ceaadf569133c"
+                "27a7e06fb98f5983"
             ]
         ]
     },
     {
-        "id": "f724d46336a12691",
+        "id": "d4b6216d5c66463b",
         "type": "seller config",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "Consultant Seller Config",
         "deviceRole": "Device role",
         "deviceName": "Device name",
@@ -126,10 +126,10 @@
         ]
     },
     {
-        "id": "37b572aa01648314",
+        "id": "ed3d9525e6cdb44f",
         "type": "comment",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "[ACTION] Double click and select \"Consultant Seller Config\"",
         "info": "",
         "x": 260,
@@ -137,27 +137,10 @@
         "wires": []
     },
     {
-        "id": "d43ceaadf569133c",
-        "type": "json",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
-        "name": "",
-        "property": "payload",
-        "action": "",
-        "pretty": false,
-        "x": 610,
-        "y": 320,
-        "wires": [
-            [
-                "167d9a9c76cf8959"
-            ]
-        ]
-    },
-    {
-        "id": "167d9a9c76cf8959",
+        "id": "90e1208255c96276",
         "type": "function",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "Extract buyer's question",
         "func": "msg.payload = msg.payload.text;\nmsg.othermessage = true;\nif(!msg.payload){\n    return null;\n}\nreturn msg;",
         "outputs": 1,
@@ -170,16 +153,16 @@
         "y": 260,
         "wires": [
             [
-                "15ea30ca8b91e590",
-                "f8bcbfec1d043c1f"
+                "6754d3455b56d584",
+                "3e3882d771232e9f"
             ]
         ]
     },
     {
-        "id": "f8bcbfec1d043c1f",
+        "id": "3e3882d771232e9f",
         "type": "ui_template",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "group": "5a98357c2bababf3",
         "name": "Seller Chat UI",
         "order": 0,
@@ -198,10 +181,10 @@
         ]
     },
     {
-        "id": "cbdebb0359f5a387",
+        "id": "ef16649b591e0a28",
         "type": "function",
-        "z": "ca583f1ec0f09687",
-        "g": "6d6c09d8078c48c9",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
         "name": "UI formating",
         "func": "\nmsg.othermessage = false;\nreturn msg;",
         "outputs": 1,
@@ -214,7 +197,31 @@
         "y": 320,
         "wires": [
             [
-                "f8bcbfec1d043c1f"
+                "3e3882d771232e9f"
+            ]
+        ]
+    },
+    {
+        "id": "27a7e06fb98f5983",
+        "type": "function",
+        "z": "8457586d179172d1",
+        "g": "86429136574a5d28",
+        "name": "Convert to JSON",
+        "func": "let out1 = null;\nlet out2 = null;\n\nlet payload = msg.payload;\n\nif (typeof payload === \"string\") {\n    if (payload.startsWith(\"Successfully sent message to peer\")) {\n        return null; // drop\n    }\n    if (payload.includes(\"/multistream/1.0.0\") || payload.includes(\"nrn-nodered/v1\")) {\n        return null; // drop\n    }\n}\ntry {\n    // Try to parse as JSON\n    msg.payload = JSON.parse(msg.payload);\n    out1 = msg;\n} catch (e) {\n    // If not valid JSON, wrap it in an object\n    msg.payload = { received: msg.payload, required:\"expecting json string with a key: text\" };\n    out2 = msg;\n}\n\nreturn [out1,out2];\n",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 490,
+        "y": 320,
+        "wires": [
+            [
+                "90e1208255c96276"
+            ],
+            [
+                "25efbe773c7584c0"
             ]
         ]
     },
