@@ -178,32 +178,16 @@ async function build() {
 
             fs.writeFileSync(configPath, JSON.stringify(pkgConfig, null, 2));
 
-            const command = `pkg --config ${configPath} -t ${target} --cjs --no-bundle -o ${outputPath} index.js`;
+            const command = `pkg --config ${configPath} -t ${target} --cjs -o ${outputPath} index.js`;
 
             console.log(chalk.grey(`Running: ${command}`));
 
-            try {
-                execSync(command, { stdio: 'inherit' });
-                console.log(chalk.blue(`Built ${target}`));
-            } catch (execError) {
-                console.error(chalk.red('Error building executable:'));
-                console.error(chalk.red('Command failed:'), command);
-                console.error(chalk.red('Error details:'), execError.message);
-                
-                // If there's stderr output, show it
-                if (execError.stderr) {
-                    console.error(chalk.red('Command stderr:'), execError.stderr.toString());
-                }
-                
-                // If there's stdout output, show it
-                if (execError.stdout) {
-                    console.error(chalk.red('Command stdout:'), execError.stdout.toString());
-                }
-                
-                process.exit(1);
-            }
+            execSync(command);
+
+            console.log(chalk.blue(`Built ${target}`));
         } catch (error) {
             console.error(chalk.red('Error building executable:'), error.message);
+
             process.exit(1);
         }
     }
