@@ -182,19 +182,35 @@ async function build() {
 
             console.log(chalk.grey(`Running: ${command}`));
 
-            execSync(command);
-
-            console.log(chalk.blue(`Built ${target}`));
+            try {
+                execSync(command, { stdio: 'inherit' });
+                console.log(chalk.blue(`Built ${target}`));
+            } catch (execError) {
+                console.error(chalk.red('Error building executable:'));
+                console.error(chalk.red('Command failed:'), command);
+                console.error(chalk.red('Error details:'), execError.message);
+                
+                // If there's stderr output, show it
+                if (execError.stderr) {
+                    console.error(chalk.red('Command stderr:'), execError.stderr.toString());
+                }
+                
+                // If there's stdout output, show it
+                if (execError.stdout) {
+                    console.error(chalk.red('Command stdout:'), execError.stdout.toString());
+                }
+                
+                process.exit(1);
+            }
         } catch (error) {
             console.error(chalk.red('Error building executable:'), error.message);
-
             process.exit(1);
         }
     }
 
     const targets = {
         'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
+        'latest-macos-x64': { bin: 'neuron-wrapper-macos-arm64', output: 'latest-macos-x64' },
         'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
     };
 
