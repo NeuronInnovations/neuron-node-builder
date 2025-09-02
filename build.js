@@ -30,13 +30,19 @@ async function build() {
         fs.mkdirSync(directories[2], { recursive: true });
     }
 
+    const headers = {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+    };
+    
+    if (process.env.GH_BUILD_TOKEN) {
+        headers['Authorization'] = `Bearer ${process.env.GH_BUILD_TOKEN}`;
+    }
+
     async function getLatestTag() {
         try {
             const response = await axios.get('https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases', {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                }
+                headers,
             });
 
             return response.data[0].tag_name;
@@ -71,10 +77,7 @@ async function build() {
     async function getAssets() {
         try {
             const response = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/tags/${tag}`, {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                }
+                headers,
             });
 
             return response.data.assets.map((asset) => {
@@ -107,10 +110,7 @@ async function build() {
             }
 
             const downloadResponse = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/assets/${asset.id}`, {
-                headers: {
-                    'Accept': 'application/octet-stream',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                },
+                headers,
                 responseType: 'stream',
             });
 
