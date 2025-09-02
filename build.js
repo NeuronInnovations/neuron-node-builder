@@ -193,16 +193,14 @@ async function build() {
     }
 
     const targets = {
-        'node18-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        'node18-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
-        'node18-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
+        'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
+        'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
+        'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
     };
 
     for (const target of Object.keys(targets)) {
         buildExecutable(target, targets[target].bin, targets[target].output);
     }
-
-    console.log(chalk.bold.red(`⚠️ Don't forget to commit the binary assets (build/bin folder) to GitHub before creating the release!`));
 }
 
 build();
