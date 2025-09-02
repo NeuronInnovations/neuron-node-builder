@@ -80,3 +80,13 @@ const child = spawn(process.execPath, [cliPath, ...args], {
 child.on('exit', (code) => {
   console.log('Process Exited', code);
 });
+
+// Open browser to localhost:1880 after a short delay to allow Node-RED to start
+setTimeout(() => {
+  try {
+    const opener = require('opener');
+    opener('http://localhost:1880');
+  } catch (err) {
+    console.log('Could not open browser:', err.message);
+  }
+}, 3000); // Wait 3 seconds for Node-RED to start up
