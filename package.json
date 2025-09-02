@@ -19,7 +19,7 @@
         "dev": "grunt dev",
         "build-dev": "grunt build-dev",
         "docs": "grunt docs",
-        "package": "node build.js"
+        "package": "node --max-old-space-size=8192 build.js"
     },
     "contributors": [
         {

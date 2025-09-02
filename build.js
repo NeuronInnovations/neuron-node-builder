@@ -162,13 +162,34 @@ async function build() {
                 assets: [
                     "../../package.json",
                     "../../neuron/**",
-                    "../../packages/node_modules/@node-red/**",
+                   /* "../../packages/node_modules/@node-red/**",
                     "../../packages/node_modules/node-red/**",
+                    "../../node_modules/node-red-dashboard/**",
+                    "../../node_modules/node-red-contrib-ai-agent/**",
+                    "../../node_modules/node-red-contrib-web-worldmap/**",
+                    "../../node_modules/@node-red-contrib-themes/**",
+                    "../../node_modules/socket.io/**",
+                    "../../node_modules/socket.io-adapter/**", 
+                    "../../node_modules/socket.io-parser/**",
+                    "../../node_modules/axios/**",
+                    "../../node_modules/@hashgraph/**",
+                    "../../node_modules/ethers/**",
+                    "../../node_modules/ws/**",
+                    "../../node_modules/dotenv/**",*/
                     "../../flows.json",
                     `../../build/bin/${bin}`,
                     "../../neuron-settings.js",
                     "../../.env.example",
                 ],
+           
+                "autoDetect": true,
+                "pkg": {
+                    "nodeOptions": [
+                        "--max-old-space-size=4096",
+                        "--max-semi-space-size=128"
+                    ]
+                }
+             
             }
 
             const configPath = path.join(directories[2], `pkg-${target}.json`);
