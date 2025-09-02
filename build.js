@@ -51,6 +51,7 @@ async function build() {
     const isNoPromptMode = process.env.CI === 'true' || process.argv.includes('--no-prompt');
     
     let tag;
+
     if (isNoPromptMode) {
         // In CI or no-prompt mode, automatically use the latest tag
         tag = await getLatestTag();
@@ -168,6 +169,8 @@ async function build() {
                     `../../build/bin/${bin}`,
                     "../../neuron-settings.js",
                     "../../.env.example",
+                    "../../node_modules/**",
+                    "../../public/**",
                 ],
             }
 
@@ -175,7 +178,7 @@ async function build() {
 
             fs.writeFileSync(configPath, JSON.stringify(pkgConfig, null, 2));
 
-            const command = `pkg --config ${configPath} -t ${target} -o ${outputPath} index.js`;
+            const command = `pkg --config ${configPath} -t ${target} --cjs --no-bundle -o ${outputPath} index.js`;
 
             console.log(chalk.grey(`Running: ${command}`));
 
@@ -190,9 +193,9 @@ async function build() {
     }
 
     const targets = {
-        'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
-        'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
+        'node18-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
+        'node18-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
+        'node18-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
     };
 
     for (const target of Object.keys(targets)) {
