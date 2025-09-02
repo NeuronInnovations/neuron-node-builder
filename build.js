@@ -194,7 +194,7 @@ async function build() {
 
     const targets = {
         'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        'latest-macos-x64': { bin: 'neuron-wrapper-macos-arm64', output: 'latest-macos-x64' },
+        'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
         'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
     };
 

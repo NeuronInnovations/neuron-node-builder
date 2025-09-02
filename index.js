@@ -28,7 +28,7 @@ require('dotenv').config({
 // Construct binary map
 const binaries = {
   'win32': 'neuron-wrapper-win64.exe',
-  'darwin': 'neuron-wrapper-macos-arm64',
+  'darwin': 'neuron-wrapper-darwin64',
   'linux': 'neuron-wrapper-linux-arm64'
 };
 
