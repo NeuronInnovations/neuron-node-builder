@@ -250,248 +250,204 @@ The Seller node allows you to:
 - **Price**: Price for the service
 - **Select Buyers**: Choose which buyer nodes to connect to
 
-## Creating Standalone Executables
+## Packaging and Distribution
 
-You can package Neuron Green as standalone executables for distribution without requiring users to install Node.js or any dependencies.
+This section covers how to package the Neuron Node Builder application into standalone executables and create professional distribution packages for macOS.
 
-### Building All Platform Executables
+### Prerequisites for Packaging
 
-To build executables for all supported platforms (Windows, macOS, Linux):
+- **Node.js 20.x** (required for optimal memory management)
+- **macOS** (for creating macOS packages)
+- **Apple Developer Account** (for code signing and notarization)
+- **Valid Code Signing Certificate** (Developer ID Application certificate)
+
+### Step 1: Package the Application
+
+First, build the standalone executable using the included build script:
 
 ```bash
+# Build the standalone executable
 npm run package
 ```
 
-This will create executables in the `build/releases/` directory:
-- `latest-win-x64.exe` - Windows 64-bit
-- `latest-darwin64` - macOS (both Intel and Apple Silicon)
-- `latest-linux-x64` - Linux 64-bit
+This will:
+- Download the required `neuron-wrapper` binaries for your platform
+- Package Node-RED and all dependencies into a single executable
+- Generate the executable in `build/releases/` directory
 
-### Building Without User Prompts (CI/Automation)
+**Note:** The build process uses `pkg` with optimized memory settings to prevent OOM errors.
 
-For automated builds or CI environments:
+### Step 2: Create macOS App Bundle (.app)
+
+Create a professional macOS application bundle:
 
 ```bash
-npm run package -- --no-prompt
+# Create .app bundle
+npm run create-app-bundle
 ```
 
-This automatically uses the latest available wrapper version.
+This generates:
+- `build/releases/Neuron-Node-builder.app` - A proper macOS application bundle
+- Includes all necessary resources and dependencies
+- Ready for code signing and distribution
 
-### Running the Standalone Executable
+### Step 3: Create macOS DMG Installer
 
-#### Method 1: Command Line
+Alternatively, create a professional DMG installer:
+
 ```bash
-# Navigate to the releases directory
-cd build/releases
-
-# Run the executable
-./latest-macos-x64          # macOS/Linux
-latest-win-x64.exe          # Windows
+# Create DMG installer
+npm run create-dmg
 ```
 
-#### Method 2: Double-Click App Bundle (macOS Only)
+This generates:
+- `build/releases/Neuron-Node-builder.dmg` - A professional disk image installer
+- Includes drag-and-drop installation
+- Applications folder shortcut
+- Custom volume icon (if available)
 
-To create a double-clickable macOS application:
+### Step 4: Code Signing and Notarization
+
+#### Option A: Sign and Notarize App Bundle
 
 ```bash
-# Create app bundle structure
-mkdir -p "Neuron-Node-Builder.app/Contents/MacOS"
-mkdir -p "Neuron-Node-Builder.app/Contents/Resources"
+# Sign and notarize the .app bundle
+./sign-and-notarize-app.sh
+```
 
-# Copy the executable
-cp build/releases/latest-macos-x64 "Neuron-Node-Builder.app/Contents/MacOS/"
+This script will:
+- Sign the app bundle with your Developer ID certificate
+- Apply hardened runtime and entitlements
+- Submit for Apple notarization
+- Staple the notarization ticket
 
-# Create the Info.plist file
-cat > "Neuron-Node-Builder.app/Contents/Info.plist" << EOF
+#### Option B: Sign and Notarize DMG
+
+```bash
+# Sign and notarize the DMG
+./sign-and-notarize-dmg.sh
+```
+
+This script will:
+- Sign the DMG with your Developer ID certificate
+- Apply hardened runtime and entitlements
+- Submit for Apple notarization
+- Staple the notarization ticket
+
+#### Option C: Simple Signing (Manual Notarization)
+
+For quick testing or manual notarization:
+
+```bash
+# Simple signing without automatic notarization
+./simple-sign.sh
+```
+
+### Step 5: Complete Build Workflow
+
+Run the complete automated workflow:
+
+```bash
+# Run complete build, package, and sign workflow
+./build-workflow.sh
+```
+
+This script automates the entire process:
+1. Package the application
+2. Create app bundle or DMG
+3. Sign with code signing certificate
+4. Submit for notarization
+5. Staple the notarization ticket
+
+### Configuration Files
+
+#### entitlements.plist
+
+The packaging process automatically includes an `entitlements.plist` file with necessary permissions:
+
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key>
-    <string>latest-macos-x64</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.neuron.node-builder</string>
-    <key>CFBundleName</key>
-    <string>Neuron Node Builder</string>
-    <key>CFBundleVersion</key>
-    <string>4.0.9</string>
-    <key>CFBundleShortVersionString</key>
-    <string>4.0.9</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
-    <key>LSUIElement</key>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
 </dict>
 </plist>
-EOF
 ```
 
-Now you can double-click `Neuron-Node-Builder.app` in Finder to start the application.
+These entitlements allow:
+- JIT compilation for Node.js
+- Third-party library loading
+- Dynamic code execution
 
-### Accessing the Application
+#### Environment Configuration
 
-After starting the executable (either method):
+The packaged application uses:
+- Port 1880 for Node-RED (configurable in `neuron-settings.js`)
+- Automatic browser opening after startup
+- Environment variables from `~/.neuron-node-builder/.env`
 
-1. **Open your browser** and navigate to: `http://127.0.0.1:1880`
-2. **The Node-RED interface** will be available with all Neuron nodes pre-loaded
-3. **Environment configuration** will be loaded from `~/.neuron-node-builder/.env`
+### Distribution
 
-### Distribution Notes
+After successful signing and notarization:
 
-- **Single File Distribution**: Share just the executable file (`latest-macos-x64`, etc.)
-- **App Bundle Distribution**: Share the entire `Neuron-Node-Builder.app` folder (macOS only)
-- **Dependencies**: The executable includes all Node.js dependencies and Neuron wrapper binaries
-- **Environment**: Users will need to configure their own `.env` file with Hedera credentials
+1. **App Bundle**: Users can drag the `.app` to Applications folder
+2. **DMG**: Users can mount and install via drag-and-drop
+3. **No Security Warnings**: Properly signed and notarized packages bypass Gatekeeper
+4. **Professional Installation**: Clean, professional user experience
 
-### What's Included in the Executable
+### Troubleshooting Packaging Issues
 
-The standalone executable includes:
-- Complete Node-RED runtime (v4.0.9)
-- All Neuron custom nodes (buyer, seller, p2p, etc.)
-- Platform-specific neuron-wrapper binary
-- All Node.js dependencies
-- Custom Neuron theme and settings
+#### Common Build Errors
 
-## Professional Distribution (macOS)
+1. **"Fatal javascript OOM in MemoryChunk allocation failed during deserialization"**
+   - Ensure you're using Node.js 20.x
+   - The build script includes optimized memory settings
 
-For professional distribution on macOS, you can create a signed and notarized DMG installer that provides a seamless installation experience without security warnings.
+2. **"Binary path does not exist"**
+   - Check that `build/bin/` contains the required binaries
+   - Verify the build process completed successfully
 
-### Prerequisites for Professional Distribution
+3. **"Error loading settings file"**
+   - Ensure `neuron-settings.js` is included in the package
+   - Check the pkg configuration in `build.js`
 
-1. **Apple Developer Account** - Required for code signing
-2. **Developer ID Application Certificate** - For code signing
-3. **App Store Connect API Key** - For notarization
-4. **macOS Development Environment** - Xcode Command Line Tools
+#### Code Signing Issues
 
-### Step 1: Create the Package
+1. **"codesign not found"**
+   - Install Xcode Command Line Tools: `xcode-select --install`
 
-Build the app bundle and cross-platform executables:
+2. **"No Developer ID certificate found"**
+   - Import your Developer ID certificate to the keychain
+   - Use the provided import scripts or import manually
 
-```bash
-npm run package
-```
+3. **Notarization failures**
+   - Check Apple's notarization logs for specific issues
+   - Ensure all dependencies are properly signed
+   - Verify the entitlements are appropriate
 
-This creates:
-- `build/releases/Neuron-Node-builder.app` - macOS app bundle
-- `build/releases/latest-macos-x64` - macOS executable
-- `build/releases/latest-linux-x64` - Linux executable
-- `build/releases/latest-win-x64.exe` - Windows executable
+### Advanced Configuration
 
-### Step 2: Create the DMG Installer
+#### Custom Build Options
 
-Create a professional DMG installer with drag-and-drop installation:
+Modify `build.js` to customize:
+- Target platforms and architectures
+- Memory allocation settings
+- Asset inclusion/exclusion
+- Binary download sources
 
-```bash
-./create-dmg.sh
-```
+#### Custom Signing Options
 
-This script will:
-- ✅ Validate that the app bundle exists
-- ✅ Calculate optimal DMG size
-- ✅ Create a temporary DMG with the app bundle
-- ✅ Mount and customize the DMG (add Applications folder symlink)
-- ✅ Apply custom styling and layout
-- ✅ Convert to final compressed DMG format
-- ✅ Generate `build/releases/Neuron-Node-Builder.dmg` (~150MB)
-
-The resulting DMG provides a professional installation experience where users can drag the app to their Applications folder.
-
-### Step 3: Sign and Notarize the DMG
-
-For distribution without security warnings, sign and notarize the DMG:
-
-```bash
-./sign-and-notarize-dmg.sh
-```
-
-This script will:
-- ✅ Validate prerequisites (certificate, API key, tools)
-- ✅ Find or import your Developer ID Application certificate
-- ✅ Create a signed copy of the DMG
-- ✅ Submit to Apple for notarization
-- ✅ Wait for notarization approval (~2-10 minutes)
-- ✅ Staple the notarization ticket to the DMG
-- ✅ Generate `build/releases/Neuron-Node-Builder-signed.dmg`
-
-**Required Files for Signing:**
-- `certificate_2_decoded.p12` - Your Developer ID certificate (PKCS#12 format)
-- `neuron/apple-credentials` - App Store Connect API key (contains private key)
-
-### Certificate and API Key Setup
-
-#### Getting Your Developer ID Certificate
-
-1. Log into [Apple Developer Portal](https://developer.apple.com)
-2. Go to Certificates, Identifiers & Profiles > Certificates
-3. Create a new "Developer ID Application" certificate
-4. Download and install in Keychain Access
-5. Export as `.p12` file with password `N3uron.W0rld`
-6. Save as `certificate_2_decoded.p12` in project root
-
-#### Getting App Store Connect API Key
-
-1. Log into [App Store Connect](https://appstoreconnect.apple.com)
-2. Go to Users and Access > Keys > App Store Connect API
-3. Create a new key with "Developer" role
-4. Download the `.p8` file
-5. Save the private key content to `neuron/apple-credentials`
-
-**Example `neuron/apple-credentials` format:**
-```
------BEGIN PRIVATE KEY-----
-MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg...
-[your private key content]
-...
------END PRIVATE KEY-----
-```
-
-### End-to-End Distribution Workflow
-
-For a complete professional distribution build:
-
-```bash
-# 1. Build the package
-npm run package
-
-# 2. Create the DMG
-./create-dmg.sh
-
-# 3. Sign and notarize
-./sign-and-notarize-dmg.sh
-```
-
-**Final Result:** `build/releases/Neuron-Node-Builder-signed.dmg`
-
-This DMG is ready for distribution and will install on any macOS system without security warnings.
-
-### Distribution Benefits
-
-✅ **Professional Installation Experience**
-- Drag-and-drop to Applications folder
-- Custom DMG background and layout
-- No security warnings or gatekeeper issues
-
-✅ **Code Signed & Notarized**
-- Signed with Developer ID certificate
-- Notarized by Apple for trust verification
-- Stapled notarization ticket for offline verification
-
-✅ **Universal Compatibility**
-- Works on both Intel and Apple Silicon Macs
-- Supports macOS 10.15+ (Catalina and later)
-- No user configuration required for basic installation
-
-### Script Details
-
-- **`create-dmg.sh`** - Creates professional DMG installer with custom styling
-- **`sign-and-notarize-dmg.sh`** - Handles code signing and Apple notarization
-- **Certificate management** - Automatic keychain import/export
-- **Error handling** - Comprehensive validation and cleanup
-- **Cross-platform** - Scripts work on any macOS development machine
+Modify signing scripts to:
+- Use different certificates
+- Apply custom entitlements
+- Configure notarization settings
+- Set custom bundle identifiers
 
 ## Troubleshooting
 
@@ -522,4 +478,3 @@ If `SDK_LOG_FOLDER` is set, check the log files for detailed error information:
 - `buyer-{nodeId}-stderr.log` - Buyer process stderr
 - `seller-{nodeId}-stdout.log` - Seller process stdout
 - `seller-{nodeId}-stderr.log` - Seller process stderr
-
