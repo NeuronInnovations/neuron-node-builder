@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neuron Co-Pilot Chat</title>
+    <title>Neuron Node-Pilot Chat</title>
     <script src="/neuron/theme/chat-server-config.js"></script>
     <style>
         * {
@@ -212,7 +212,7 @@
                 <svg width="20" height="20" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;">
                     <path d="M116.736 373.991C116.736 373.991 117.296 250.322 188.729 231.521C289.649 204.96 297.03 397.603 398.286 371.564C482.834 349.821 483.029 229 483.029 229" stroke="white" stroke-width="40.6992" stroke-linecap="square"/>
                 </svg>
-                Neuron Co-Pilot
+                Neuron Node-Pilot
             </span>
             <button onclick="window.close()" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer; padding: 8px;">✕</button>
         </div>
@@ -398,6 +398,55 @@
             }
             
             console.log('[AUTH] User forced back to login state');
+        }
+        
+        // Refresh expired access token
+        async function refreshAccessToken() {
+            const refreshToken = localStorage.getItem('refresh-token');
+            
+            if (!refreshToken) {
+                console.log('❌ [AUTH] No refresh token available');
+                return false;
+            }
+            
+            try {
+                console.log('🔄 [AUTH] Attempting to refresh access token...');
+                
+                const response = await fetch(`${CONFIG.serverUrl}/api/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        refresh_token: refreshToken
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.access_token) {
+                        // Store new tokens
+                        localStorage.setItem('chat-token', data.access_token);
+                        if (data.refresh_token) {
+                            localStorage.setItem('refresh-token', data.refresh_token);
+                        }
+                        if (data.expires_in) {
+                            const expiresAt = Date.now() + (parseInt(data.expires_in) * 1000);
+                            localStorage.setItem('token-expires-at', expiresAt);
+                        }
+                        
+                        console.log('✅ [AUTH] Access token refreshed successfully');
+                        return true;
+                    }
+                } else {
+                    console.error('❌ [AUTH] Token refresh failed:', response.status);
+                }
+            } catch (error) {
+                console.error('❌ [AUTH] Error refreshing token:', error);
+            }
+            
+            return false;
         }
         
         // Debug function to check localStorage data
@@ -999,11 +1048,54 @@
             if (!response.ok) {
                 if (response.status === 401) {
                     // Token expired or invalid
-                    console.log('[AUTH] 401 Unauthorized response received');
-                    serverConnectionState = 'disconnected';
-                    updateStatus('Authentication required', 'error');
-                    handleAuthenticationFailure();
-                    throw new Error('Authentication required');
+                    console.log('[AUTH] 401 Unauthorized response received, attempting token refresh...');
+                    
+                    // Try to refresh the token before giving up
+                    const refreshSuccess = await refreshAccessToken();
+                    if (refreshSuccess) {
+                        console.log('✅ [AUTH] Token refreshed successfully, retrying request...');
+                        
+                        // Get the new token and retry the request
+                        const newAccessToken = localStorage.getItem('chat-token');
+                        if (newAccessToken) {
+                            const retryResponse = await fetch(`${CONFIG.serverUrl}${CONFIG.apiEndpoint}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${newAccessToken}`
+                                },
+                                body: JSON.stringify(requestBody)
+                            });
+                            
+                            if (retryResponse.ok) {
+                                console.log('✅ [AUTH] Retry request successful after token refresh');
+                                const retryData = await retryResponse.json();
+                                return retryData;
+                            } else {
+                                console.log('❌ [AUTH] Retry request failed even with refreshed token');
+                                serverConnectionState = 'disconnected';
+                                updateStatus('Authentication required', 'error');
+                                handleAuthenticationFailure();
+                                throw new Error('Authentication required');
+                            }
+                        } else {
+                            console.log('❌ [AUTH] No new token available after refresh');
+                            serverConnectionState = 'disconnected';
+                            updateStatus('Authentication required', 'error');
+                            handleAuthenticationFailure();
+                            throw new Error('Authentication required');
+                        }
+                    } else {
+                        console.log('❌ [AUTH] Token refresh failed, logging out user');
+                        serverConnectionState = 'disconnected';
+                        updateStatus('Authentication required', 'error');
+                        handleAuthenticationFailure();
+                        throw new Error('Authentication required');
+                    }
+                } else if (response.status === 429) {
+                    // Rate limiting - don't logout, just show error
+                    console.log('⚠️ [RATE LIMIT] Too many requests, please wait before trying again');
+                    throw new Error('Rate limit exceeded - please wait before sending another message');
                 }
                 throw new Error('Server error: ' + response.status + ' ' + response.statusText);
             }
