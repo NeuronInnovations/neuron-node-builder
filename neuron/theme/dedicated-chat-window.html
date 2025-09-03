@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuron Co-Pilot Chat</title>
+    <script src="/neuron/theme/chat-server-config.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1D1D1D;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #1D1D1D;
+            border: 1px solid #333;
+            border-radius: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: #1D1D1D;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            min-height: 32px;
+            position: relative;
+            border-bottom: 1px solid #333;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 2px;
+            overflow-y: auto;
+            background: #1D1D1D;
+            max-height: none;
+            scrollbar-width: thin;
+            scrollbar-color: #c1c1c1 #1D1D1D;
+            margin-bottom: 60px;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .chat-input-area {
+            padding: 4px;
+            border-top: 1px solid #333;
+            background: #1D1D1D;
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+            min-height: 40px;
+            width: 100%;
+            box-sizing: border-box;
+            position: absolute;
+            bottom: 32px;
+            left: 0;
+            right: 0;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            min-width: 0;
+            background: #1D1D1D;
+            color: white;
+        }
+        
+        .chat-input::placeholder {
+            color: #a0aec0;
+        }
+        
+        .chat-send {
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        
+        .chat-send:hover {
+            background: #0056b3;
+        }
+        
+
+        
+        .chat-status {
+            text-align: center;
+            padding: 4px 3px;
+            border-top: 1px solid #333;
+            background: #1D1D1D;
+            flex-shrink: 0;
+            min-height: 16px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+        
+        .chat-status small {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        /* Typing animation */
+        @keyframes dot1 { 0%, 20% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes dot2 { 0%, 20% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes dot3 { 0%, 20% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
+        
+        .typing-dots span:nth-child(1) { animation-delay: 0s; }
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        
+        /* Markdown formatting styles */
+        h3, h4 {
+            margin: 16px 0 8px 0;
+            font-weight: bold;
+            color: inherit;
+        }
+        
+        h3 { font-size: 16px; }
+        h4 { font-size: 14px; }
+        
+        strong { font-weight: bold; }
+        em { font-style: italic; }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .list-item {
+            margin: 2px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+        
+        .list-item .number {
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+        
+        .list-item .bullet {
+            position: absolute;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <span>
+                <svg width="20" height="20" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;">
+                    <path d="M116.736 373.991C116.736 373.991 117.296 250.322 188.729 231.521C289.649 204.96 297.03 397.603 398.286 371.564C482.834 349.821 483.029 229 483.029 229" stroke="white" stroke-width="40.6992" stroke-linecap="square"/>
+                </svg>
+                Neuron Co-Pilot
+            </span>
+            <button onclick="window.close()" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer; padding: 8px;">✕</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages will be loaded here -->
+        </div>
+        <div class="chat-input-area">
+            <input type="text" placeholder="Ask about Neuron software..." class="chat-input" id="chat-input">
+            <button class="chat-send" id="chat-send">Send</button>
+        </div>
+        <div class="chat-status">
+            <small id="status-text">Chat window - Original window will be restored when you close this</small>
+        </div>
+    </div>
+    
+    <script>
+        // User context management functions
+        function getUserIdFromToken() {
+            try {
+                const token = localStorage.getItem('chat-token');
+                if (!token) {
+                    console.log('[USER DATA] No token found, using default user');
+                    return 'default';
+                }
+                
+                // Parse JWT token to extract user ID
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const userId = payload.sub || payload.user_id || payload.id;
+                
+                if (userId) {
+                    console.log('[USER DATA] Extracted user ID from token:', userId);
+                    return userId;
+                } else {
+                    console.log('[USER DATA] No user ID in token payload, using default');
+                    return 'default';
+                }
+            } catch (error) {
+                console.error('[USER DATA] Error parsing token:', error);
+                return 'default';
+            }
+        }
+        
+        function getUserStorageKey(baseKey) {
+            const userId = getUserIdFromToken();
+            const userKey = `${baseKey}-${userId}`;
+            console.log('[USER DATA] Using storage key:', userKey, 'for user:', userId);
+            return userKey;
+        }
+        
+        function getUserData(dataType) {
+            const key = getUserStorageKey('neuron-chat-widget-data');
+            try {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    console.log(`[USER DATA] Retrieved ${dataType} for user:`, getUserIdFromToken());
+                    console.log(`[USER DATA] Storage key used:`, key);
+                    console.log(`[USER DATA] Data size:`, data.length, 'characters');
+                    return parsed;
+                } else {
+                    console.log(`[USER DATA] No data found for key:`, key);
+                }
+            } catch (error) {
+                console.error('[USER DATA] Error reading user data:', error);
+            }
+            return null;
+        }
+        
+        function setUserData(dataType, data) {
+            const key = getUserStorageKey('neuron-chat-widget-data');
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+                console.log(`[USER DATA] Storing ${dataType} for user:`, getUserIdFromToken());
+            } catch (error) {
+                console.error('[USER DATA] Error saving user data:', error);
+            }
+        }
+        
+        // Error handling and UX functions
+        function checkServerHealth() {
+            return new Promise(async (resolve) => {
+                try {
+                    const response = await fetch(`${CONFIG.serverUrl}${CONFIG.healthEndpoint}`, {
+                        method: 'GET',
+                        timeout: 5000
+                    });
+                    const isHealthy = response.ok;
+                    console.log('[SERVER HEALTH] Server health check:', isHealthy ? '✅ Healthy' : '❌ Unhealthy');
+                    resolve(isHealthy);
+                } catch (error) {
+                    console.log('[SERVER HEALTH] Server health check failed:', error.message);
+                    resolve(false);
+                }
+            });
+        }
+        
+        function showReconnectingBanner() {
+            // Remove existing banner if present
+            hideReconnectingBanner();
+            
+            const banner = document.createElement('div');
+            banner.id = 'neuron-reconnecting-banner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: #f39c12;
+                color: white;
+                text-align: center;
+                padding: 12px;
+                font-size: 14px;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            `;
+            banner.innerHTML = '🔄 Reconnecting to server...';
+            
+            document.body.appendChild(banner);
+            console.log('[RECONNECTION] Reconnecting banner displayed');
+        }
+        
+        function hideReconnectingBanner() {
+            const banner = document.getElementById('neuron-reconnecting-banner');
+            if (banner) {
+                banner.remove();
+                console.log('[RECONNECTION] Reconnecting banner hidden');
+            }
+        }
+        
+        function clearUserData(userId) {
+            try {
+                // Remove user-specific chat data
+                const chatKey = `neuron-chat-widget-data-${userId}`;
+                localStorage.removeItem(chatKey);
+                
+                // Remove other user-specific data if any
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.includes(`-${userId}`)) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    console.log(`[USER DATA] Removed user data key: ${key}`);
+                });
+                
+                console.log(`[USER DATA] Cleared all data for user: ${userId}`);
+            } catch (error) {
+                console.error('[USER DATA] Error clearing user data:', error);
+            }
+        }
+        
+        function handleAuthenticationFailure() {
+            const userId = getUserIdFromToken();
+            console.log('[AUTH] Authentication failure detected, clearing user data for:', userId);
+            
+            // Clear user-specific data
+            clearUserData(userId);
+            
+            // Clear authentication tokens
+            localStorage.removeItem('chat-token');
+            localStorage.removeItem('refresh-token');
+            localStorage.removeItem('token-expires-at');
+            localStorage.removeItem('token-type');
+            
+            // Show authentication required message
+            const messagesContainer = document.getElementById('chat-messages');
+            if (messagesContainer) {
+                const authMessage = document.createElement('div');
+                authMessage.className = 'chat-message chat-system';
+                authMessage.innerHTML = `
+                    <div class="message-content">
+                        🔐 Authentication required. Please log in again to continue.
+                    </div>
+                    <div class="message-time">${new Date().toLocaleTimeString()}</div>
+                `;
+                messagesContainer.appendChild(authMessage);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            console.log('[AUTH] User forced back to login state');
+        }
+        
+        // Debug function to check localStorage data
+        function debugLocalStorage() {
+            console.log('🔍 [DEBUG] Checking localStorage data...');
+            const userId = getUserIdFromToken();
+            const key = getUserStorageKey('neuron-chat-widget-data');
+            
+            console.log('🔍 [DEBUG] User ID:', userId);
+            console.log('🔍 [DEBUG] Storage key:', key);
+            
+            // Check all localStorage keys
+            console.log('🔍 [DEBUG] All localStorage keys:');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('neuron-chat-widget-data')) {
+                    const data = localStorage.getItem(key);
+                    console.log(`🔍 [DEBUG] Key: ${key}, Size: ${data ? data.length : 0} chars`);
+                    if (data) {
+                        try {
+                            const parsed = JSON.parse(data);
+                            console.log(`🔍 [DEBUG] Data structure:`, {
+                                hasMessages: !!parsed.messages,
+                                messageCount: parsed.messages ? parsed.messages.length : 0,
+                                hasChatHistory: !!parsed.chatHistory,
+                                chatHistoryCount: parsed.chatHistory ? parsed.chatHistory.length : 0
+                            });
+                        } catch (e) {
+                            console.log(`🔍 [DEBUG] Data is not valid JSON`);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Initialize server health monitoring
+        function initializeServerHealthMonitoring() {
+            console.log('[SERVER HEALTH] Initializing server health monitoring...');
+            
+            // Initial health check
+            checkServerHealth().then(isHealthy => {
+                if (!isHealthy) {
+                    showReconnectingBanner();
+                }
+            });
+            
+            // Set up periodic health monitoring (every 30 seconds)
+            setInterval(async () => {
+                const isHealthy = await checkServerHealth();
+                if (isHealthy) {
+                    hideReconnectingBanner();
+                } else {
+                    showReconnectingBanner();
+                }
+            }, 30000);
+            
+            console.log('[SERVER HEALTH] Server health monitoring initialized');
+        }
+        
+        // Load chat data from user-specific localStorage
+        function loadChatData() {
+            try {
+                console.log('📱 [DEDICATED CHAT] Starting to load chat data...');
+                
+                // First, check if the messages container exists
+                const messagesContainer = document.getElementById('chat-messages');
+                if (!messagesContainer) {
+                    console.error('📱 [DEDICATED CHAT] Messages container not found!');
+                    return;
+                }
+                
+                // Get chat data from localStorage
+                const chatData = getUserData('chat');
+                console.log('📱 [DEDICATED CHAT] Retrieved chat data:', chatData);
+                
+                if (!chatData) {
+                    console.warn('📱 [DEDICATED CHAT] No chat data found in localStorage');
+                    return;
+                }
+                
+                // Clear existing messages first
+                messagesContainer.innerHTML = '';
+                console.log('📱 [DEDICATED CHAT] Cleared existing messages');
+                
+                if (chatData.messages && Array.isArray(chatData.messages)) {
+                    console.log('📱 [DEDICATED CHAT] Loading', chatData.messages.length, 'messages from messages array');
+                    
+                    // Track loaded message IDs to prevent duplicates
+                    const loadedMessageIds = new Set();
+                    
+                    chatData.messages.forEach((msg, index) => {
+                        // Check for duplicate by ID or content+timestamp
+                        const messageId = msg.id || `${msg.timestamp}-${msg.text.substring(0, 20)}`;
+                        
+                        if (loadedMessageIds.has(messageId)) {
+                            console.log(`📱 [DEDICATED CHAT] Skipping duplicate message ${index + 1}:`, msg);
+                            return;
+                        }
+                        
+                        loadedMessageIds.add(messageId);
+                        console.log(`📱 [DEDICATED CHAT] Loading message ${index + 1}:`, msg);
+                        // Load existing messages without saving to localStorage (prevents duplication)
+                        addMessage(msg.text, msg.sender, false, msg.time, msg.timestamp);
+                    });
+                    
+                    console.log('📱 [DEDICATED CHAT] Successfully loaded', chatData.messages.length, 'messages');
+                    
+                } else if (chatData.chatHistory && Array.isArray(chatData.chatHistory)) {
+                    // Handle legacy format
+                        console.log('📱 [DEDICATED CHAT] Migrating old chatHistory format to new messages format');
+                    const migratedData = {
+                        ...chatData,
+                        messages: chatData.chatHistory.map(message => ({
+                            text: message.content,
+                            sender: message.role,
+                            time: message.timestamp || new Date().toLocaleTimeString()
+                        }))
+                    };
+                        // Remove old format
+                    delete migratedData.chatHistory;
+                    
+                    // Save migrated data back to user-specific localStorage
+                    setUserData('chat', migratedData);
+                        console.log('📱 [DEDICATED CHAT] Migration completed, saved back to localStorage');
+                    
+                    // Load the migrated messages
+                    migratedData.messages.forEach((msg, index) => {
+                        console.log(`📱 [DEDICATED CHAT] Loading migrated message ${index + 1}:`, msg);
+                                addMessage(msg.text, msg.sender, false);
+                            });
+                    
+                    console.log('📱 [DEDICATED CHAT] Successfully loaded', migratedData.messages.length, 'migrated messages');
+                    
+                    } else {
+                    console.warn('📱 [DEDICATED CHAT] No valid messages found in chat data. Data structure:', chatData);
+                    console.log('📱 [DEDICATED CHAT] Available keys:', Object.keys(chatData));
+                }
+                
+                // Final verification
+                const finalMessageCount = messagesContainer.children.length;
+                console.log('📱 [DEDICATED CHAT] Final message count in container:', finalMessageCount);
+                
+            } catch (error) {
+                console.error('📱 [DEDICATED CHAT] Error loading chat data:', error);
+                console.error('📱 [DEDICATED CHAT] Error stack:', error.stack);
+            }
+        }
+        
+        // Professional markdown parser with proper list formatting and spacing
+        function parseMarkdown(text) {
+            if (!text || typeof text !== 'string') {
+                return text;
+            }
+            
+            let formatted = text;
+            
+            // Step 1: Handle code blocks first (before line processing)
+            formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre style="background: #2d3748; color: #e2e8f0; padding: 12px; border-radius: 6px; margin: 12px 0; overflow-x: auto; font-family: monospace; font-size: 12px;">$2</pre>');
+            
+            // Step 2: Handle headings
+            formatted = formatted.replace(/^##\s+(.+)$/gm, '<h3 style="margin: 20px 0 12px 0; font-size: 16px; font-weight: bold; color: inherit; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">$1</h3>');
+            formatted = formatted.replace(/^###\s+(.+)$/gm, '<h4 style="margin: 16px 0 8px 0; font-size: 14px; font-weight: bold; color: inherit;">$1</h4>');
+            
+            // Step 3: Handle inline formatting
+            formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: bold;">$1</strong>');
+            formatted = formatted.replace(/\*(.+?)\*/g, '<em style="font-style: italic;">$1</em>');
+            formatted = formatted.replace(/`([^`]+)`/g, '<code style="background: #2d3748; color: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px;">$1</code>');
+            
+            // Step 4: Process line by line to handle lists properly
+            const lines = formatted.split('\n');
+            const processedLines = [];
+            let inList = false;
+            let listType = null;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                if (!line) {
+                    // Empty line - end current list if we're in one
+                    if (inList) {
+                        processedLines.push('</div>');
+                        inList = false;
+                        listType = null;
+                    }
+                    processedLines.push('<br>');
+                    continue;
+                }
+                
+                // Check for numbered list (1. item: description)
+                const numberedMatch = line.match(/^(\d+)\.\s*(.+?):\s*(.+)$/);
+                if (numberedMatch) {
+                    if (!inList || listType !== 'numbered') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'numbered';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; font-weight: bold; color: white;">${numberedMatch[1]}.</span>
+                        <span style="font-weight: normal; color: white;">${numberedMatch[2]}:</span> ${numberedMatch[3]}
+                    </div>`);
+                    continue;
+                }
+                
+                // Check for numbered list with just title (1. item:)
+                const numberedTitleMatch = line.match(/^(\d+)\.\s*(.+?):\s*$/);
+                if (numberedTitleMatch) {
+                    if (!inList || listType !== 'numbered') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'numbered';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; font-weight: bold; color: white;">${numberedTitleMatch[1]}.</span>
+                        <span style="font-weight: normal; color: white;">${numberedTitleMatch[2]}:</span>
+                    </div>`);
+                    continue;
+                }
+                
+                // Check for bullet points (- item: description)
+                const bulletMatch = line.match(/^-\s*(.+?):\s*(.+)$/);
+                if (bulletMatch) {
+                    if (!inList || listType !== 'bullet') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'bullet';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #718096;">•</span>
+                        <span style="font-weight: normal; color: white;">${bulletMatch[1]}:</span> ${bulletMatch[2]}
+                    </div>`);
+                    continue;
+                }
+                
+                // Check for bullet points with just title (- item:)
+                const bulletTitleMatch = line.match(/^-\s*(.+?):\s*$/);
+                if (bulletTitleMatch) {
+                    if (!inList || listType !== 'bullet') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'bullet';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #718096;">•</span>
+                        <span style="font-weight: normal; color: white;">${bulletTitleMatch[1]}:</span>
+                    </div>`);
+                    continue;
+                }
+                
+                // Check for simple numbered list (1. item)
+                const simpleNumberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+                if (simpleNumberedMatch) {
+                    if (!inList || listType !== 'numbered') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'numbered';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; font-weight: bold; color: white;">${simpleNumberedMatch[1]}.</span>
+                        ${simpleNumberedMatch[2]}
+                    </div>`);
+                    continue;
+                }
+                
+                // Check for simple bullet point (- item)
+                const simpleBulletMatch = line.match(/^-\s+(.+)$/);
+                if (simpleBulletMatch) {
+                    if (!inList || listType !== 'bullet') {
+                        if (inList) processedLines.push('</div>');
+                        processedLines.push('<div style="margin: 8px 0;">');
+                        inList = true;
+                        listType = 'bullet';
+                    }
+                    processedLines.push(`<div style="margin: 6px 0; padding-left: 20px; position: relative;">
+                        <span style="position: absolute; left: 0; color: #718096;">•</span>
+                        ${simpleBulletMatch[1]}
+                    </div>`);
+                    continue;
+                }
+                
+                // Regular text line - end list if we were in one
+                if (inList) {
+                    processedLines.push('</div>');
+                    inList = false;
+                    listType = null;
+                }
+                
+                // Add regular paragraph
+                processedLines.push(`<p style="margin: 8px 0; line-height: 1.5;">${line}</p>`);
+            }
+            
+            // Close any open list
+            if (inList) {
+                processedLines.push('</div>');
+            }
+            
+            // Join lines and clean up
+            formatted = processedLines.join('');
+            
+            // Clean up consecutive <br> tags and <p> tags
+            formatted = formatted.replace(/(<br>){2,}/g, '<br>');
+            formatted = formatted.replace(/(<p[^>]*>.*?<\/p>){2,}/g, (match) => {
+                return match.replace(/<\/p>\s*<p[^>]*>/g, '</p><p style="margin: 8px 0; line-height: 1.5;">');
+            });
+            
+            // DEBUG: Log the final formatted HTML
+            console.log('🔍 [DEDICATED CHAT] Final formatted HTML:', formatted);
+            
+            return formatted;
+        }
+        
+        // Add message to chat with inline styling - matches main widget
+        function addMessage(text, sender, saveToStorage = true, providedTime = null, providedTimestamp = null) {
+            const messages = document.getElementById('chat-messages');
+            if (!messages) {
+                return;
+            }
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `chat-message chat-${sender}`;
+            
+            // Apply message styling inline - matches main widget exactly
+            msgDiv.style.cssText = `
+                margin-bottom: 12px;
+                padding: 8px 12px;
+                border-radius: 8px;
+                max-width: 80%;
+                word-wrap: break-word;
+                font-size: 13px;
+                line-height: 1.4;
+            `;
+            
+            // DEBUG: Log the message being processed
+            console.log('🔍 [DEDICATED CHAT] Processing message:', { text, sender });
+            
+            if (sender === 'user') {
+                msgDiv.style.cssText += `
+                    background: #007bff;
+                    color: white;
+                    margin-left: auto;
+                    text-align: right;
+                `;
+            } else if (sender === 'system') {
+                msgDiv.style.cssText += `
+                    background: #e8f5e8;
+                    color: #2d5a2d;
+                    border: 1px solid rgba(195, 230, 195, 0.3);
+                    text-align: center;
+                    font-style: italic;
+                    margin: 0 auto;
+                `;
+            } else {
+                msgDiv.style.cssText += `
+                    background: transparent;
+                    color: white;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                `;
+            }
+            
+            // Parse markdown for AI responses (assistant/system messages)
+            let formattedText = text;
+            if (sender === 'assistant' || sender === 'system') {
+                formattedText = parseMarkdown(text);
+            }
+            
+            const displayTime = providedTime || (providedTimestamp ? new Date(providedTimestamp).toLocaleTimeString() : new Date().toLocaleTimeString());
+            msgDiv.innerHTML = `
+                <div class="message-content">${formattedText}</div>
+                <div class="message-time" style="font-size: 10px; opacity: 0.7; margin-top: 4px;">
+                    ${displayTime}
+                </div>
+            `;
+            
+            // DEBUG: Log the final message HTML
+            console.log('🔍 [DEDICATED CHAT] Final message HTML:', msgDiv.outerHTML);
+            
+            messages.appendChild(msgDiv);
+            messages.scrollTop = messages.scrollHeight;
+            
+            // Save message to localStorage for sync with main widget (only if saveToStorage is true)
+            if (saveToStorage) {
+            saveMessageToLocalStorage(text, sender);
+            }
+        }
+        
+        // Save message to localStorage for synchronization
+        function saveMessageToLocalStorage(text, sender) {
+            try {
+                // Get existing data from the correct storage key
+                const key = getUserStorageKey('neuron-chat-widget-data');
+                let existingData = localStorage.getItem(key);
+                let parsedData = {};
+                
+                if (existingData) {
+                    try {
+                        parsedData = JSON.parse(existingData);
+                    } catch (e) {
+                        console.log('🧹 [DEDICATED CHAT] Error parsing existing data, starting fresh');
+                        parsedData = { messages: [], flowContext: {}, timestamp: Date.now() };
+                    }
+                } else {
+                    parsedData = { messages: [], flowContext: {}, timestamp: Date.now() };
+                }
+                
+                // Clean up data structure - ensure we only have the new format
+                if (parsedData.chatHistory) {
+                    console.log('🧹 [DEDICATED CHAT] Cleaning up old chatHistory format');
+                    delete parsedData.chatHistory;
+                }
+                
+                // CRITICAL: Save the formatted HTML content for proper display in both windows
+                // This ensures consistent formatting when syncing between windows
+                let formattedText = text;
+                
+                // For AI responses, format the text before saving
+                if (sender === 'assistant' || sender === 'system') {
+                    formattedText = parseMarkdown(text);
+                }
+                
+                console.log('🔍 [DEDICATED CHAT] Original text:', text);
+                console.log('🔍 [DEDICATED CHAT] Formatted text:', formattedText);
+                
+                // Add new message - use same format as main widget
+                const message = {
+                    text: formattedText, // Save formatted HTML for consistent display
+                    sender: sender === 'user' ? 'user' : 'assistant',
+                    time: new Date().toLocaleTimeString(),
+                    timestamp: Date.now(), // Add timestamp for proper sorting
+                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` // Unique ID to prevent duplicates
+                };
+                
+                // Initialize messages array if it doesn't exist
+                if (!parsedData.messages) {
+                    parsedData.messages = [];
+                }
+                
+                parsedData.messages.push(message);
+                
+                // Keep only last 50 messages to prevent localStorage from getting too large
+                if (parsedData.messages.length > 50) {
+                    parsedData.messages = parsedData.messages.slice(-50);
+                }
+                
+                // Save back to the CORRECT storage key directly
+                localStorage.setItem(key, JSON.stringify(parsedData));
+                
+                console.log('💾 [CHAT SYNC] Saved formatted HTML to localStorage:', message);
+                console.log('💾 [CHAT SYNC] Storage key used:', key);
+                console.log('💾 [CHAT SYNC] Total messages now:', parsedData.messages.length);
+            } catch (error) {
+                console.error('💾 [CHAT SYNC] Error saving message to localStorage:', error);
+            }
+        }
+        
+        // Send message functionality
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            addMessage(text, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            const typing = addTypingIndicator();
+            
+            try {
+                // Send to external server with flow context
+                const response = await sendToExternalServer(text);
+                typing.remove();
+                addMessage(response.content, 'assistant');
+                updateStatus('Connected to external server', 'success');
+            } catch (error) {
+                console.error('Error sending message:', error);
+                typing.remove();
+                addMessage("Sorry, I'm having trouble connecting to the external server. Please check if the server is running.", 'assistant');
+                updateStatus('Connection error', 'error');
+            }
+        }
+        
+        // Server configuration - matches main widget
+        const CONFIG = {
+            serverUrl: window.NEURON_CHAT_SERVER_URL || 'http://localhost:3001',
+            apiEndpoint: '/api/chat',
+            healthEndpoint: '/health'
+        };
+        
+        // Check server connection status
+        let serverConnectionState = 'unknown';
+        
+        // Check if external server is available
+        async function checkServerConnection() {
+            try {
+                const response = await fetch(`${CONFIG.serverUrl}${CONFIG.healthEndpoint}`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    serverConnectionState = 'connected';
+                    updateStatus('Connected to external server', 'success');
+                    return true;
+                } else {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('🔍 [SERVER] Connection error:', error);
+                serverConnectionState = 'disconnected';
+                updateStatus('Server connection error', 'error');
+                return false;
+            }
+        }
+        
+        // Send message to external server with authentication
+        async function sendToExternalServer(message) {
+            // Check server connection first
+            if (serverConnectionState !== 'connected') {
+                const isConnected = await checkServerConnection();
+                if (!isConnected) {
+                    throw new Error('Server not available');
+                }
+            }
+            
+            const requestBody = {
+                message: message,
+                context: 'Neuron software context',
+                flowContext: null,  // Will be populated if available
+                rawFlowJson: null   // Will be populated if available
+            };
+            
+            // Try to get flow context from localStorage if available
+            try {
+                const chatData = getUserData('chat');
+                console.log('📱 [SERVER DEBUG] Retrieved chat data for flow context:', chatData);
+                
+                if (chatData && chatData.flowContext) {
+                    requestBody.flowContext = chatData.flowContext;
+                    console.log('📱 [SERVER DEBUG] Using flow context from localStorage:', chatData.flowContext.flowName);
+                }
+                
+                if (chatData && chatData.rawFlowJson) {
+                    requestBody.rawFlowJson = chatData.rawFlowJson;
+                    console.log('📱 [SERVER DEBUG] Using raw flow JSON from localStorage, nodes:', chatData.rawFlowJson.length);
+                }
+                
+                // If we don't have raw flow JSON, try to get it from the parent window
+                if (!requestBody.rawFlowJson && window.opener && !window.opener.closed) {
+                    try {
+                        console.log('📱 [SERVER DEBUG] Attempting to get raw flow JSON from parent window...');
+                        // Try to access the parent window's RED object
+                        if (window.opener.RED && window.opener.RED.nodes && typeof window.opener.RED.nodes.createCompleteNodeSet === 'function') {
+                            requestBody.rawFlowJson = window.opener.RED.nodes.createCompleteNodeSet();
+                            console.log('📱 [SERVER DEBUG] Successfully got raw flow JSON from parent window, nodes:', requestBody.rawFlowJson.length);
+                }
+            } catch (error) {
+                        console.warn('📱 [SERVER DEBUG] Could not get raw flow JSON from parent window:', error);
+                    }
+                }
+                
+                console.log('📱 [SERVER DEBUG] Final request body flow context:', {
+                    hasFlowContext: !!requestBody.flowContext,
+                    hasRawFlowJson: !!requestBody.rawFlowJson,
+                    flowContextKeys: requestBody.flowContext ? Object.keys(requestBody.flowContext) : [],
+                    rawFlowJsonNodeCount: requestBody.rawFlowJson ? requestBody.rawFlowJson.length : 0
+                });
+                
+            } catch (error) {
+                console.warn('📱 [SERVER DEBUG] Could not get flow context from localStorage:', error);
+            }
+            
+            // Get authentication token if available
+            const authToken = localStorage.getItem('chat-token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            console.log('📱 [SERVER DEBUG] Sending request to server...');
+            console.log('📱 [SERVER DEBUG] Server URL:', `${CONFIG.serverUrl}${CONFIG.apiEndpoint}`);
+            console.log('📱 [SERVER DEBUG] Request body size:', JSON.stringify(requestBody).length, 'characters');
+            console.log('📱 [SERVER DEBUG] Request body preview:', JSON.stringify(requestBody, null, 2).substring(0, 500) + '...');
+            
+            const response = await fetch(`${CONFIG.serverUrl}${CONFIG.apiEndpoint}`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(requestBody)
+            });
+            
+            console.log('📱 [SERVER DEBUG] Response status:', response.status);
+            console.log('📱 [SERVER DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired or invalid
+                    console.log('[AUTH] 401 Unauthorized response received');
+                    serverConnectionState = 'disconnected';
+                    updateStatus('Authentication required', 'error');
+                    handleAuthenticationFailure();
+                    throw new Error('Authentication required');
+                }
+                throw new Error('Server error: ' + response.status + ' ' + response.statusText);
+            }
+            
+            const responseData = await response.json();
+            console.log('📱 [SERVER DEBUG] Response data received, size:', JSON.stringify(responseData).length, 'characters');
+            console.log('📱 [SERVER DEBUG] Response preview:', JSON.stringify(responseData, null, 2).substring(0, 300) + '...');
+            
+            return responseData;
+        }
+        
+        // Add typing indicator with matching styling
+        function addTypingIndicator() {
+            const messages = document.getElementById('chat-messages');
+            const typing = document.createElement('div');
+            typing.className = 'chat-message chat-assistant';
+            typing.id = 'typing-indicator';
+            
+            // Apply same styling as assistant messages - matches main widget exactly
+            typing.style.cssText = `
+                margin-bottom: 12px;
+                padding: 8px 12px;
+                border-radius: 8px;
+                max-width: 80%;
+                word-wrap: break-word;
+                font-size: 13px;
+                line-height: 1.4;
+                background: transparent;
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            `;
+            
+            typing.innerHTML = '<div class="message-content"><span style="margin-right: 8px; font-style: italic;">Thinking</span><span class="typing-dots"><span style="animation: dot1 1.4s infinite;">.</span><span style="animation: dot2 1.4s infinite;">.</span><span style="animation: dot3 1.4s infinite;">.</span></span></div>';
+            
+            messages.appendChild(typing);
+            messages.scrollTop = messages.scrollHeight;
+            return typing;
+        }
+        
+        // Update status
+        function updateStatus(message, type) {
+            const status = document.getElementById('status-text');
+            if (status) {
+                status.textContent = message;
+                status.style.color = type === 'success' ? '#68d391' : type === 'error' ? '#fc8181' : '#a0aec0';
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('chat-send').addEventListener('click', sendMessage);
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        // Listen for messages from the main window
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'RELOAD_CHAT_DATA') {
+                console.log('📱 [DEDICATED CHAT] Received reload message from main window');
+                // Small delay to ensure localStorage is ready
+                setTimeout(() => {
+                    console.log('📱 [DEDICATED CHAT] Reloading chat data...');
+                    loadChatData();
+                }, 100);
+            }
+        });
+        
+        // Notify parent window when this window is about to close
+        window.addEventListener('beforeunload', function(event) {
+            console.log('📱 [DEDICATED CHAT] Window about to close, notifying parent...');
+            
+            // Ensure all current data is saved before closing
+            try {
+                const currentData = getUserData('chat');
+                if (currentData && currentData.messages) {
+                    console.log('📱 [DEDICATED CHAT] Final data save before closing, messages:', currentData.messages.length);
+                    
+                    // Try to sync data to main window before closing
+                    if (window.opener && !window.opener.closed) {
+                        try {
+                            window.opener.postMessage({ 
+                                type: 'SYNC_CHAT_DATA', 
+                                data: currentData 
+                            }, '*');
+                            console.log('📱 [DEDICATED CHAT] Data sync sent before closing');
+                        } catch (e) {
+                            console.log('📱 [DEDICATED CHAT] Could not sync data before closing:', e.message);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('📱 [DEDICATED CHAT] Error during final data save:', error);
+            }
+            
+            if (window.opener && !window.opener.closed) {
+                try {
+                    window.opener.postMessage({ type: 'DEDICATED_WINDOW_CLOSING' }, '*');
+                    console.log('📱 [DEDICATED CHAT] Sent closing notification to parent window');
+                } catch (e) {
+                    console.log('📱 [DEDICATED CHAT] Could not send closing notification:', e.message);
+                }
+            }
+        });
+        
+        // Make debug functions available globally
+        window.debugChatData = debugLocalStorage;
+        window.forceLoadChatData = loadChatData;
+        window.reloadChatData = function() {
+            console.log('📱 [DEDICATED CHAT] Manual reload triggered');
+            loadChatData();
+        };
+        window.checkChatState = function() {
+            console.log('📱 [DEDICATED CHAT] Checking chat state...');
+            const messagesContainer = document.getElementById('chat-messages');
+            if (messagesContainer) {
+                console.log('📱 [DEDICATED CHAT] Messages container found with', messagesContainer.children.length, 'children');
+                console.log('📱 [DEDICATED CHAT] Container HTML:', messagesContainer.innerHTML.substring(0, 200) + '...');
+            } else {
+                console.log('📱 [DEDICATED CHAT] Messages container NOT found');
+            }
+            
+            const chatData = getUserData('chat');
+            console.log('📱 [DEDICATED CHAT] Current localStorage data:', chatData);
+        };
+        
+        window.forceDataSync = function() {
+            console.log('📱 [DEDICATED CHAT] Force data sync triggered...');
+            
+            // Clear current messages
+            const messagesContainer = document.getElementById('chat-messages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+                console.log('📱 [DEDICATED CHAT] Cleared current messages');
+            }
+            
+            // Wait a moment then reload
+            setTimeout(() => {
+                console.log('📱 [DEDICATED CHAT] Reloading data after clear...');
+                loadChatData();
+            }, 200);
+        };
+        
+        window.syncDataToMainWindow = function() {
+            console.log('📱 [DEDICATED CHAT] Syncing data to main window...');
+            
+            if (window.opener && !window.opener.closed) {
+                try {
+                    // Get current data
+                    const currentData = getUserData('chat');
+                    if (currentData) {
+                        console.log('📱 [DEDICATED CHAT] Sending data to main window:', currentData.messages ? currentData.messages.length : 0, 'messages');
+                        
+                        // Send data to main window
+                        window.opener.postMessage({ 
+                            type: 'SYNC_CHAT_DATA', 
+                            data: currentData 
+                        }, '*');
+                        
+                        console.log('📱 [DEDICATED CHAT] Data sync message sent to main window');
+                        return true;
+                    } else {
+                        console.warn('📱 [DEDICATED CHAT] No data to sync');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('📱 [DEDICATED CHAT] Error syncing data to main window:', error);
+                    return false;
+                }
+            } else {
+                console.warn('📱 [DEDICATED CHAT] Main window not available for sync');
+                return false;
+            }
+        };
+        
+        window.refreshFlowContext = function() {
+            console.log('📱 [DEDICATED CHAT] Refreshing flow context from parent window...');
+            
+            // Try to get fresh flow context from parent window
+            if (window.opener && !window.opener.closed) {
+                try {
+                    // Get flow context
+                    if (window.opener.getCurrentFlowContext && typeof window.opener.getCurrentFlowContext === 'function') {
+                        const freshFlowContext = window.opener.getCurrentFlowContext();
+                        console.log('📱 [DEDICATED CHAT] Fresh flow context:', freshFlowContext);
+                        
+                        // Get raw flow JSON
+                        let freshRawFlowJson = null;
+                        if (window.opener.RED && window.opener.RED.nodes && typeof window.opener.RED.nodes.createCompleteNodeSet === 'function') {
+                            freshRawFlowJson = window.opener.RED.nodes.createCompleteNodeSet();
+                            console.log('📱 [DEDICATED CHAT] Fresh raw flow JSON, nodes:', freshRawFlowJson.length);
+                        }
+                        
+                        // Update localStorage with fresh data
+                        const currentData = getUserData('chat');
+                        if (currentData) {
+                            const updatedData = {
+                                ...currentData,
+                                flowContext: freshFlowContext,
+                                rawFlowJson: freshRawFlowJson
+                            };
+                            setUserData('chat', updatedData);
+                            console.log('📱 [DEDICATED CHAT] Updated localStorage with fresh flow context');
+                        }
+                        
+                        return { flowContext: freshFlowContext, rawFlowJson: freshRawFlowJson };
+                    } else {
+                        console.warn('📱 [DEDICATED CHAT] Parent window does not have getCurrentFlowContext function');
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('📱 [DEDICATED CHAT] Error refreshing flow context:', error);
+                    return null;
+                }
+            } else {
+                console.warn('📱 [DEDICATED CHAT] Parent window not available');
+                return null;
+            }
+        };
+        window.testChatPersistence = function() {
+            console.log('🧪 [TEST] Testing chat persistence in dedicated window...');
+            
+            // Test 1: Check current data
+            const currentData = getUserData('chat');
+            console.log('🧪 [TEST] Current chat data:', currentData);
+            
+            // Test 2: Try to load chat data
+            console.log('🧪 [TEST] Attempting to load chat data...');
+            loadChatData();
+            
+            // Test 3: Check if messages were loaded
+            const messagesContainer = document.getElementById('chat-messages');
+            if (messagesContainer) {
+                const messageCount = messagesContainer.children.length;
+                console.log('🧪 [TEST] Messages container has', messageCount, 'children');
+                
+                if (messageCount > 0) {
+                    console.log('✅ [TEST] Chat persistence test PASSED - messages loaded');
+                    return true;
+                } else {
+                    console.log('❌ [TEST] Chat persistence test FAILED - no messages loaded');
+                    return false;
+                }
+            } else {
+                console.log('❌ [TEST] Chat persistence test FAILED - messages container not found');
+                return false;
+            }
+        };
+        
+        // Initialize server connection monitoring
+        async function initializeServerConnection() {
+            console.log('🔍 [DEDICATED CHAT] Initializing server connection...');
+            
+            // Debug localStorage data
+            debugLocalStorage();
+            
+            await checkServerConnection();
+            
+            // Initialize server health monitoring
+            initializeServerHealthMonitoring();
+            
+            // Set up periodic connection monitoring
+            setInterval(async () => {
+                if (serverConnectionState !== 'connected') {
+                    await checkServerConnection();
+                }
+            }, 30000); // Check every 30 seconds
+        }
+        
+        // Load chat data and initialize server connection when page loads
+        window.addEventListener('load', async () => {
+            loadChatData();
+            await initializeServerConnection();
+        });
+        
+        // Add window close event listener to ensure sync
+        window.addEventListener('beforeunload', function() {
+            console.log('📱 [DEDICATED CHAT] Window closing, ensuring chat sync...');
+            // Force a final save of any pending messages
+            const input = document.getElementById('chat-input');
+            if (input && input.value.trim()) {
+                saveMessageToLocalStorage(input.value.trim(), 'user');
+            }
+        });
+    </script>
+</body>
+</html>

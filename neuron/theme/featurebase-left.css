@@ -1,0 +1,49 @@
+/* Force Featurebase to left side with very specific selectors */
+#featurebase-frame,
+#featurebase-button,
+.featurebase-widget,
+.fb-widget,
+[class*="featurebase"],
+[id*="featurebase"],
+[class*="fb_"],
+[id*="fb_"],
+iframe[src*="featurebase"],
+iframe[src*="widget.featurebase"] {
+    right: auto !important;
+    left: 20px !important;
+    z-index: 10000 !important;
+}
+
+/* Specific targeting for different states */
+#featurebase-frame.neuron-repositioned,
+#featurebase-button.neuron-repositioned,
+.featurebase-widget.neuron-repositioned {
+    right: auto !important;
+    left: 20px !important;
+}
+
+/* Handle expanded state */
+.featurebase-widget.expanded,
+.fb-widget.expanded,
+[class*="featurebase"].expanded,
+[class*="fb_"].expanded {
+    right: auto !important;
+    left: 20px !important;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    #featurebase-frame,
+    #featurebase-button,
+    .featurebase-widget,
+    .fb-widget {
+        left: 10px !important;
+        right: auto !important;
+    }
+}
+
+/* Ensure Node-RED UI elements don't get covered */
+.red-ui-sidebar,
+.red-ui-header {
+    z-index: 10001 !important; /* Just above Featurebase */
+}
