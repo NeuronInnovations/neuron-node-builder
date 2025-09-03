@@ -2,7 +2,7 @@
     'use strict';
     
     /**
-     * Neuron Co-Pilot Chat Widget - Simple Loading System
+     * Neuron Node-Pilot Chat Widget - Simple Loading System
      * 
      * This widget uses a simple, reliable loading strategy:
      * 
@@ -329,7 +329,7 @@
                     <svg width="20" height="20" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;">
                         <path d="M116.736 373.991C116.736 373.991 117.296 250.322 188.729 231.521C289.649 204.96 297.03 397.603 398.286 371.564C482.834 349.821 483.029 229 483.029 229" stroke="white" stroke-width="40.6992" stroke-linecap="square"/>
                     </svg>
-                    Neuron Co-Pilot
+                    Neuron Node-Pilot
                 </span>
                 <div class="chat-header-buttons">
                     ${authState ? `
@@ -383,7 +383,7 @@
                             margin-bottom: 16px;
                             letter-spacing: 0.5px;
                             white-space: nowrap;
-                        ">Welcome to Neuron Co-Pilot</div>
+                        ">Welcome to Neuron Node-Pilot</div>
                         
                         <div class="login-description" style="
                             font-size: 14px;
@@ -391,7 +391,7 @@
                             margin-bottom: 32px;
                             line-height: 1.5;
                             max-width: 280px;
-                        ">Get AI-powered assistance with your Neuron software, project workflows, and development questions. Login to start chatting with our intelligent co-pilot.</div>
+                        ">Get AI-powered assistance with your Neuron software, project workflows, and development questions. Login to start chatting with our intelligent Node-Pilot.</div>
                         
                         <button onclick="openAuthPopup()" class="login-button" style="
                             background: white;
@@ -743,6 +743,9 @@
         // Add event listeners only if we have the necessary elements
         if (input && sendBtn) {
             setupChatEvents(widget);
+        } else {
+            // Even when not authenticated, we need to set up the minimize button
+            setupMinimizeButton(widget);
         }
         
         // Style login container if it exists
@@ -785,7 +788,7 @@
         // Add welcome message only if user is authenticated
         if (authState) {
             setTimeout(() => {
-                addMessage("Welcome to Neuron Co-Pilot! Let me help you build a flow. Ask me any question you like, and I will guide you.", 'assistant');
+                addMessage("Welcome to Neuron Node-Pilot! Let me help you build a flow. Ask me any question you like, and I will guide you.", 'assistant');
             }, 500);
         }
         
@@ -1422,6 +1425,7 @@
             nodeCount: 0,
             connectionCount: 0,
             nodeTypes: [],
+            nodes: [],
             neuronNodes: [],
             hasConnections: false,
             workspaces: [],
@@ -1434,6 +1438,7 @@
         
         // Count and categorize nodes using the same logic as the AI
         const nodeTypes = new Set();
+        const nodes = [];
         const neuronNodes = [];
         const connections = [];
         let activeWorkspace = null;
@@ -1443,22 +1448,75 @@
         let activeTabId = null;
         let activeTab = null;
         
+        // Get all tab IDs first
         completeFlow.forEach(item => {
             if (item.type === 'tab') {
                 tabIds.add(item.id);
-                
-                // Try to identify the currently active flow
-                // Check if this tab is selected/active (Node-RED sets selected: true on the active tab)
-                if (item.selected === true || (!activeTab && !item.disabled)) {
-                    activeTabId = item.id;
-                    activeTab = item;
-                }
             }
         });
         
-        // If no active tab found, use the first non-disabled tab
+        // Use RED.workspaces.active() to get the active workspace ID (most reliable method)
+        let activeWorkspaceId = null;
+        if (RED.workspaces && typeof RED.workspaces.active === 'function') {
+            activeWorkspaceId = RED.workspaces.active();
+            console.log('🔍 [FLOW SELECTION] Active workspace ID from RED.workspaces:', activeWorkspaceId);
+        }
+        
+        // Find the corresponding flow or subflow in the complete node set
+        if (activeWorkspaceId) {
+            activeTab = completeFlow.find(item => item.id === activeWorkspaceId);
+            if (activeTab) {
+                activeTabId = activeTab.id;
+                console.log('🔍 [FLOW SELECTION] Found active workspace in complete flow:', {
+                    type: activeTab.type,
+                    id: activeTab.id,
+                    name: activeTab.label || activeTab.name
+                });
+            } else {
+                console.log('🔍 [FLOW SELECTION] Active workspace ID not found in complete flow data');
+            }
+        }
+        
+        // Fallback: Use DOM detection if RED.workspaces is not available
         if (!activeTab) {
-            const firstTab = completeFlow.find(item => item.type === 'tab' && !item.disabled);
+            console.log('🔍 [FLOW SELECTION] Falling back to DOM detection...');
+            const tabs = document.querySelectorAll('.red-ui-tab');
+            let activeFlowName = null;
+            
+            tabs.forEach(tab => {
+                if (tab.classList.contains('active')) {
+                    // Get the tab text
+                    const tabText = tab.textContent?.trim();
+                    if (tabText) {
+                        // Check if this tab corresponds to any flow or subflow in our complete node set
+                        const matchingItem = completeFlow.find(item => 
+                            (item.type === 'tab' || item.type === 'subflow') && 
+                            item.label === tabText
+                        );
+                        
+                        if (matchingItem) {
+                            activeFlowName = tabText;
+                        }
+                    }
+                }
+            });
+            
+            // Find the corresponding flow in the complete node set
+            if (activeFlowName) {
+                activeTab = completeFlow.find(item => 
+                    (item.type === 'tab' || item.type === 'subflow') && item.label === activeFlowName
+                );
+                if (activeTab) {
+                    activeTabId = activeTab.id;
+                }
+            }
+        }
+        
+        // Fallback: if no active tab found via DOM, use the first non-disabled tab or subflow
+        if (!activeTab) {
+            const firstTab = completeFlow.find(item => 
+                (item.type === 'tab' || item.type === 'subflow') && !item.disabled
+            );
             if (firstTab) {
                 activeTabId = firstTab.id;
                 activeTab = firstTab;
@@ -1467,13 +1525,19 @@
         
         // Set the active flow context
         if (activeTab) {
-            flowContext.flowName = activeTab.label || 'Unnamed Flow';
+            // flowName: Use 'label' for tabs, 'name' for subflows
+            if (activeTab.type === 'subflow') {
+                flowContext.flowName = activeTab.name || 'Unnamed Subflow';
+            } else {
+                flowContext.flowName = activeTab.label || 'Unnamed Flow';
+            }
             flowContext.flowId = activeTab.id;
             activeWorkspace = activeTab;
             
             console.log('🔍 [FLOW SELECTION] Active flow identified:', {
                 id: activeTab.id,
-                name: activeTab.label,
+                type: activeTab.type,
+                name: activeTab.label || activeTab.name,
                 selected: activeTab.selected,
                 disabled: activeTab.disabled
             });
@@ -1484,7 +1548,9 @@
         console.log('🔍 [FLOW SELECTION] All tabs found:', Array.from(tabIds));
         console.log('🔍 [FLOW SELECTION] Active tab ID:', activeTabId);
         
+        // Process all items in the complete flow
         completeFlow.forEach(item => {
+            // Collect workspace information
             if (item.type === 'tab') {
                 flowContext.workspaces.push({
                     id: item.id,
@@ -1493,21 +1559,16 @@
                     isActive: item.id === activeTabId
                 });
             } else if (item.type === 'subflow') {
-                // Only count subflows that belong to the active flow
-                if (item.z === activeTabId) {
-                    // Count internal nodes for this subflow
-                    const internalNodes = completeFlow.filter(subItem => 
-                        subItem.z === item.id && 
-                        subItem.hasOwnProperty('x') && 
-                        subItem.hasOwnProperty('y')
-                    );
-                    
+                // Only add to subflows array if this subflow is NOT the active tab
+                // When editing a subflow definition, we don't count it as a "subflow" in the context
+                if (item.id !== activeTabId) {
                     flowContext.subflows.push({
                         id: item.id,
                         name: item.name || 'Unnamed Subflow',
                         inputs: item.in?.length || 0,
                         outputs: item.out?.length || 0,
-                        internalNodeCount: internalNodes.length
+                        internalNodeCount: 0, // Will be calculated separately
+                        isActive: false
                     });
                 }
             } else if (item.type === 'group') {
@@ -1519,33 +1580,44 @@
                 flowContext.junctions.push({
                     id: item.id
                 });
-            } else if (item.hasOwnProperty('x') && item.hasOwnProperty('y')) {
-                // Only count nodes that are descendants of the ACTIVE tab (top-level nodes)
-                if (item.z && item.z === activeTabId) {
-                    // This is a top-level node in the currently active flow
-                    flowContext.nodeCount++;
-                    nodeTypes.add(item.type);
-                    
-                    // Check if it's a Neuron-related node
-                    if (item.type.includes('neuron') || 
-                        item.type.includes('buyer') || 
-                        item.type.includes('seller') ||
-                        item.type.includes('p2p') ||
-                        item.type.includes('contract')) {
-                        neuronNodes.push({
-                            type: item.type,
-                            name: item.name || item.type, // Use type if no name
-                            id: item.id
-                        });
-                    }
+            }
+            
+            // Count nodes that belong to the active flow (z === activeTabId)
+            // Exclude groups, tabs, and other non-node items
+            if (item.z === activeTabId && item.hasOwnProperty('x') && item.hasOwnProperty('y') && item.type !== 'group') {
+                // nodeCount: Total number of nodes with the active flowID as the parent
+                flowContext.nodeCount++;
+                
+                // nodeTypes: Array of all node types with the active flowID as the parent
+                nodeTypes.add(item.type);
+                
+                // nodes: Array of all individual nodes with their names
+                nodes.push({
+                    type: item.type,
+                    name: item.name || item.label || 'unnamed',
+                    id: item.id
+                });
+                
+                // neuronNodes: Array of Neuron-specific nodes that have the active flowID as the parent
+                if (item.type.includes('neuron') || 
+                    item.type.includes('buyer') || 
+                    item.type.includes('seller') ||
+                    item.type.includes('p2p') ||
+                    item.type.includes('contract')) {
+                    neuronNodes.push({
+                        type: item.type,
+                        name: item.name || item.type,
+                        id: item.id
+                    });
                 }
-                // Note: Internal subflow nodes are not counted in the total
             }
         });
         
         // Extract connections from the flow data using the correct Node-RED algorithm
         console.log('🔍 [FLOW DEBUG] Starting connection extraction from', completeFlow.length, 'items');
         
+        // First, collect ALL connections
+        const allConnections = [];
         completeFlow.forEach((item, index) => {
             if (item.wires && Array.isArray(item.wires)) {
                 console.log(`🔍 [FLOW DEBUG] Item ${index}: ${item.type} (${item.id}) has ${item.wires.length} output ports`);
@@ -1559,20 +1631,20 @@
                             // Find the target node
                             const targetNode = completeFlow.find(n => n.id === targetNodeId);
                             if (targetNode) {
-                                    connections.push({
-                                        from: {
-                                            nodeId: item.id,
-                                            nodeName: item.name || item.type,
-                                            nodeType: item.type,
+                                allConnections.push({
+                                    from: {
+                                        nodeId: item.id,
+                                        nodeName: item.name || item.type,
+                                        nodeType: item.type,
                                         port: outputPortIndex
-                                        },
-                                        to: {
-                                            nodeId: targetNode.id,
-                                            nodeName: targetNode.name || targetNode.type,
-                                            nodeType: targetNode.type,
+                                    },
+                                    to: {
+                                        nodeId: targetNode.id,
+                                        nodeName: targetNode.name || targetNode.type,
+                                        nodeType: targetNode.type,
                                         port: 0  // Node-RED doesn't expose input port info in JSON
-                                        }
-                                    });
+                                    }
+                                });
                                 console.log(`🔍 [FLOW DEBUG] Added connection: ${item.type} → ${targetNode.type}`);
                             } else {
                                 console.log(`🔍 [FLOW DEBUG] Target node ${targetNodeId} not found in flow`);
@@ -1589,10 +1661,29 @@
             }
         });
         
-        flowContext.connections = connections;
-        flowContext.connectionCount = connections.length;
-        flowContext.hasConnections = connections.length > 0;
+        // Filter connections to only include those within the active flow
+        const activeFlowConnections = allConnections.filter(conn => {
+            const fromNode = completeFlow.find(n => n.id === conn.from.nodeId);
+            const toNode = completeFlow.find(n => n.id === conn.to.nodeId);
+            
+            // connectionCount: Total number of connections concerning nodes with the active flowID as the parent
+            if (fromNode && toNode) {
+                return fromNode.z === activeTabId && toNode.z === activeTabId;
+            }
+            
+            return false;
+        });
+        
+        console.log('🔍 [FLOW DEBUG] Connection filtering:');
+        console.log(`  - Total connections found: ${allConnections.length}`);
+        console.log(`  - Active flow connections: ${activeFlowConnections.length}`);
+        console.log(`  - Active flow ID: ${activeTabId}`);
+        
+        flowContext.connections = activeFlowConnections;
+        flowContext.connectionCount = activeFlowConnections.length;
+        flowContext.hasConnections = activeFlowConnections.length > 0;
         flowContext.nodeTypes = Array.from(nodeTypes);
+        flowContext.nodes = nodes;
         flowContext.neuronNodes = neuronNodes;
         
         // Generate flow analysis
@@ -1600,10 +1691,10 @@
         
         // Log connection details for debugging
         console.log('🔍 [FLOW DEBUG] Connection analysis:');
-        console.log('  - Total connections found:', connections.length);
-        if (connections.length > 0) {
+        console.log('  - Total connections found:', activeFlowConnections.length);
+        if (activeFlowConnections.length > 0) {
             console.log('  - Sample connections:');
-            connections.slice(0, 3).forEach((conn, i) => {
+            activeFlowConnections.slice(0, 3).forEach((conn, i) => {
                 console.log(`    ${i + 1}. ${conn.from.nodeType} (${conn.from.nodeName}) [port ${conn.from.port}] → ${conn.to.nodeType} (${conn.to.nodeName})`);
             });
         }
@@ -1686,6 +1777,7 @@
             nodeCount: 0,
             connectionCount: 0,
             nodeTypes: [],
+            nodes: [],
             neuronNodes: [],
             hasConnections: false,
             workspaces: [],
@@ -1697,6 +1789,7 @@
         };
         
         const nodeTypes = new Set();
+        const nodes = [];
         const neuronNodes = [];
         const connections = [];
         let activeWorkspace = null;
@@ -1705,6 +1798,13 @@
         RED.nodes.eachNode(function(node) {
             flowContext.nodeCount++;
             nodeTypes.add(node.type);
+            
+            // Collect individual nodes with their names
+            nodes.push({
+                type: node.type,
+                name: node.name || node.label || 'unnamed',
+                id: node.id
+            });
             
             // Check if it's a Neuron-related node
             if (node.type.includes('neuron') || 
@@ -1725,14 +1825,17 @@
             nodeTypes.add(configNode.type);
         });
         
-        // Collect subflows
+        // Collect subflows (only if not the active tab)
         RED.nodes.eachSubflow(function(subflow) {
-            flowContext.subflows.push({
-                id: subflow.id,
-                name: subflow.name || 'Unnamed Subflow',
-                inputs: subflow.in?.length || 0,
-                outputs: subflow.out?.length || 0
-            });
+            // Only add to subflows array if this subflow is NOT the active tab
+            if (subflow.id !== flowContext.flowId) {
+                flowContext.subflows.push({
+                    id: subflow.id,
+                    name: subflow.name || 'Unnamed Subflow',
+                    inputs: subflow.in?.length || 0,
+                    outputs: subflow.out?.length || 0
+                });
+            }
         });
         
         // Collect groups
@@ -1820,6 +1923,7 @@
         flowContext.connectionCount = connections.length;
         flowContext.hasConnections = connections.length > 0;
         flowContext.nodeTypes = Array.from(nodeTypes);
+        flowContext.nodes = nodes;
         flowContext.neuronNodes = neuronNodes;
         
         // Generate flow analysis
@@ -1839,6 +1943,7 @@
             nodeCount: 0,
             connectionCount: 0,
             nodeTypes: [],
+            nodes: [],
             neuronNodes: [],
             hasConnections: false,
             workspaces: [],
@@ -1881,12 +1986,15 @@
                 const subflows = RED.nodes.subflows();
                 if (Array.isArray(subflows)) {
                     subflows.forEach(subflow => {
-                        flowContext.subflows.push({
-                            id: subflow.id,
-                            name: subflow.name || 'Unnamed Subflow',
-                            inputs: subflow.in?.length || 0,
-                            outputs: subflow.out?.length || 0
-                        });
+                        // Only add to subflows array if this subflow is NOT the active tab
+                        if (subflow.id !== flowContext.flowId) {
+                            flowContext.subflows.push({
+                                id: subflow.id,
+                                name: subflow.name || 'Unnamed Subflow',
+                                inputs: subflow.in?.length || 0,
+                                outputs: subflow.out?.length || 0
+                            });
+                        }
                     });
                 }
             }
@@ -1920,14 +2028,22 @@
                 if (completeFlow && Array.isArray(completeFlow)) {
                     // Count nodes and extract connections
                     const nodeTypes = new Set();
+                    const nodes = [];
                     const neuronNodes = [];
                     const connections = [];
                     
                     completeFlow.forEach(item => {
-                        if (item.hasOwnProperty('x') && item.hasOwnProperty('y')) {
+                        if (item.hasOwnProperty('x') && item.hasOwnProperty('y') && item.type !== 'group') {
                             // This is a regular node
                             flowContext.nodeCount++;
                             nodeTypes.add(item.type);
+                            
+                            // Collect individual nodes with their names
+                            nodes.push({
+                                type: item.type,
+                                name: item.name || item.label || 'unnamed',
+                                id: item.id
+                            });
                             
                             // Check if it's a Neuron-related node
                             if (item.type.includes('neuron') || 
@@ -1981,6 +2097,7 @@
                     });
                     
                     flowContext.nodeTypes = Array.from(nodeTypes);
+                    flowContext.nodes = nodes;
                     flowContext.neuronNodes = neuronNodes;
                     flowContext.connections = connections;
                     flowContext.connectionCount = connections.length;
@@ -1997,6 +2114,59 @@
         
         console.log('🔍 [FLOW DEBUG] Workspace flow context extracted:', flowContext);
         return flowContext;
+    }
+    
+    // Setup minimize button functionality (for non-authenticated state)
+    function setupMinimizeButton(widget) {
+        const minimizeBtn = widget.querySelector('.chat-minimize');
+        
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                const body = widget.querySelector('.chat-body');
+                const isMinimized = body.style.display === 'none';
+                
+                if (isMinimized) {
+                    // Expand the widget
+                    body.style.display = 'flex';
+                    minimizeBtn.textContent = '−';
+                    minimizeBtn.title = 'Minimize';
+                    widget.style.width = '380px';
+                    widget.style.height = 'calc(100vh - 48px)';
+                    widget.style.top = '48px';
+                    widget.style.bottom = 'auto';
+                    widget.style.right = '0';
+                    widget.style.borderRadius = '0';
+                    widget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    widget.style.background = 'white';
+                    hideNotificationIndicator();
+                    
+                    // Show header text
+                    const headerText = widget.querySelector('.chat-header span');
+                    if (headerText) headerText.style.display = 'block';
+                    
+                    // Restore header background
+                    const header = widget.querySelector('.chat-header');
+                    if (header) header.style.background = '#2c3e50';
+                    
+                    // Restore button size
+                    minimizeBtn.style.fontSize = '18px';
+                    minimizeBtn.style.width = '24px';
+                    minimizeBtn.style.height = '24px';
+                    
+                    // Remove chat bubble
+                    const chatBubble = document.getElementById('neuron-chat-bubble');
+                    if (chatBubble) {
+                        chatBubble.remove();
+                    }
+                } else {
+                    // Hide the main widget
+                    widget.style.display = 'none';
+                    
+                    // Create new chat bubble element
+                    createChatBubble();
+                }
+            });
+        }
     }
     
     // Setup chat functionality
@@ -2137,9 +2307,48 @@
             
             if (!response.ok) {
                 if (response.status === 401) {
-                    console.log('[AUTH] 401 Unauthorized response received');
-                    handleAuthenticationFailure();
-                    throw new Error('Authentication required');
+                    console.log('[AUTH] 401 Unauthorized response received, attempting token refresh...');
+                    
+                    // Try to refresh the token before giving up
+                    const refreshSuccess = await refreshAccessToken();
+                    if (refreshSuccess) {
+                        console.log('✅ [AUTH] Token refreshed successfully, retrying request...');
+                        
+                        // Get the new token and retry the request
+                        const newAccessToken = localStorage.getItem('chat-token');
+                        if (newAccessToken) {
+                            const retryResponse = await fetch(`${CONFIG.serverUrl}${CONFIG.apiEndpoint}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${newAccessToken}`
+                                },
+                                body: JSON.stringify(requestBody)
+                            });
+                            
+                            if (retryResponse.ok) {
+                                console.log('✅ [AUTH] Retry request successful after token refresh');
+                                const retryData = await retryResponse.json();
+                                return retryData;
+                            } else {
+                                console.log('❌ [AUTH] Retry request failed even with refreshed token');
+                                handleAuthenticationFailure();
+                                throw new Error('Authentication required');
+                            }
+                        } else {
+                            console.log('❌ [AUTH] No new token available after refresh');
+                            handleAuthenticationFailure();
+                            throw new Error('Authentication required');
+                        }
+                    } else {
+                        console.log('❌ [AUTH] Token refresh failed, logging out user');
+                        handleAuthenticationFailure();
+                        throw new Error('Authentication required');
+                    }
+                } else if (response.status === 429) {
+                    // Rate limiting - don't logout, just show error
+                    console.log('⚠️ [RATE LIMIT] Too many requests, please wait before trying again');
+                    throw new Error('Rate limit exceeded - please wait before sending another message');
                 }
                 throw new Error(`Server error: ${response.status}`);
             }
@@ -3047,7 +3256,7 @@
             '<head>' +
             '    <meta charset="UTF-8">' +
             '    <meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-            '    <title>Neuron Co-Pilot Chat</title>' +
+            '    <title>Neuron Node-Pilot Chat</title>' +
             '    <style>' +
             '        * { margin: 0; padding: 0; box-sizing: border-box; }' +
             '        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1D1D1D; color: white; height: 100vh; overflow: hidden; }' +
@@ -3071,7 +3280,7 @@
             '                <svg width="20" height="20" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;">' +
             '                    <path d="M116.736 373.991C116.736 373.991 117.296 250.322 188.729 231.521C289.649 204.96 297.03 397.603 398.286 371.564C482.834 349.821 483.029 229 483.029 229" stroke="white" stroke-width="40.6992" stroke-linecap="square"/>' +
             '                </svg>' +
-            '                Neuron Co-Pilot Chat (Fallback)' +
+            '                Neuron Node-Pilot Chat (Fallback)' +
             '            </span>' +
             '            <button onclick="window.close()" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer; padding: 8px;">✕</button>' +
             '        </div>' +
@@ -3313,7 +3522,7 @@
                     }
                     
                     // Update window title
-                    document.title = 'Neuron Co-Pilot Chat - ' + document.title;
+                    document.title = 'Neuron Node-Pilot Chat - ' + document.title;
                 }
             } catch (error) {
                 console.error('🔍 [NEW WINDOW] Error restoring chat data:', error);
@@ -3932,15 +4141,20 @@
             if (existingWidget) {
                 // Check if we need to update the widget state
                 const currentInput = existingWidget.querySelector('.chat-input');
-                if (!currentInput) {
-                    // Widget needs to be updated to authenticated state
+                const loginButton = existingWidget.querySelector('.login-button');
+                
+                if (!currentInput && loginButton) {
+                    // Widget is in unauthenticated state, needs to be updated to authenticated state
+                    console.log('🔄 [AUTH] Updating widget from unauthenticated to authenticated state');
                     existingWidget.remove();
                     createChatWidget();
-                    
-
+                } else if (currentInput) {
+                    // Widget is already in authenticated state, no need to recreate
+                    console.log('✅ [AUTH] Widget already in authenticated state');
                 }
             } else {
                 // Create new widget
+                console.log('🆕 [AUTH] Creating new authenticated widget');
                 createChatWidget();
             }
             
@@ -3970,9 +4184,11 @@
             const response = await fetch(`${CONFIG.serverUrl}/api/auth/refresh`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${refreshToken}`
-                }
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    refresh_token: refreshToken
+                })
             });
             
             if (response.ok) {
