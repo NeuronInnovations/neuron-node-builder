@@ -20,7 +20,9 @@
         "build-dev": "grunt build-dev",
         "docs": "grunt docs",
         "package": "node --max-old-space-size=8192 build.js",
-        "copy-binaries": "node copy-binaries.js"
+        "copy-binaries": "node copy-binaries.js",
+        "create-app-bundle": "node create-app-bundle.js",
+        "create-dmg": "node create-dmg.js"
     },
     "contributors": [
         {
