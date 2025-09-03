@@ -283,7 +283,7 @@ class ProcessManager {
             if (!executablePath) {
                 throw new Error("NEURON_SDK_PATH environment variable is not set. Please set it to the path of the pre-compiled neuron-sdk executable.");
             }
-            
+
             // Check if executable exists
             if (!fs.existsSync(executablePath)) {
                 console.error(`Executable not found at: ${executablePath}`);
@@ -292,6 +292,43 @@ class ProcessManager {
             console.log(`Using pre-compiled executable from NEURON_SDK_PATH: ${executablePath}`);
             const envFilePath = path.join(require('../services/NeuronUserHome').load(), 'sdk_env_files', `.${nodeType}-env-${node.id}`);
             
+            const workingFile = path.basename(executablePath);
+            console.log(`Working file: ${workingFile}`);
+            
+            const workingDirectory = path.dirname(executablePath);
+            console.log(`Working directory: ${workingDirectory}`);
+
+            console.log(`🔍 Check #2 - Looking for executable in: ${workingDirectory}/${workingFile}`);
+
+            if (!fs.existsSync(`${workingDirectory}/${workingFile}`)) {
+                console.error(`❌ Check #2 - Executable check failed`);
+                throw new Error(`Working file not found at: ${workingFile}. Please ensure the pre-compiled binary is available at the specified path.`);
+            } else {
+                console.log(`✅ Check #2 - Executable check passed`);
+            }
+
+            console.log(`🔍 Check #3 - Looking for executable in: ${executablePath}`);
+
+            if (!fs.existsSync(`${executablePath}`)) {
+                console.error(`❌ Check #3 - Executable check failed`);
+                throw new Error(`Working file not found at: ${executablePath}. Please ensure the pre-compiled binary is available at the specified path.`);
+            } else {
+                console.log(`✅ Check #3 - Executable check passed`);
+            }
+
+            const binDirectory = path.join(require('../services/NeuronUserHome').load(), 'bin');
+            if (!fs.existsSync(binDirectory)) {
+                fs.mkdirSync(binDirectory, { recursive: true });
+            }
+            fs.copyFileSync(executablePath, path.join(binDirectory, path.basename(executablePath)));
+            const copiedExecutablePath = path.join(binDirectory, path.basename(executablePath));
+
+            console.log(`🔍 Check #4 - Copying executable to: ${copiedExecutablePath}`);
+
+            const cwd = path.join(require('../services/NeuronUserHome').load(), 'sdk_env_files');
+
+            console.log(`🔍 Check #4 - Using working directory: ${cwd}`);
+
             const args = [
                 `--port=${port}`,
                // '--use-local-address',
@@ -303,8 +340,12 @@ class ProcessManager {
                 `--ws-port=${port}`
             ];
 
-            const goProcess = spawn(executablePath, args, {
-                cwd: path.join(require('../services/NeuronUserHome').load(), 'sdk_env_files'),
+
+            console.log(`🔍 Spawning process with executable: ${executablePath}`);
+            console.log(`🔍 Spawning process with working directory: ${workingDirectory}`);
+
+            const goProcess = spawn(copiedExecutablePath, args, {
+                cwd: cwd,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
 

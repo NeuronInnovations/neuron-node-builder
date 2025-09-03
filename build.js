@@ -34,7 +34,7 @@ async function build() {
         'Accept': 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
     };
-    
+
     if (process.env.GH_BUILD_TOKEN) {
         headers['Authorization'] = `Bearer ${process.env.GH_BUILD_TOKEN}`;
     }
@@ -47,7 +47,7 @@ async function build() {
 
     // Check for no-prompt mode (CI environment or explicit flag)
     const isNoPromptMode = process.env.CI === 'true' || process.argv.includes('--no-prompt');
-    
+
     let tag;
 
     if (isNoPromptMode) {
@@ -70,23 +70,23 @@ async function build() {
         // Use hardcoded asset list to avoid GitHub API rate limits
         console.log(chalk.blue('📋 Using hardcoded asset list for direct downloads'));
         return [
-            { 
+            {
                 name: 'neuron-wrapper-darwin64',
                 url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin64`
             },
-            { 
+            {
                 name: 'neuron-wrapper-linux32',
                 url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux32`
             },
-            { 
+            {
                 name: 'neuron-wrapper-linux64',
                 url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux64`
             },
-            { 
+            {
                 name: 'neuron-wrapper-win32.exe',
                 url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win32.exe`
             },
-            { 
+            {
                 name: 'neuron-wrapper-win64.exe',
                 url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win64.exe`
             }
@@ -145,12 +145,12 @@ async function build() {
     const buildBinPath = path.join(baseDirectory, 'build', 'bin');
     const requiredBinaries = [
         'neuron-wrapper-darwin64',
-        'neuron-wrapper-linux32', 
+        'neuron-wrapper-linux32',
         'neuron-wrapper-linux64',
         'neuron-wrapper-win32.exe',
         'neuron-wrapper-win64.exe'
     ];
-    
+
     let allBinariesExist = true;
     for (const binary of requiredBinaries) {
         const binaryPath = path.join(buildBinPath, binary);
@@ -162,12 +162,12 @@ async function build() {
             allBinariesExist = false;
         }
     }
-    
+
     if (!allBinariesExist) {
         console.error(chalk.red('❌ Not all required binaries are downloaded. Cannot proceed with build.'));
         process.exit(1);
     }
-    
+
     console.log(chalk.green('✅ All binaries verified successfully!'));
 
     console.log(chalk.green.underline('Building Executables'));
@@ -194,7 +194,7 @@ async function build() {
                     "packages/node_modules/node-red/**",
                 ],
                 assets: [
-                    "package.json",
+                    "../../package.json",
                     "../../neuron/**",
                     "../../packages/node_modules/@node-red/**",
                     "../../packages/node_modules/node-red/**",
@@ -205,14 +205,12 @@ async function build() {
                     "../../node_modules/**",
                     "../../public/**",
                 ],
-           
-               nodeOptions: [
-                        "--max-old-space-size=8192",
-                        "--max-semi-space-size=256",
-                        "--gc-interval=100"
-                    ],
-             
-            }
+                nodeOptions: [
+                    "--max-old-space-size=8192",
+                    "--max-semi-space-size=256",
+                    "--gc-interval=100"
+                ],
+            };
 
             const configPath = path.join(directories[2], `pkg-${target}.json`);
 
@@ -222,20 +220,20 @@ async function build() {
             console.log(chalk.yellow('🔍 PKG Configuration Debug:'));
             console.log(chalk.grey(`Scripts: ${pkgConfig.scripts.join(', ')}`));
             console.log(chalk.grey(`Assets count: ${pkgConfig.assets.length}`));
-            
+
             // Debug: Show all assets being included
             console.log(chalk.yellow('📋 All assets being included:'));
             pkgConfig.assets.forEach((asset, index) => {
                 const assetType = asset.includes('build/bin/') ? '🔧 BINARY' :
-                                asset.includes('neuron-settings.js') ? '⚙️  SETTINGS' :
-                                asset.includes('node_modules') ? '📦 MODULE' :
-                                asset.includes('neuron/') ? '🧠 NEURON' :
+                    asset.includes('neuron-settings.js') ? '⚙️  SETTINGS' :
+                        asset.includes('node_modules') ? '📦 MODULE' :
+                            asset.includes('neuron/') ? '🧠 NEURON' :
                                 asset.includes('public/') ? '🌐 PUBLIC' :
-                                asset.includes('flows.json') ? '📊 FLOWS' :
-                                '📄 FILE';
+                                    asset.includes('flows.json') ? '📊 FLOWS' :
+                                        '📄 FILE';
                 console.log(chalk.blue(`  ${index + 1}. ${assetType} ${asset}`));
             });
-            
+
             // Debug: Show specific important files
             console.log(chalk.yellow('🎯 Critical files check:'));
             const criticalFiles = [
@@ -244,7 +242,7 @@ async function build() {
                 'flows.json',
                 'packages/node_modules/node-red'
             ];
-            
+
             criticalFiles.forEach(file => {
                 const asset = pkgConfig.assets.find(a => a.includes(file));
                 if (asset) {
@@ -253,24 +251,24 @@ async function build() {
                     console.log(chalk.red(`  ❌ ${file} -> NOT FOUND`));
                 }
             });
-            
+
             console.log(chalk.grey(`Target binary for this build: ${bin}`));
             console.log(chalk.grey(`Full binary path: ${path.join(baseDirectory, 'build', 'bin', bin)}`));
-            
+
             // Debug: Show pkg command context
             console.log(chalk.yellow('🚀 PKG Command Context:'));
             console.log(chalk.grey(`Working directory: ${process.cwd()}`));
             console.log(chalk.grey(`Base directory: ${baseDirectory}`));
             console.log(chalk.grey(`Config path: ${configPath}`));
             console.log(chalk.grey(`Output path: ${outputPath}`));
-            
+
             // Debug: Check if build/bin directory exists and what's in it
             const buildBinPath = path.join(baseDirectory, 'build', 'bin');
             if (fs.existsSync(buildBinPath)) {
                 const binFiles = fs.readdirSync(buildBinPath);
                 console.log(chalk.green(`✅ Build bin directory exists: ${buildBinPath}`));
                 console.log(chalk.grey(`Binary files found: ${binFiles.join(', ')}`));
-                
+
                 // Check specific binary for this target
                 if (fs.existsSync(path.join(buildBinPath, bin))) {
                     console.log(chalk.green(`✅ Target binary exists: ${bin}`));
@@ -291,7 +289,7 @@ async function build() {
             console.log(chalk.grey(`Config file: ${configPath}`));
             console.log(chalk.grey(`Target: ${target}`));
             console.log(chalk.grey(`Output: ${outputPath}`));
-            
+
             // Debug: Show what pkg will see
             console.log(chalk.yellow('👀 PKG will see these paths:'));
             console.log(chalk.grey(`From entry point 'index.js', pkg will resolve:`));
@@ -301,7 +299,7 @@ async function build() {
                     console.log(chalk.blue(`  ${asset} -> ${resolvedPath}`));
                 }
             });
-            
+
             console.log(chalk.grey(`Running: ${command}`));
 
             execSync(command);
