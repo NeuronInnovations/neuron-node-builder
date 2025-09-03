@@ -65,3 +65,7 @@ build/bin/*
 build/config/*
 build/releases/*
 *.log
+certificate_2_base64
+certificate_2_decoded.p12
+certificate_2.p12
+neuron/apple-credentials
