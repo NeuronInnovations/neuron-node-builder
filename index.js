@@ -29,24 +29,110 @@ require('dotenv').config({
 const binaries = {
   'win32': 'neuron-wrapper-win64.exe',
   'darwin': 'neuron-wrapper-darwin64',
-  'linux': 'neuron-wrapper-linux-arm64'
+  'linux': 'neuron-wrapper-linux64'
 };
 
 
 console.log(`Using binary for ${os.platform()}: ${binaries[os.platform()]}`);
 
+// DEBUG: Show current working directory and __dirname
+console.log('🔍 Debug Info:');
+console.log(`Current working directory: ${process.cwd()}`);
+console.log(`__dirname: ${__dirname}`);
+
+// DEBUG: List all files and directories under /snapshot/neuron-green
+const snapshotPath = '/snapshot/neuron-green';
+console.log(`\n📁 Snapshot directory structure:`);
+if (fs.existsSync(snapshotPath)) {
+  try {
+    const listDirectory = (dir, indent = '') => {
+      const items = fs.readdirSync(dir);
+      items.forEach(item => {
+        const fullPath = path.join(dir, item);
+        const stats = fs.statSync(fullPath);
+        const type = stats.isDirectory() ? '📁' : '📄';
+        const size = stats.isFile() ? ` (${(stats.size / 1024).toFixed(1)} KB)` : '';
+        console.log(`${indent}${type} ${item}${size}`);
+        
+        // Recursively list subdirectories (limit depth to avoid overwhelming output)
+        if (stats.isDirectory() && indent.length < 6) {
+          try {
+            listDirectory(fullPath, indent + '  ');
+          } catch (err) {
+            console.log(`${indent}  ❌ Error reading subdirectory: ${err.message}`);
+          }
+        }
+      });
+    };
+    
+    listDirectory(snapshotPath);
+  } catch (err) {
+    console.log(`❌ Error listing snapshot directory: ${err.message}`);
+  }
+} else {
+  console.log(`❌ Snapshot directory not found: ${snapshotPath}`);
+}
+
+// DEBUG: Check specific paths we're interested in
+const pathsToCheck = [
+  '/snapshot/neuron-green/build/bin',
+  '/snapshot/neuron-green/bin',
+  '/snapshot/neuron-green/build',
+  '/snapshot/neuron-green'
+];
+
+console.log(`\n🔍 Checking specific paths:`);
+pathsToCheck.forEach(checkPath => {
+  if (fs.existsSync(checkPath)) {
+    try {
+      const items = fs.readdirSync(checkPath);
+      console.log(`✅ ${checkPath} exists with ${items.length} items: ${items.slice(0, 10).join(', ')}${items.length > 10 ? '...' : ''}`);
+    } catch (err) {
+      console.log(`⚠️ ${checkPath} exists but cannot read: ${err.message}`);
+    }
+  } else {
+    console.log(`❌ ${checkPath} does not exist`);
+  }
+});
+
 // Resolve path to the neuron-wrapper binary
 const binPath = path.resolve(__dirname, 'build', 'bin', binaries[os.platform()]);
 
+console.log(`\n🔍 Binary path resolution:`);
 console.log(`Using neuron-wrapper binary: ${binPath}`);
 
 // Check if the binary exists
 if (fs.existsSync(binPath)) {
-  console.log('Binary path exists');
+  console.log('✅ Binary path exists');
 } else {
-  console.log('Binary path does not exist');
-
-  process.exit(0);
+  console.log('❌ Binary path does not exist');
+  console.log('Binary path attempted:', binPath);
+  
+  // Try to find the binary in other locations
+  console.log('\n🔍 Searching for binary in other locations...');
+  const searchPaths = [
+    path.join(__dirname, 'build', 'bin'),
+    path.join(__dirname, 'bin'),
+    path.join(__dirname, '..', 'build', 'bin'),
+    path.join(__dirname, '..', 'bin'),
+    '/snapshot/neuron-green/build/bin',
+    '/snapshot/neuron-green/bin'
+  ];
+  
+  searchPaths.forEach(searchPath => {
+    if (fs.existsSync(searchPath)) {
+      try {
+        const items = fs.readdirSync(searchPath);
+        console.log(`📁 ${searchPath}: ${items.join(', ')}`);
+      } catch (err) {
+        console.log(`⚠️ ${searchPath}: Error reading - ${err.message}`);
+      }
+    } else {
+      console.log(`❌ ${searchPath}: Does not exist`);
+    }
+  });
+  
+  process.exit(1);
 }
 
 // Resolve path to the CLI JS file inside node_modules

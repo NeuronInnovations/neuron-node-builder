@@ -47,9 +47,15 @@ if [ ! -d "$APP_PATH" ]; then
     mkdir -p "$APP_PATH/Contents/MacOS"
     mkdir -p "$APP_PATH/Contents/Resources"
     
-    # Copy the executable
+    # Copy the executable with proper permissions
     cp "$EXECUTABLE_PATH" "$APP_PATH/Contents/MacOS/neuron-node-builder"
     chmod +x "$APP_PATH/Contents/MacOS/neuron-node-builder"
+    
+    # Verify executable integrity
+    if ! file "$APP_PATH/Contents/MacOS/neuron-node-builder" | grep -q "Mach-O"; then
+        echo -e "${RED}❌ Executable verification failed${NC}"
+        exit 1
+    fi
     
     # Create the Info.plist file
     cat > "$APP_PATH/Contents/Info.plist" << EOF
@@ -87,11 +93,16 @@ EOF
         cp "$VOLUME_ICON" "$APP_PATH/Contents/Resources/AppIcon.icns" 2>/dev/null || true
     fi
     
-    # Create a launch script to handle the executable properly
+    # Create a launch script with memory optimization
     cat > "$APP_PATH/Contents/Resources/launch.sh" << 'EOF'
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXECUTABLE="$SCRIPT_DIR/../MacOS/neuron-node-builder"
+
+# Set memory optimization environment variables
+export NODE_OPTIONS="--max-old-space-size=8192 --max-semi-space-size=256 --gc-interval=100"
+
+# Launch with memory optimization
 exec "$EXECUTABLE" "$@"
 EOF
     chmod +x "$APP_PATH/Contents/Resources/launch.sh"
@@ -109,6 +120,7 @@ EOF
             --options runtime \
             --timestamp \
             --identifier "com.neuron.node-builder" \
+            --entitlements "$SCRIPT_DIR/entitlements.plist" \
             "$APP_PATH"
         
         if codesign --verify --verbose "$APP_PATH"; then

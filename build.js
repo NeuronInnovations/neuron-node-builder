@@ -40,17 +40,9 @@ async function build() {
     }
 
     async function getLatestTag() {
-        try {
-            const response = await axios.get('https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases', {
-                headers,
-            });
-
-            return response.data[0].tag_name;
-        } catch (error) {
-            console.error(chalk.red('Error fetching latest tag:'), error.message);
-
-            process.exit(1);
-        }
+        // Use direct download approach - skip GitHub API entirely
+        console.log(chalk.blue('📥 Using direct download approach to avoid rate limits'));
+        return 'v0.0.1-alpha';
     }
 
     // Check for no-prompt mode (CI environment or explicit flag)
@@ -75,22 +67,30 @@ async function build() {
     console.log(chalk.green.underline('Finding Assets'));
 
     async function getAssets() {
-        try {
-            const response = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/tags/${tag}`, {
-                headers,
-            });
-
-            return response.data.assets.map((asset) => {
-                return {
-                    id: asset.id,
-                    name: asset.name,
-                };
-            });
-        } catch (error) {
-            console.error(chalk.red('Error fetching assets:'), error.message);
-
-            process.exit(1);
-        }
+        // Use hardcoded asset list to avoid GitHub API rate limits
+        console.log(chalk.blue('📋 Using hardcoded asset list for direct downloads'));
+        return [
+            { 
+                name: 'neuron-wrapper-darwin64',
+                url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin64`
+            },
+            { 
+                name: 'neuron-wrapper-linux32',
+                url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux32`
+            },
+            { 
+                name: 'neuron-wrapper-linux64',
+                url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux64`
+            },
+            { 
+                name: 'neuron-wrapper-win32.exe',
+                url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win32.exe`
+            },
+            { 
+                name: 'neuron-wrapper-win64.exe',
+                url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win64.exe`
+            }
+        ];
     }
 
     const assets = await getAssets();
@@ -109,8 +109,7 @@ async function build() {
                 fs.mkdirSync(binDir, { recursive: true });
             }
 
-            const downloadResponse = await axios.get(`https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/assets/${asset.id}`, {
-                headers,
+            const downloadResponse = await axios.get(asset.url, {
                 responseType: 'stream',
             });
 
@@ -121,6 +120,10 @@ async function build() {
 
             return new Promise((resolve, reject) => {
                 writer.on('finish', () => {
+                    // Make the file executable on Unix-like systems
+                    if (process.platform !== 'win32') {
+                        fs.chmodSync(filePath, 0o755);
+                    }
                     console.log(chalk.blue(`Downloaded ${asset.name} to ${filePath}`));
                     resolve(filePath);
                 });
@@ -136,6 +139,36 @@ async function build() {
     for (const asset of assets) {
         await downloadAsset(asset);
     }
+
+    // Verify all binaries are downloaded before building
+    console.log(chalk.yellow('🔍 Verifying all binaries are downloaded...'));
+    const buildBinPath = path.join(baseDirectory, 'build', 'bin');
+    const requiredBinaries = [
+        'neuron-wrapper-darwin64',
+        'neuron-wrapper-linux32', 
+        'neuron-wrapper-linux64',
+        'neuron-wrapper-win32.exe',
+        'neuron-wrapper-win64.exe'
+    ];
+    
+    let allBinariesExist = true;
+    for (const binary of requiredBinaries) {
+        const binaryPath = path.join(buildBinPath, binary);
+        if (fs.existsSync(binaryPath)) {
+            const stats = fs.statSync(binaryPath);
+            console.log(chalk.green(`✅ ${binary} exists (${(stats.size / 1024 / 1024).toFixed(2)} MB)`));
+        } else {
+            console.log(chalk.red(`❌ ${binary} missing`));
+            allBinariesExist = false;
+        }
+    }
+    
+    if (!allBinariesExist) {
+        console.error(chalk.red('❌ Not all required binaries are downloaded. Cannot proceed with build.'));
+        process.exit(1);
+    }
+    
+    console.log(chalk.green('✅ All binaries verified successfully!'));
 
     console.log(chalk.green.underline('Building Executables'));
 
@@ -158,25 +191,13 @@ async function build() {
 
             const pkgConfig = {
                 scripts: [
-                    "../../packages/node_modules/node-red/**",
+                    "packages/node_modules/node-red/**",
                 ],
                 assets: [
-                    "../../package.json",
+                    "package.json",
                     "../../neuron/**",
-                   /* "../../packages/node_modules/@node-red/**",
+                    "../../packages/node_modules/@node-red/**",
                     "../../packages/node_modules/node-red/**",
-                    "../../node_modules/node-red-dashboard/**",
-                    "../../node_modules/node-red-contrib-ai-agent/**",
-                    "../../node_modules/node-red-contrib-web-worldmap/**",
-                    "../../node_modules/@node-red-contrib-themes/**",
-                    "../../node_modules/socket.io/**",
-                    "../../node_modules/socket.io-adapter/**", 
-                    "../../node_modules/socket.io-parser/**",
-                    "../../node_modules/axios/**",
-                    "../../node_modules/@hashgraph/**",
-                    "../../node_modules/ethers/**",
-                    "../../node_modules/ws/**",
-                    "../../node_modules/dotenv/**",*/
                     "../../flows.json",
                     `../../build/bin/${bin}`,
                     "../../neuron-settings.js",
@@ -185,13 +206,11 @@ async function build() {
                     "../../public/**",
                 ],
            
-                "autoDetect": true,
-                "pkg": {
-                    "nodeOptions": [
-                        "--max-old-space-size=4096",
-                        "--max-semi-space-size=128"
-                    ]
-                }
+               nodeOptions: [
+                        "--max-old-space-size=8192",
+                        "--max-semi-space-size=256",
+                        "--gc-interval=100"
+                    ],
              
             }
 
@@ -199,8 +218,90 @@ async function build() {
 
             fs.writeFileSync(configPath, JSON.stringify(pkgConfig, null, 2));
 
+            // Debug: Show what's being included in pkg
+            console.log(chalk.yellow('🔍 PKG Configuration Debug:'));
+            console.log(chalk.grey(`Scripts: ${pkgConfig.scripts.join(', ')}`));
+            console.log(chalk.grey(`Assets count: ${pkgConfig.assets.length}`));
+            
+            // Debug: Show all assets being included
+            console.log(chalk.yellow('📋 All assets being included:'));
+            pkgConfig.assets.forEach((asset, index) => {
+                const assetType = asset.includes('build/bin/') ? '🔧 BINARY' :
+                                asset.includes('neuron-settings.js') ? '⚙️  SETTINGS' :
+                                asset.includes('node_modules') ? '📦 MODULE' :
+                                asset.includes('neuron/') ? '🧠 NEURON' :
+                                asset.includes('public/') ? '🌐 PUBLIC' :
+                                asset.includes('flows.json') ? '📊 FLOWS' :
+                                '📄 FILE';
+                console.log(chalk.blue(`  ${index + 1}. ${assetType} ${asset}`));
+            });
+            
+            // Debug: Show specific important files
+            console.log(chalk.yellow('🎯 Critical files check:'));
+            const criticalFiles = [
+                'neuron-settings.js',
+                'build/bin',
+                'flows.json',
+                'packages/node_modules/node-red'
+            ];
+            
+            criticalFiles.forEach(file => {
+                const asset = pkgConfig.assets.find(a => a.includes(file));
+                if (asset) {
+                    console.log(chalk.green(`  ✅ ${file} -> ${asset}`));
+                } else {
+                    console.log(chalk.red(`  ❌ ${file} -> NOT FOUND`));
+                }
+            });
+            
+            console.log(chalk.grey(`Target binary for this build: ${bin}`));
+            console.log(chalk.grey(`Full binary path: ${path.join(baseDirectory, 'build', 'bin', bin)}`));
+            
+            // Debug: Show pkg command context
+            console.log(chalk.yellow('🚀 PKG Command Context:'));
+            console.log(chalk.grey(`Working directory: ${process.cwd()}`));
+            console.log(chalk.grey(`Base directory: ${baseDirectory}`));
+            console.log(chalk.grey(`Config path: ${configPath}`));
+            console.log(chalk.grey(`Output path: ${outputPath}`));
+            
+            // Debug: Check if build/bin directory exists and what's in it
+            const buildBinPath = path.join(baseDirectory, 'build', 'bin');
+            if (fs.existsSync(buildBinPath)) {
+                const binFiles = fs.readdirSync(buildBinPath);
+                console.log(chalk.green(`✅ Build bin directory exists: ${buildBinPath}`));
+                console.log(chalk.grey(`Binary files found: ${binFiles.join(', ')}`));
+                
+                // Check specific binary for this target
+                if (fs.existsSync(path.join(buildBinPath, bin))) {
+                    console.log(chalk.green(`✅ Target binary exists: ${bin}`));
+                    const stats = fs.statSync(path.join(buildBinPath, bin));
+                    console.log(chalk.grey(`Binary size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`));
+                } else {
+                    console.log(chalk.red(`❌ Target binary missing: ${bin}`));
+                }
+            } else {
+                console.log(chalk.red(`❌ Build bin directory missing: ${buildBinPath}`));
+            }
+
             const command = `pkg --config ${configPath} -t ${target} --cjs -o ${outputPath} index.js`;
 
+            console.log(chalk.yellow('🔧 PKG Command Details:'));
+            console.log(chalk.grey(`Command: ${command}`));
+            console.log(chalk.grey(`Entry point: index.js`));
+            console.log(chalk.grey(`Config file: ${configPath}`));
+            console.log(chalk.grey(`Target: ${target}`));
+            console.log(chalk.grey(`Output: ${outputPath}`));
+            
+            // Debug: Show what pkg will see
+            console.log(chalk.yellow('👀 PKG will see these paths:'));
+            console.log(chalk.grey(`From entry point 'index.js', pkg will resolve:`));
+            pkgConfig.assets.forEach((asset, index) => {
+                if (asset.includes('../../')) {
+                    const resolvedPath = path.resolve(process.cwd(), asset);
+                    console.log(chalk.blue(`  ${asset} -> ${resolvedPath}`));
+                }
+            });
+            
             console.log(chalk.grey(`Running: ${command}`));
 
             execSync(command);
@@ -214,9 +315,9 @@ async function build() {
     }
 
     const targets = {
-        'latest-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
-        'latest-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
-        'latest-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
+        'node18-win-x64': { bin: 'neuron-wrapper-win64.exe', output: 'latest-win-x64.exe' },
+        'node18-macos-x64': { bin: 'neuron-wrapper-darwin64', output: 'latest-macos-x64' },
+        'node18-linux-x64': { bin: 'neuron-wrapper-linux64', output: 'latest-linux-x64' },
     };
 
     for (const target of Object.keys(targets)) {
