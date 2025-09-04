@@ -592,8 +592,8 @@ module.exports = {
 
                 require("path").resolve(__dirname, "neuron/theme/balance-service.js"),
                 require("path").resolve(__dirname, "public/health-indicator.js"),
-                require("path").resolve(__dirname, "public/featurebase-loader.js"),
-                require("path").resolve(__dirname, "neuron/theme/featurebase-reposition.js") ,
+               // require("path").resolve(__dirname, "public/featurebase-loader.js"),
+               // require("path").resolve(__dirname, "neuron/theme/featurebase-reposition.js") ,
                 require("path").resolve(__dirname, "neuron/theme/menu-customizer.js"),
                 require("path").resolve(__dirname, "neuron/theme/chat-server-config.js"),
                 require("path").resolve(__dirname, "neuron/theme/neuron-chat-widget.js"),
