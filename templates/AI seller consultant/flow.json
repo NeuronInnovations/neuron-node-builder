@@ -1,6 +1,6 @@
 [
     {
-        "id": "8457586d179172d1",
+        "id": "7b1ee736e1a2a0ce",
         "type": "tab",
         "label": "Flow 2",
         "disabled": false,
@@ -8,9 +8,9 @@
         "env": []
     },
     {
-        "id": "86429136574a5d28",
+        "id": "c064a303fe724e9a",
         "type": "group",
-        "z": "8457586d179172d1",
+        "z": "7b1ee736e1a2a0ce",
         "style": {
             "stroke": "#3e404a",
             "stroke-opacity": "1",
@@ -21,16 +21,17 @@
             "color": "#f8f8f2"
         },
         "nodes": [
-            "6754d3455b56d584",
-            "e6d8d9f317bea8ec",
-            "21ce5c1d0c40338c",
-            "25efbe773c7584c0",
-            "d4b6216d5c66463b",
-            "ed3d9525e6cdb44f",
-            "90e1208255c96276",
-            "3e3882d771232e9f",
-            "ef16649b591e0a28",
-            "27a7e06fb98f5983"
+            "fb042bb1c4f61cbc",
+            "01598d370cbfe0ea",
+            "01d9bdd6c7ec633f",
+            "24bfa7e80ae688bf",
+            "5a9506cca353ea01",
+            "d496cfe7acc6cfe3",
+            "7db13aff1a2fca1d",
+            "badf24134ed0033a",
+            "dacbe82beacf2521",
+            "614c218ec79898b6",
+            "8cff3076ed0dcb25"
         ],
         "x": 14,
         "y": 119,
@@ -38,10 +39,10 @@
         "h": 382
     },
     {
-        "id": "6754d3455b56d584",
+        "id": "fb042bb1c4f61cbc",
         "type": "ai-model",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "My AI Model",
         "model": "microsoft/mai-ds-r1:free",
         "temperature": 0.7,
@@ -50,15 +51,15 @@
         "y": 200,
         "wires": [
             [
-                "21ce5c1d0c40338c"
+                "01d9bdd6c7ec633f"
             ]
         ]
     },
     {
-        "id": "e6d8d9f317bea8ec",
+        "id": "01598d370cbfe0ea",
         "type": "comment",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "[ACTION] - Configure your OpenRouter API key and model",
         "info": "Go to https://openrouter.ai/ and register/sigin and create a new API KEY",
         "x": 1030,
@@ -66,10 +67,10 @@
         "wires": []
     },
     {
-        "id": "21ce5c1d0c40338c",
+        "id": "01d9bdd6c7ec633f",
         "type": "ai-agent",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "Ask my AI model",
         "systemPrompt": "You are a helpful AI assistant.",
         "responseType": "text",
@@ -77,16 +78,16 @@
         "y": 320,
         "wires": [
             [
-                "25efbe773c7584c0",
-                "ef16649b591e0a28"
+                "24bfa7e80ae688bf",
+                "dacbe82beacf2521"
             ]
         ]
     },
     {
-        "id": "25efbe773c7584c0",
+        "id": "24bfa7e80ae688bf",
         "type": "neuron-p2p",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "",
         "selectedNode": "",
         "description": "",
@@ -94,15 +95,16 @@
         "y": 320,
         "wires": [
             [
-                "27a7e06fb98f5983"
+                "614c218ec79898b6",
+                "19d8a8dd6e781c04"
             ]
         ]
     },
     {
-        "id": "d4b6216d5c66463b",
+        "id": "5a9506cca353ea01",
         "type": "seller config",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "Consultant Seller Config",
         "deviceRole": "Device role",
         "deviceName": "Device name",
@@ -111,25 +113,25 @@
         "deviceType": "Device Type",
         "price": "1",
         "description": "",
-        "evmAddress": "0x1967a5bc55b3bd3541b58a556e2aecee0e4ef055",
-        "balance": "5.72 USDC",
+        "evmAddress": "0x2659a4fc1e41643688595b173d667489c32e1c76",
+        "balance": "5.70 USDC",
         "buyerEvmAddress": [],
         "buyerDevices": [],
-        "publicKey": "02a8a44d24a7e0b209481743904f62fe92315a1d7d5bed213b582ea39d074ad920",
-        "stdInTopic": "0.0.6614200",
-        "stdOutTopic": "0.0.6614201",
-        "stdErrTopic": "0.0.6614199",
+        "publicKey": "026ab434fed77a1d481f7fa95197b384c32b3b28e5ac653612f38c072938de2dc6",
+        "stdInTopic": "0.0.6758494",
+        "stdOutTopic": "0.0.6758496",
+        "stdErrTopic": "0.0.6758495",
         "x": 170,
-        "y": 180,
+        "y": 200,
         "wires": [
             []
         ]
     },
     {
-        "id": "ed3d9525e6cdb44f",
+        "id": "d496cfe7acc6cfe3",
         "type": "comment",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "[ACTION] Double click and select \"Consultant Seller Config\"",
         "info": "",
         "x": 260,
@@ -137,10 +139,10 @@
         "wires": []
     },
     {
-        "id": "90e1208255c96276",
+        "id": "7db13aff1a2fca1d",
         "type": "function",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "Extract buyer's question",
         "func": "msg.payload = msg.payload.text;\nmsg.othermessage = true;\nif(!msg.payload){\n    return null;\n}\nreturn msg;",
         "outputs": 1,
@@ -153,22 +155,23 @@
         "y": 260,
         "wires": [
             [
-                "6754d3455b56d584",
-                "3e3882d771232e9f"
+                "fb042bb1c4f61cbc",
+                "badf24134ed0033a",
+                "3c303c4e056101e5"
             ]
         ]
     },
     {
-        "id": "3e3882d771232e9f",
+        "id": "badf24134ed0033a",
         "type": "ui_template",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
-        "group": "5a98357c2bababf3",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
+        "group": "fa8f3df35e1f5bd2",
         "name": "Seller Chat UI",
         "order": 0,
         "width": "6",
         "height": "15",
-        "format": "<style>\n  .chat-container-alt {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n    display: flex;\n    flex-direction: column;\n    height: 100%;\n    background-color: #f8f9fa;\n    border-radius: 8px;\n    overflow: hidden;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    margin-top: 10px;\n  }\n\n  .message-panel-alt {\n    flex-grow: 1;\n    overflow-y: auto;\n    padding: 16px;\n    background-color: #ffffff;\n  }\n\n  .message-alt {\n    max-width: 80%;\n    padding: 10px 14px;\n    margin-bottom: 12px;\n    border-radius: 10px;\n    line-height: 1.4;\n    position: relative;\n    word-wrap: break-word;\n    animation: fadeInAlt 0.3s ease-out;\n    background-color: #e9ecef;\n    color: #212529;\n  }\n\n  .message-alt-other {\n    background-color: #007bff;\n    color: #ffffff;\n  }\n\n  @keyframes fadeInAlt {\n    from {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n\n    to {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .timestamp-alt {\n    font-size: 11px;\n    opacity: 0.6;\n    margin-top: 4px;\n    text-align: right;\n  }\n\n  .input-area-alt {\n    display: flex;\n    padding: 12px;\n    background-color: #ffffff;\n    border-top: 1px solid #dee2e6;\n  }\n\n  #chat-input-alt {\n    flex-grow: 1;\n    padding: 10px 14px;\n    border: 1px solid #ced4da;\n    border-radius: 20px;\n    outline: none;\n    font-size: 14px;\n  }\n\n  #chat-input-alt:focus {\n    border-color: #007bff;\n  }\n\n  #send-button-alt {\n    margin-left: 10px;\n    padding: 10px 20px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 20px;\n    cursor: pointer;\n    font-size: 14px;\n  }\n\n  #send-button-alt:hover {\n    background-color: #0069d9;\n  }\n\n  #send-button-alt:disabled {\n    background-color: #adb5bd;\n    cursor: not-allowed;\n  }\n</style>\n\n<div class=\"chat-container-alt\">\n  <div id=\"message-panel-alt\" class=\"message-panel-alt\"></div>\n  <div class=\"input-area-alt\">\n    <input type=\"text\" id=\"chat-input-alt\" placeholder=\"Type your message...\" autocomplete=\"off\" />\n    <button id=\"send-button-alt\" disabled>Send</button>\n  </div>\n</div>\n\n<script>\n  (function(scope) {\n  const messagePanel = document.getElementById('message-panel-alt');\n  const chatInput = document.getElementById('chat-input-alt');\n  const sendButton = document.getElementById('send-button-alt');\n\n  function formatTimestamp(date = new Date()) {\n    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n  }\n\n  function scrollToBottom() {\n    messagePanel.scrollTop = messagePanel.scrollHeight;\n  }\n\n  function addMessage(text, isOther = false) {\n    const messageElement = document.createElement('div');\n    messageElement.className = \"message-alt\" + (isOther ? \" message-alt-other\" : \"\");\n    messageElement.innerHTML = `\n      ${text}\n      <div class=\"timestamp-alt\">${formatTimestamp()}</div>\n    `;\n    messagePanel.appendChild(messageElement);\n    scrollToBottom();\n  }\n\n  function updateSendButton() {\n    sendButton.disabled = chatInput.value.trim() === '';\n  }\n\n  function sendMessage() {\n    const messageText = chatInput.value.trim();\n    if (!messageText) return;\n    addMessage(messageText, false); // user messages are default style\n\n    if (typeof scope.send === 'function') {\n      scope.send({ payload: messageText });\n    }\n\n    chatInput.value = '';\n    updateSendButton();\n    chatInput.focus();\n  }\n\n  sendButton.addEventListener('click', sendMessage);\n  chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });\n  chatInput.addEventListener('input', updateSendButton);\n\n\n\nscope.$watch('msg', function(msg) {\n  if (!msg) return;\n  try {\n    const text = typeof msg.payload === 'object' \n      ? JSON.stringify(msg.payload) \n      : String(msg.payload);\n\n    const isOther = (msg.othermessage === true || msg.othermessage === \"true\");\n    addMessage(text, isOther);\n  } catch (err) {\n    console.error(\"Error showing message:\", err, msg);\n  }\n});\n\n\n  chatInput.focus();\n})(scope);\n</script>",
+        "format": "<style>\n  .chat-container-2 {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n    display: flex;\n    flex-direction: column;\n    height: 100%;\n    background-color: #f8f9fa;\n    border-radius: 8px;\n    overflow: hidden;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    margin-top: 10px;\n  }\n\n  .message-panel-2 {\n    flex-grow: 1;\n    overflow-y: auto;\n    padding: 16px;\n    background-color: #ffffff;\n  }\n\n  .message {\n    max-width: 80%;\n    padding: 10px 14px;\n    margin-bottom: 12px;\n    border-radius: 18px;\n    line-height: 1.4;\n    position: relative;\n    word-wrap: break-word;\n    animation: fadeIn 0.3s ease-out;\n  }\n\n  @keyframes fadeIn {\n    from {\n      opacity: 0;\n      transform: translateY(10px);\n    }\n\n    to {\n      opacity: 1;\n      transform: translateY(0);\n    }\n  }\n\n  .user-message {\n    background-color: #007bff;\n    color: white;\n    margin-left: auto;\n    border-bottom-right-radius: 4px;\n  }\n\n  .other-message {\n    background-color: #e9ecef;\n    color: #212529;\n    margin-right: auto;\n    border-bottom-left-radius: 4px;\n  }\n\n  .system-message {\n    background-color: #fff3cd;\n    color: #856404;\n    margin: 0 auto;\n    text-align: center;\n    border-radius: 8px;\n    max-width: 90%;\n    font-style: italic;\n  }\n\n  .timestamp {\n    font-size: 11px;\n    opacity: 0.8;\n    margin-top: 4px;\n    text-align: right;\n  }\n\n  .input-area {\n    display: flex;\n    padding: 12px;\n    background-color: #ffffff;\n    border-top: 1px solid #dee2e6;\n  }\n\n  #chat-input-2 {\n    flex-grow: 1;\n    padding: 10px 14px;\n    border: 1px solid #ced4da;\n    border-radius: 20px;\n    outline: none;\n    font-size: 14px;\n  }\n\n  #chat-input-2:focus {\n    border-color: #007bff;\n  }\n\n  #send-button-2 {\n    margin-left: 10px;\n    padding: 10px 20px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 20px;\n    cursor: pointer;\n    font-size: 14px;\n  }\n\n  #send-button-2:hover {\n    background-color: #0069d9;\n  }\n\n  #send-button-2:disabled {\n    background-color: #adb5bd;\n    cursor: not-allowed;\n  }\n\n  .typing-indicator {\n    display: flex;\n    padding: 8px 16px;\n    justify-content: flex-start;\n    gap: 4px;\n  }\n\n  .typing-dot {\n    width: 8px;\n    height: 8px;\n    background-color: #6c757d;\n    border-radius: 50%;\n    animation: typingAnimation 1.4s infinite ease-in-out;\n  }\n\n  .typing-dot:nth-child(1) {\n    animation-delay: 0s;\n  }\n\n  .typing-dot:nth-child(2) {\n    animation-delay: 0.2s;\n  }\n\n  .typing-dot:nth-child(3) {\n    animation-delay: 0.4s;\n  }\n\n  @keyframes typingAnimation {\n\n    0%,\n    60%,\n    100% {\n      transform: translateY(0);\n    }\n\n    30% {\n      transform: translateY(-4px);\n    }\n  }\n</style>\n\n<div class=\"chat-container-2\">\n  <div id=\"message-panel-2\" class=\"message-panel-2\"></div>\n  <div id=\"typing-indicator-2\" class=\"typing-indicator\" style=\"display: none;\">\n    <div class=\"typing-dot\"></div>\n    <div class=\"typing-dot\"></div>\n    <div class=\"typing-dot\"></div>\n  </div>\n  <div class=\"input-area\">\n    <input type=\"text\" id=\"chat-input-2\" placeholder=\"Type your message...\" autocomplete=\"off\" />\n    <button id=\"send-button-2\" disabled>Send</button>\n  </div>\n</div>\n\n<script>\n  (function(scope) {\n  const state = {\n    messageCount: 0,\n    isTyping: false,\n    pendingMessages: new Set()\n  };\n  \n  const messagePanel = document.getElementById('message-panel-2');\n  const chatInput = document.getElementById('chat-input-2');\n  const sendButton = document.getElementById('send-button-2');\n  const typingIndicator = document.getElementById('typing-indicator-2');\n  \n  function formatTimestamp(date = new Date()) {\n    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\n  }\n  \n  function scrollToBottom() {\n    messagePanel.scrollTop = messagePanel.scrollHeight;\n  }\n  \n  function addMessage(text, sender, timestamp, messageId) {\n    const id = messageId || 'msg-' + state.messageCount++ + '-' + Date.now();\n    \n    if (state.pendingMessages.has(id)) return;\n    state.pendingMessages.add(id);\n    \n    const messageElement = document.createElement('div');\n    messageElement.className = `message ${sender}-message`;\n    messageElement.id = id;\n    messageElement.innerHTML = `\n      ${text}\n      <div class=\"timestamp\">${formatTimestamp(timestamp ? new Date(timestamp) : new Date())}</div>\n    `;\n    \n    messagePanel.appendChild(messageElement);\n    scrollToBottom();\n  }\n  \n  function updateSendButton() {\n    sendButton.disabled = chatInput.value.trim() === '';\n  }\n  \n  function sendMessage() {\n    const messageText = chatInput.value.trim();\n    if (!messageText) return;\n    \n    const timestamp = new Date();\n    const messageId = 'user-msg-2-' + Date.now();\n    \n    addMessage(messageText, 'user', timestamp, messageId);\n    \n    if (typeof scope.send === 'function') {\n      scope.send({ \n        payload: { \n          text: messageText, \n          sender: 'user',\n          timestamp: timestamp.toISOString(),\n          messageId: 'net-' + messageId,\n          instance: 'chat-2',\n          source: 'local'\n        } \n      });\n    }\n    \n    chatInput.value = '';\n    updateSendButton();\n    chatInput.focus();\n  }\n  \n  sendButton.addEventListener('click', sendMessage);\n  \n  chatInput.addEventListener('keypress', function(e) {\n    if (e.key === 'Enter') {\n      sendMessage();\n    }\n  });\n  \n  chatInput.addEventListener('input', updateSendButton);\n  \n  // Handle incoming messages\n  scope.$watch('msg', function(msg) {\n    if (!msg) return;\n    \n    try {\n      // Skip locally originated messages that come back\n      if (msg.payload && msg.payload.source === 'local') return;\n      \n      // Handle typing indicator\n      if (msg.payload && msg.payload.typing !== undefined) {\n        typingIndicator.style.display = msg.payload.typing ? 'flex' : 'none';\n        scrollToBottom();\n        return;\n      }\n      \n      // Process message - handle various formats\n      let messageText = null;\n      let messageSender = 'other';\n      let timestamp = new Date();\n      let messageId = 'other-msg-2-' + Date.now();\n      \n      // Handle payload as string (could be JSON or plain text)\n      if (typeof msg.payload === 'string') {\n        // Try to parse as JSON first\n        try {\n          const parsedPayload = JSON.parse(msg.payload);\n          // If it has a text property, use that\n          if (parsedPayload.text) {\n            messageText = parsedPayload.text;\n            messageSender = parsedPayload.sender === 'user' ? 'user' : 'other';\n            timestamp = parsedPayload.timestamp || new Date();\n            messageId = parsedPayload.messageId || messageId;\n          } else {\n            // If it's JSON but doesn't have a text property, stringify it\n            messageText = JSON.stringify(parsedPayload);\n          }\n        } catch (e) {\n          // If parsing fails, treat it as plain text\n          messageText = msg.payload;\n        }\n      }\n      // Handle payload as object\n      else if (typeof msg.payload === 'object') {\n        // Skip if this is a network echo of our own message\n        if (msg.payload.messageId && msg.payload.messageId.startsWith('net-user-msg-2-')) return;\n        \n        messageId = msg.payload.messageId || messageId;\n        messageText = msg.payload.text || JSON.stringify(msg.payload);\n        messageSender = msg.payload.sender === 'user' ? 'user' : 'other';\n        timestamp = msg.payload.timestamp || new Date();\n      }\n      // Handle other message formats (raw message)\n      else if (msg.payload !== undefined && msg.payload !== null) {\n        messageText = String(msg.payload);\n      }\n      // Handle case where there's no payload but the message itself has content\n      else if (typeof msg === 'string') {\n        messageText = msg;\n      } else if (typeof msg === 'object') {\n        messageText = JSON.stringify(msg);\n      }\n      \n      if (messageText && !state.pendingMessages.has(messageId)) {\n        addMessage(messageText, messageSender, timestamp, messageId);\n      }\n    } catch (error) {\n      console.error(\"Error processing message:\", error, msg);\n      \n      // Display error message\n      const errorId = 'error-msg-2-' + Date.now();\n      addMessage(\"Error displaying message: \" + error.toString(), 'system', new Date(), errorId);\n    }\n  });\n  \n  chatInput.focus();\n})(scope);\n</script>",
         "storeOutMessages": true,
         "fwdInMessages": false,
         "resendOnRefresh": true,
@@ -181,10 +184,10 @@
         ]
     },
     {
-        "id": "ef16649b591e0a28",
+        "id": "dacbe82beacf2521",
         "type": "function",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "UI formating",
         "func": "\nmsg.othermessage = false;\nreturn msg;",
         "outputs": 1,
@@ -197,17 +200,17 @@
         "y": 320,
         "wires": [
             [
-                "3e3882d771232e9f"
+                "badf24134ed0033a"
             ]
         ]
     },
     {
-        "id": "27a7e06fb98f5983",
+        "id": "614c218ec79898b6",
         "type": "function",
-        "z": "8457586d179172d1",
-        "g": "86429136574a5d28",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
         "name": "Convert to JSON",
-        "func": "let out1 = null;\nlet out2 = null;\n\nlet payload = msg.payload;\n\nif (typeof payload === \"string\") {\n    if (payload.startsWith(\"Successfully sent message to peer\")) {\n        return null; // drop\n    }\n    if (payload.includes(\"/multistream/1.0.0\") || payload.includes(\"nrn-nodered/v1\")) {\n        return null; // drop\n    }\n}\ntry {\n    // Try to parse as JSON\n    msg.payload = JSON.parse(msg.payload);\n    out1 = msg;\n} catch (e) {\n    // If not valid JSON, wrap it in an object\n    msg.payload = { received: msg.payload, required:\"expecting json string with a key: text\" };\n    out2 = msg;\n}\n\nreturn [out1,out2];\n",
+        "func": "let payload = msg.payload;\n\n// Filter out unwanted messages\nif (typeof payload === \"string\") {\n    if (payload.startsWith(\"Successfully sent message to peer\") ||\n        payload.includes(\"/multistream/1.0.0\") || \n        payload.includes(\"nrn-nodered/v1\")) {\n        return null; // drop\n    }\n}\n\n// Ensure payload is always an object with a text property\nif (typeof payload === \"string\") {\n    try {\n        payload = JSON.parse(payload);\n    } catch (e) {\n        // If not JSON, wrap in object\n        payload = {text: payload};\n    }\n} else if (typeof payload !== \"object\" || payload === null) {\n    // Handle other types (numbers, booleans, etc.)\n    payload = {text: String(payload)};\n}\n\nmsg.payload = payload;\n\n// Create two outputs\nreturn [msg, {received: payload}];",
         "outputs": 2,
         "timeout": 0,
         "noerr": 0,
@@ -218,15 +221,67 @@
         "y": 320,
         "wires": [
             [
-                "90e1208255c96276"
+                "7db13aff1a2fca1d",
+                "8cff3076ed0dcb25"
             ],
             [
-                "25efbe773c7584c0"
+                "24bfa7e80ae688bf"
             ]
         ]
     },
     {
-        "id": "5a98357c2bababf3",
+        "id": "19d8a8dd6e781c04",
+        "type": "debug",
+        "z": "7b1ee736e1a2a0ce",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 660,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "3c303c4e056101e5",
+        "type": "debug",
+        "z": "7b1ee736e1a2a0ce",
+        "name": "ask LLM",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1140,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "8cff3076ed0dcb25",
+        "type": "debug",
+        "z": "7b1ee736e1a2a0ce",
+        "g": "c064a303fe724e9a",
+        "name": "out 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 750,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "fa8f3df35e1f5bd2",
         "type": "ui_group",
         "name": "Seller",
         "tab": "ef656de5cefe0a4d",

@@ -326,6 +326,15 @@ class ProcessManager {
             console.log(`🔍 Check #4 - Copying executable to: ${copiedExecutablePath}`);
 
             const cwd = path.join(require('../services/NeuronUserHome').load(), 'sdk_env_files');
+            
+            if (process.platform !== 'win32') {
+                try {
+                    fs.chmodSync(copiedExecutablePath, 0o755); // rwxr-xr-x permissions
+                    console.log(`✅ Set executable permissions on: ${copiedExecutablePath}`);
+                } catch (chmodError) {
+                    console.warn(`⚠️ Could not set executable permissions: ${chmodError.message}`);
+                }
+            }
 
             console.log(`🔍 Check #4 - Using working directory: ${cwd}`);
 
