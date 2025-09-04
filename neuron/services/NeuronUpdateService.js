@@ -54,7 +54,7 @@ class NeuronUpdateService {
                             // Get the last object in the array (latest release)
                             const latestRelease = releases[releases.length - 1];
                             console.log(' - 📦 Latest release fetched:', latestRelease);
-                            resolve(latestRelease);
+                            resolve(releases);
                         } else {
                             console.log(' - ⚠️ No releases found in releases.json');
                             resolve(null);
@@ -77,32 +77,45 @@ class NeuronUpdateService {
         // Get the update flags, current version, and latest update
         const updateFlags = await this.#getUpdateFlags();
         const currentVersion = await this.#getVersion();
-        const latestUpdate = await this.#getLatestUpdate();
+        const releases = await this.#getLatestUpdate();
 
         console.log(` - 📦 Current version: ${currentVersion}`);
 
-        // Check if a new update is available
-        if (latestUpdate === null) {
+        let mandatoryUpdate = null;
+        let optionalUpdate = null;
+
+        for (let i = releases.length - 1; i >= 0; i--) {
+            const release = releases[i];
+
+            if (release.version === currentVersion) {
+                break;
+            }
+
+            if (release.isMandatory && mandatoryUpdate === null) {
+                mandatoryUpdate = release;
+
+                break;
+            } else if (optionalUpdate === null) {
+                optionalUpdate = release;
+            }
+        }
+
+        console.log(` - 📦 Mandatory update: ${mandatoryUpdate?.version || 'Not Found'}`);
+        console.log(` - 📦 Optional update: ${optionalUpdate?.version || 'Not Found'}`);
+
+        if (mandatoryUpdate === null && optionalUpdate === null) {
             console.log(' - ✅ No updates found');
 
             return { type: 'continue' };
         }
 
-        // Check if the current version is the latest version
-        if (currentVersion === latestUpdate.version) {
-            console.log(' - ✅ No updates found');
+        if (mandatoryUpdate !== null) {
+            console.log(' - 🚨 Mandatory update required:', mandatoryUpdate.version);
 
-            return { type: 'continue' };
+            return { type: 'redirect', url: `/neuron/pages/mandatory-update.html?current=${currentVersion}&required=${mandatoryUpdate.version}` };
         }
 
-        // Check if the update is mandatory
-        if (latestUpdate.isMandatory) {
-            console.log(' - 🚨 Mandatory update required:', latestUpdate.version);
-
-            return { type: 'redirect', url: `/neuron/pages/mandatory-update.html?current=${currentVersion}&required=${latestUpdate.version}` };
-        }
-
-        console.log(' - 🚨 Optional update available:', latestUpdate.version);
+        console.log(' - 🚨 Optional update available:', optionalUpdate.version);
 
         // Check if the user wants to skip the update
         if (searchParams.get('skip') === 'true') {
@@ -110,11 +123,11 @@ class NeuronUpdateService {
                 updateFlags.skippedVersions = [];
             }
 
-            updateFlags.skippedVersions.push(latestUpdate.version);
+            updateFlags.skippedVersions.push(optionalUpdate.version);
 
             await this.#setUpdateFlags(updateFlags);
 
-            console.log(` - 📋 Skipping version ${latestUpdate.version}`);
+            console.log(` - 📋 Skipping version ${optionalUpdate.version}`);
 
             return { type: 'redirect', url: `/` };
         }
@@ -126,28 +139,28 @@ class NeuronUpdateService {
             }
 
             updateFlags.remindedVersions.push({
-                version: latestUpdate.version,
+                version: optionalUpdate.version,
                 remindAt: Date.now() + (24 * 60 * 60 * 1000)
             });
 
             await this.#setUpdateFlags(updateFlags);
 
-            console.log(` - 📋 Setting reminder for version ${latestUpdate.version}`);
+            console.log(` - 📋 Setting reminder for version ${optionalUpdate.version}`);
 
             return { type: 'redirect', url: `/` };
         }
 
         // Check if this version was previously skipped
-        const skippedVersion = updateFlags.skippedVersions?.find(skippedVersion => skippedVersion === latestUpdate.version);
+        const skippedVersion = updateFlags.skippedVersions?.find(skippedVersion => skippedVersion === optionalUpdate.version);
 
         if (skippedVersion) {
-            console.log(` - 📋 Version ${latestUpdate.version} was previously skipped, not showing again`);
+            console.log(` - 📋 Version ${optionalUpdate.version} was previously skipped, not showing again`);
 
             return { type: 'continue' };
         }
 
         // Check if reminder is still active
-        const updateReminder = updateFlags.remindedVersions?.find(remindedVersion => remindedVersion.version === latestUpdate.version);
+        const updateReminder = updateFlags.remindedVersions?.find(remindedVersion => remindedVersion.version === optionalUpdate.version);
 
         if (updateReminder) {
             if (Date.now() < updateReminder.remindAt) {
@@ -156,7 +169,7 @@ class NeuronUpdateService {
                 return { type: 'continue' };
             } else {
                 // Clear expired reminder and remove from array
-                updateFlags.remindedVersions = updateFlags.remindedVersions.filter(reminder => reminder.version !== latestUpdate.version);
+                updateFlags.remindedVersions = updateFlags.remindedVersions.filter(reminder => reminder.version !== optionalUpdate.version);
 
                 await this.#setUpdateFlags(updateFlags);
 
@@ -165,7 +178,7 @@ class NeuronUpdateService {
         }
 
         // Redirect to optional update page with version parameters
-        return { type: 'redirect', url: `/neuron/pages/optional-update.html?current=${currentVersion}&available=${latestUpdate.version}` };
+        return { type: 'redirect', url: `/neuron/pages/optional-update.html?current=${currentVersion}&available=${optionalUpdate.version}` };
     }
 }
 
