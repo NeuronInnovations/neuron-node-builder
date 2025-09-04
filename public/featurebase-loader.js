@@ -1,20 +1,10 @@
-
-// Load Featurebase SDK dynamically
-(function() {
-  var script = document.createElement("script");
-  script.src = "https://do.featurebase.app/js/sdk.js";
-  script.async = true;
-  script.onload = function() {
-    // Boot Featurebase after SDK loads
-    Featurebase("boot", {
-      appId: "68ac623bb50949d095155ee3",         // required
-      email: "user@example.com",         // optional
-      userId: "12345",                   // optional
-      createdAt: "2025-05-06T12:00:00Z", // optional
-      theme: "light",                    // "light" or "dark"
-      language: "en"                     // short code
-    });
-  };
-  document.head.appendChild(script);
-})();
-
+!(function(e,t){const a="featurebase-sdk";function n(){if(!t.getElementById(a)){var e=t.createElement("script");(e.id=a),(e.src="https://do.featurebase.app/js/sdk.js"),t.getElementsByTagName("script")[0].parentNode.insertBefore(e,t.getElementsByTagName("script")[0])}}"function"!=typeof e.Featurebase&&(e.Featurebase=function(){(e.Featurebase.q=e.Featurebase.q||[]).push(arguments)}),"complete"===t.readyState||"interactive"===t.readyState?n():t.addEventListener("DOMContentLoaded",n)})(window,document);
+Featurebase("initialize_feedback_widget", {
+  organization: "Neuron", // Replace this with your organization name
+  theme: "dark",
+  placement: "left",
+  email: "youruser@example.com",
+  defaultBoard: "yourboardname",
+  locale: "en",
+  metadata: null
+});
