@@ -1,0 +1,191 @@
+/* Neuron Feedback Widget Styles */
+/* Floating feedback bubble positioned in bottom-left corner */
+
+#neuron-feedback-bubble {
+    position: fixed;
+    bottom: 30px;
+    left: 10px;
+    z-index: 9999;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.feedback-bubble-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1D1D1D;
+    border: 1px solid #333;
+    border-radius: 25px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.feedback-bubble-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: #4CAF50;
+    flex-shrink: 0;
+}
+
+.feedback-bubble-text {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Hover effects */
+#neuron-feedback-bubble:hover .feedback-bubble-content {
+    background: #2a2a2a;
+    border-color: #4CAF50;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+}
+
+#neuron-feedback-bubble:hover .feedback-bubble-icon {
+    color: #66BB6A;
+}
+
+#neuron-feedback-bubble:hover .feedback-bubble-text {
+    color: #4CAF50;
+}
+
+/* Active state */
+#neuron-feedback-bubble:active .feedback-bubble-content {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    #neuron-feedback-bubble {
+        bottom: 25px;
+        left: 5px;
+    }
+    
+    .feedback-bubble-content {
+        padding: 6px 12px;
+        min-width: 100px;
+    }
+    
+    .feedback-bubble-text {
+        font-size: 13px;
+    }
+    
+    .feedback-bubble-icon {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    #neuron-feedback-bubble {
+        bottom: 20px;
+        left: 0px;
+    }
+    
+    .feedback-bubble-content {
+        padding: 5px 10px;
+        min-width: 90px;
+    }
+    
+    .feedback-bubble-text {
+        font-size: 12px;
+    }
+}
+
+/* Ensure the bubble doesn't interfere with other UI elements */
+#neuron-feedback-bubble {
+    /* Avoid conflicts with Node-RED's palette and other UI elements */
+    pointer-events: auto;
+}
+
+/* Dark theme compatibility */
+body.dark-theme #neuron-feedback-bubble .feedback-bubble-content,
+[data-theme="dark"] #neuron-feedback-bubble .feedback-bubble-content {
+    background: #1D1D1D;
+    border-color: #333;
+}
+
+body.dark-theme #neuron-feedback-bubble:hover .feedback-bubble-content,
+[data-theme="dark"] #neuron-feedback-bubble:hover .feedback-bubble-content {
+    background: #2a2a2a;
+    border-color: #4CAF50;
+}
+
+/* Animation for initial appearance */
+@keyframes feedbackBubbleAppear {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+#neuron-feedback-bubble {
+    animation: feedbackBubbleAppear 0.5s ease-out;
+}
+
+/* Ensure proper layering with other Neuron widgets */
+#neuron-feedback-bubble {
+    /* Lower z-index than chat widget to avoid conflicts */
+    z-index: 9998;
+}
+
+/* Hide on very small screens to avoid UI clutter */
+@media (max-width: 320px) {
+    #neuron-feedback-bubble {
+        display: none;
+    }
+}
+
+/* Accessibility improvements */
+#neuron-feedback-bubble:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 2px;
+}
+
+#neuron-feedback-bubble:focus .feedback-bubble-content {
+    background: #2a2a2a;
+    border-color: #4CAF50;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .feedback-bubble-content {
+        border-width: 2px;
+        border-color: #ffffff;
+    }
+    
+    .feedback-bubble-text {
+        color: #ffffff;
+    }
+    
+    .feedback-bubble-icon {
+        color: #ffffff;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    #neuron-feedback-bubble,
+    .feedback-bubble-content {
+        transition: none;
+    }
+    
+    #neuron-feedback-bubble {
+        animation: none;
+    }
+}
