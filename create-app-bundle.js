@@ -2,10 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Read version from package.json
+const packageJson = require('./package.json');
+const version = packageJson.version; // e.g., "4.0.10"
+
 const baseDirectory = path.resolve(__dirname);
 const buildPath = path.join(baseDirectory, 'build', 'releases');
 const executablePath = path.join(buildPath, 'latest-macos-x64');
-const appPath = path.join(buildPath, 'Neuron-Node-Builder.app');
+const appBundleName = `neuron-node-builder-macos-x64-v${version}`;
+const appPath = path.join(buildPath, `${appBundleName}.app`);
 
 console.log('Creating macOS app bundle...');
 
@@ -43,9 +48,9 @@ const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
     <key>CFBundleDisplayName</key>
     <string>Neuron Node Builder</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>${version}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>${version}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -73,4 +78,5 @@ if (fs.existsSync(iconPath)) {
 }
 
 console.log(`App bundle created at: ${appPath}`);
+console.log(`App bundle name: ${appBundleName}.app`);
 console.log('You can now run `npm run create-dmg` to create the DMG file.');

@@ -2,12 +2,16 @@ const appdmg = require('appdmg');
 const path = require('path');
 const fs = require('fs');
 
+// Read version from package.json
+const packageJson = require('./package.json');
+const version = packageJson.version; // e.g., "4.0.10"
+
 const baseDirectory = path.resolve(__dirname);
 const distPath = path.join(baseDirectory, 'dist');
 const buildPath = path.join(baseDirectory, 'build', 'releases');
-const appName = 'Neuron-Node-Builder';
-const appPath = path.join(buildPath, `${appName}.app`);
-const dmgPath = path.join(distPath, `${appName}.dmg`);
+const appBundleName = `neuron-node-builder-macos-x64-v${version}`;
+const appPath = path.join(buildPath, `${appBundleName}.app`);
+const dmgPath = path.join(distPath, `${appBundleName}.dmg`);
 
 if (!fs.existsSync(distPath)) {
     fs.mkdirSync(distPath);
@@ -27,7 +31,7 @@ const dmgOptions = {
     target: dmgPath,
     basepath: baseDirectory,
     specification: {
-        "title": appName,
+        "title": appBundleName,
         "window": {
             "size": {
                 "width": 600,
