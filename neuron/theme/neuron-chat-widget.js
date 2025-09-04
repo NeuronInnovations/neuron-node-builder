@@ -4279,5 +4279,50 @@
     });
     observer.observe(document, { subtree: true, childList: true });
     
+    // Load feedback widget after chat widget is initialized
+    loadFeedbackWidget();
+    
 })();
+
+// Feedback Widget Loading Function
+function loadFeedbackWidget() {
+    // Wait a bit to ensure chat widget is fully loaded
+    setTimeout(() => {
+        // Load feedback widget configuration first
+        const feedbackConfig = document.createElement('script');
+        feedbackConfig.src = '/neuron/theme/feedback-config.js';
+        feedbackConfig.async = true;
+        feedbackConfig.id = 'neuron-feedback-config-js';
+        
+        // Check if config is already loaded
+        if (!document.getElementById('neuron-feedback-config-js')) {
+            document.head.appendChild(feedbackConfig);
+            console.log('[CHAT WIDGET] Loading feedback widget configuration...');
+        }
+        
+        // Load feedback widget CSS
+        const feedbackCSS = document.createElement('link');
+        feedbackCSS.rel = 'stylesheet';
+        feedbackCSS.href = '/neuron/theme/feedback-widget.css';
+        feedbackCSS.id = 'neuron-feedback-widget-css';
+        
+        // Check if CSS is already loaded
+        if (!document.getElementById('neuron-feedback-widget-css')) {
+            document.head.appendChild(feedbackCSS);
+            console.log('[CHAT WIDGET] Loading feedback widget CSS...');
+        }
+        
+        // Load feedback widget JavaScript
+        const feedbackJS = document.createElement('script');
+        feedbackJS.src = '/neuron/theme/feedback-widget.js';
+        feedbackJS.async = true;
+        feedbackJS.id = 'neuron-feedback-widget-js';
+        
+        // Check if JS is already loaded
+        if (!document.getElementById('neuron-feedback-widget-js')) {
+            document.head.appendChild(feedbackJS);
+            console.log('[CHAT WIDGET] Loading feedback widget JavaScript...');
+        }
+    }, 1000); // Wait 1 second after chat widget initialization
+}
 
