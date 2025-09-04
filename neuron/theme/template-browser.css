@@ -419,7 +419,6 @@
     transition: all 0.3s ease !important;
     visibility: visible !important;
     opacity: 1 !important;
-    order: -1 !important;
     font-size: 14px !important;
     height: auto !important;
     line-height: normal !important;
@@ -447,9 +446,9 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
 }
 
-/* Position template button after balance display */
+/* Position template button to the left of deploy button */
 .red-ui-header-toolbar li:has(#red-ui-header-button-templates) {
-    order: 0 !important;
+    order: -1 !important;
     margin-left: 10px !important;
     display: inline-flex !important;
     align-items: center !important;
