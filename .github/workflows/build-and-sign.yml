@@ -93,23 +93,31 @@ jobs:
           echo "Contents of artifacts directory:"
           find ./artifacts -type f -name "*" | head -20
 
+      - name: Create ZIP files for each platform
+        run: |
+          echo "Creating ZIP files for each platform..."
+    
+          # Create Windows ZIP
+          cd artifacts/windows-executable
+          zip -r ../../neuron-node-builder-win-x64-${{ github.ref_name }}.zip latest-win-x64.exe
+          cd ../..
+          
+          echo "ZIP files created:"
+          ls -la *.zip
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/macos-executable-signed/latest-macos-x64-signed
-            artifacts/windows-executable/latest-win-x64.exe
-            artifacts/linux-executable/latest-linux-x64
+            neuron-node-builder-win-x64-${{ github.ref_name }}.zip
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
             ## Neuron Node Builder ${{ github.ref_name }}
             
             ### Downloads
-            - **macOS**: `latest-macos-x64-signed` (code signed)
-            - **Windows**: `latest-win-x64.exe`
-            - **Linux**: `latest-linux-x64`
-            
+            - **Windows**: `neuron-node-builder-win-x64-${{ github.ref_name }}.zip`
+
             ### Changes
             See the [changelog](CHANGELOG.md) for details.
         env:
