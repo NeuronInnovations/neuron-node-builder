@@ -5,6 +5,14 @@ const path = require('path');
 const fs = require('fs');
 const os = require('node:os');
 
+// Resolve home path
+const homePath = path.resolve(os.homedir(), '.neuron-node-builder');
+
+// Create home directory if it doesn't exist
+if (!fs.existsSync(homePath)) {
+  fs.mkdirSync(homePath, { recursive: true });
+}
+
 // Resolve path to the .env file
 const envPath = path.resolve(os.homedir(), '.neuron-node-builder', '.env');
 
