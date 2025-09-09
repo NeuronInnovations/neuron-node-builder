@@ -33,7 +33,7 @@ Both must be compiled for your specific platform and placed in the same director
 
 ```bash
 git clone <repository-url>
-cd neuron-green
+cd neuron-nodebuilder
 ```
 
 ### Step 2: Install Node.js Dependencies
@@ -106,9 +106,9 @@ npm run build
 cd ../../..
 ```
 
-### Step 6: Start Neuron Green
+### Step 6: Start Neuron Node Builder
 
-Start Neuron Green with the custom settings:
+Start Neuron Node Builder with the custom settings:
 
 ```bash
 npm run start
@@ -156,32 +156,6 @@ Download the installer from [golang.org/dl/](https://golang.org/dl/)
 go version
 ```
 
-### Step 3: Clone and Build neuron-go-hedera-sdk
-
-```bash
-# Clone the repository
-git clone https://github.com/NeuronInnovations/neuron-go-hedera-sdk.git
-cd neuron-go-hedera-sdk
-
-# Build for your platform
-go build -o neuron-go-hedera-sdk
-
-# For cross-platform builds, you can specify the target:
-# macOS ARM64 (Apple Silicon)
-GOOS=darwin GOARCH=arm64 go build -o neuron-go-hedera-sdk-darwin-arm64
-
-# macOS Intel
-GOOS=darwin GOARCH=amd64 go build -o neuron-go-hedera-sdk-darwin-amd64
-
-# Linux x64
-GOOS=linux GOARCH=amd64 go build -o neuron-go-hedera-sdk-linux-amd64
-
-# Linux ARM64
-GOOS=linux GOARCH=arm64 go build -o neuron-go-hedera-sdk-linux-arm64
-
-# Windows
-GOOS=windows GOARCH=amd64 go build -o neuron-go-hedera-sdk.exe
-```
 
 ### Step 4: Clone and Build neuron-nodered-sdk-wrapper
 
@@ -212,18 +186,16 @@ GOOS=windows GOARCH=amd64 go build -o neuron-nodered-sdk-wrapper.exe
 
 ### Step 5: Place Compiled Binaries
 
-Move both compiled executables to the same directory. For example, create a `bin` directory in your project:
+Move compiled executables to a directory. For example, create a `bin` directory in your project:
 
 ```bash
 # Create bin directory
 mkdir -p bin
 
 # Copy the compiled executables
-cp ../neuron-go-hedera-sdk/neuron-go-hedera-sdk bin/
 cp ../neuron-nodered-sdk-wrapper/neuron-nodered-sdk-wrapper bin/
 
 # Make them executable (on Unix-like systems)
-chmod +x bin/neuron-go-hedera-sdk
 chmod +x bin/neuron-nodered-sdk-wrapper
 ```
 
@@ -236,15 +208,14 @@ Update your `.env` file to point to the compiled wrapper:
 NEURON_SDK_PATH=/path/to/your/project/bin/neuron-nodered-sdk-wrapper
 ```
 
-**Important:** Make sure both `neuron-go-hedera-sdk` and `neuron-nodered-sdk-wrapper` are in the same directory, as the wrapper depends on the SDK.
 
 ## First-Time Setup
 
-When you first start Neuron Green, you'll be automatically redirected to a setup wizard if your Hedera credentials are not configured. The wizard will:
+When you first start Neuron Node Builder, you'll be automatically redirected to a setup wizard if your Hedera credentials are not configured. The wizard will:
 
 1. Prompt you to enter your Hedera credentials
 2. Save them to the `.env` file
-3. Redirect you to the normal Neuron Green interface
+3. Redirect you to the normal Neuron Node Builder interface
 
 ## Using the Custom Nodes
 
