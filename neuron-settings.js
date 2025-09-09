@@ -586,7 +586,8 @@ module.exports = {
             css: [
                 require("path").resolve(__dirname, "neuron/theme/header-balance.css"),
                 require("path").resolve(__dirname, "neuron/theme/template-browser.css"),
-                require("path").resolve(__dirname, "neuron/theme/featurebase-left.css")
+                require("path").resolve(__dirname, "neuron/theme/featurebase-left.css"),
+                require("path").resolve(__dirname, "neuron/theme/chat-widget-layout.css")
             ],
             scripts: [
 

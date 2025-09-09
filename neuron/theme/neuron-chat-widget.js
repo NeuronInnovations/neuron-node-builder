@@ -310,6 +310,278 @@
         });
     }
     
+    // Function to adjust sidebar position for chat widget using CSS classes and dynamic positioning
+    function adjustSidebarForChatWidget(chatOpen) {
+        const body = document.body;
+        
+        // Simple state management - just set CSS classes
+        if (chatOpen) {
+            body.classList.add('neuron-chat-open');
+            body.classList.remove('neuron-chat-closed');
+            console.log('Chat opened');
+        } else {
+            body.classList.add('neuron-chat-closed');
+            body.classList.remove('neuron-chat-open');
+            console.log('Chat closed');
+        }
+        
+        // Update sidebar state detection
+        updateSidebarStateClass();
+        
+        // Calculate and set positions based on actual sidebar width
+        updateLayoutPositions(chatOpen);
+        
+        console.log('Body classes:', body.className);
+    }
+    
+    // Simple function to calculate positions based on actual sidebar width
+    function updateLayoutPositions(chatOpen) {
+        const sidebar = document.getElementById('red-ui-sidebar');
+        const separator = document.getElementById('red-ui-sidebar-separator');
+        const workspace = document.getElementById('red-ui-workspace');
+        const editorStack = document.getElementById('red-ui-editor-stack');
+        const mainContainer = document.getElementById('red-ui-main-container');
+        
+        // Skip if essential elements don't exist
+        if (!sidebar || !mainContainer) return;
+        
+        const sidebarClosed = mainContainer.classList.contains('red-ui-sidebar-closed');
+        const chatWidgetWidth = 380;
+        const separatorWidth = 7; // Node-RED's default separator width
+        
+        if (sidebarClosed) {
+            // Sidebar is closed - position separator and workspace appropriately
+            if (chatOpen) {
+                // Chat open, sidebar closed: separator at chat's left edge
+                if (separator) {
+                    separator.style.setProperty('right', chatWidgetWidth + 'px', 'important');
+                    console.log('DEBUG: Sidebar closed, chat open - separator at:', chatWidgetWidth + 'px', '(with !important)');
+                }
+                if (workspace) {
+                    const workspacePos = chatWidgetWidth + separatorWidth;
+                    workspace.style.setProperty('right', workspacePos + 'px', 'important');
+                    console.log('DEBUG: Set workspace right to:', workspacePos + 'px', '(chat + separator width, with !important)');
+                }
+                if (editorStack) {
+                    const editorPos = chatWidgetWidth + separatorWidth + 1;
+                    editorStack.style.setProperty('right', editorPos + 'px', 'important');
+                    console.log('DEBUG: Set editor stack right to:', editorPos + 'px', '(with !important)');
+                }
+            } else {
+                // Both closed: separator at right edge, workspace accounts for separator width
+                if (separator) {
+                    separator.style.setProperty('right', '0px', 'important');
+                    console.log('DEBUG: Both closed - separator at right edge (with !important)');
+                }
+                if (workspace) {
+                    workspace.style.setProperty('right', separatorWidth + 'px', 'important');
+                    console.log('DEBUG: Set workspace to account for separator width:', separatorWidth + 'px', '(with !important)');
+                }
+                if (editorStack) {
+                    const editorPos = separatorWidth + 1;
+                    editorStack.style.setProperty('right', editorPos + 'px', 'important');
+                    console.log('DEBUG: Set editor stack right to:', editorPos + 'px', '(with !important)');
+                }
+            }
+        } else {
+            // Sidebar is open - calculate based on actual width
+            const sidebarWidth = sidebar.offsetWidth || 315;
+            console.log('Calculating positions for sidebar width:', sidebarWidth);
+            
+            if (chatOpen) {
+                // Chat open: separator at sidebar_width + chat_width, workspace accounts for separator width
+                const separatorPos = sidebarWidth + chatWidgetWidth;
+                const workspacePos = separatorPos + separatorWidth;
+                
+                console.log('DEBUG: Chat open positioning - sidebarWidth:', sidebarWidth, 'chatWidth:', chatWidgetWidth, 'separatorWidth:', separatorWidth, 'separatorPos:', separatorPos, 'workspacePos:', workspacePos);
+                
+                if (separator) {
+                    separator.style.setProperty('right', separatorPos + 'px', 'important');
+                    console.log('DEBUG: Set separator right to:', separatorPos + 'px', '(with !important)');
+                }
+                if (workspace) {
+                    workspace.style.setProperty('right', workspacePos + 'px', 'important');
+                    console.log('DEBUG: Set workspace right to:', workspacePos + 'px', '(accounting for separator width, with !important)');
+                }
+                if (editorStack) {
+                    editorStack.style.setProperty('right', (workspacePos + 1) + 'px', 'important');
+                    console.log('DEBUG: Set editor stack right to:', (workspacePos + 1) + 'px', '(with !important)');
+                }
+                
+                console.log('Chat open - separator at:', separatorPos, 'workspace at:', workspacePos);
+            } else {
+                // Chat closed: separator at sidebar_width, workspace accounts for separator width
+                if (separator) separator.style.setProperty('right', sidebarWidth + 'px', 'important');
+                if (workspace) {
+                    const workspacePos = sidebarWidth + separatorWidth;
+                    workspace.style.setProperty('right', workspacePos + 'px', 'important');
+                    console.log('DEBUG: Set workspace right to:', workspacePos + 'px', '(sidebar + separator width, with !important)');
+                }
+                if (editorStack) {
+                    const editorPos = sidebarWidth + separatorWidth + 1;
+                    editorStack.style.setProperty('right', editorPos + 'px', 'important');
+                    console.log('DEBUG: Set editor stack right to:', editorPos + 'px', '(with !important)');
+                }
+                
+                console.log('Chat closed - separator at:', sidebarWidth, 'workspace at:', sidebarWidth + separatorWidth);
+            }
+        }
+    }
+    
+    // REMOVED: Complex dynamic positioning function - using pure CSS approach instead
+    function updateDynamicPositioning_DISABLED(chatOpen) {
+        const sidebar = document.getElementById('red-ui-sidebar');
+        const sidebarSeparator = document.getElementById('red-ui-sidebar-separator');
+        const workspace = document.getElementById('red-ui-workspace');
+        const editorStack = document.getElementById('red-ui-editor-stack');
+        const mainContainer = document.getElementById('red-ui-main-container');
+        
+        // Check if essential elements exist
+        if (!mainContainer) {
+            console.log('Cannot update dynamic positioning - main container not found');
+            return;
+        }
+        
+        const chatWidgetWidth = 380;
+        const sidebarClosed = mainContainer.classList.contains('red-ui-sidebar-closed');
+        
+        // Trigger Node-RED's sidebar resize event to ensure content fits properly
+        function triggerSidebarResize() {
+            if (typeof RED !== 'undefined' && RED.events) {
+                setTimeout(() => {
+                    RED.events.emit("sidebar:resize");
+                    console.log('Triggered sidebar:resize event for content adjustment');
+                    
+                    // Also trigger a window resize event to ensure all components recalculate
+                    window.dispatchEvent(new Event('resize'));
+                    console.log('Triggered window resize event for full layout recalculation');
+                }, 100);
+            }
+        }
+        
+        if (chatOpen) {
+            if (sidebarClosed) {
+                // Sidebar closed, chat open: separator at chat's left edge
+                if (sidebarSeparator) sidebarSeparator.style.right = chatWidgetWidth + 'px';
+                if (workspace) workspace.style.right = chatWidgetWidth + 'px';
+                if (editorStack) editorStack.style.right = (chatWidgetWidth + 1) + 'px';
+            } else {
+                // Both open: calculate based on actual sidebar width
+                const actualSidebarWidth = sidebar ? sidebar.offsetWidth : 315;
+                const totalWidth = chatWidgetWidth + actualSidebarWidth;
+                
+                if (sidebar) sidebar.style.right = chatWidgetWidth + 'px';
+                if (sidebarSeparator) sidebarSeparator.style.right = totalWidth + 'px';
+                if (workspace) workspace.style.right = totalWidth + 'px';
+                if (editorStack) editorStack.style.right = (totalWidth + 1) + 'px';
+                
+                console.log('Dynamic positioning - Sidebar width:', actualSidebarWidth, 'Total width:', totalWidth);
+            }
+        } else {
+            // Chat closed: reset to normal or handle sidebar-only state
+            if (sidebarClosed) {
+                if (sidebarSeparator) sidebarSeparator.style.right = '0px';
+                if (workspace) workspace.style.right = '0px';
+                if (editorStack) editorStack.style.right = '1px';
+            } else {
+                const actualSidebarWidth = sidebar ? sidebar.offsetWidth : 315;
+                if (sidebar) sidebar.style.right = '0px';
+                if (sidebarSeparator) sidebarSeparator.style.right = actualSidebarWidth + 'px';
+                if (workspace) workspace.style.right = (actualSidebarWidth + 7) + 'px'; // Node-RED default margin
+                if (editorStack) editorStack.style.right = (actualSidebarWidth + 8) + 'px';
+            }
+        }
+        
+        // Trigger sidebar content resize after positioning changes
+        triggerSidebarResize();
+    }
+    
+    // Function to monitor and update sidebar state class
+    function updateSidebarStateClass() {
+        const body = document.body;
+        const mainContainer = document.getElementById('red-ui-main-container');
+        
+        // Check if main container exists (Node-RED DOM might not be ready yet)
+        if (!mainContainer) {
+            console.log('Main container not found - Node-RED DOM not ready yet');
+            return false; // Return false to indicate failure
+        }
+        
+        // Check if Node-RED has the sidebar-closed class and mirror it on body
+        if (mainContainer.classList.contains('red-ui-sidebar-closed')) {
+            body.classList.add('red-ui-sidebar-closed');
+            console.log('Sidebar is closed - added red-ui-sidebar-closed to body');
+            console.log('Main container classes:', mainContainer.className);
+        } else {
+            body.classList.remove('red-ui-sidebar-closed');
+            console.log('Sidebar is open - removed red-ui-sidebar-closed from body');
+            console.log('Main container classes:', mainContainer.className);
+        }
+        
+        return true; // Return true to indicate success
+    }
+    
+    // Global test function for debugging (accessible from browser console)
+    window.testNeuronLayout = function() {
+        console.log('=== NEURON LAYOUT DEBUG ===');
+        const body = document.body;
+        const mainContainer = document.getElementById('red-ui-main-container');
+        const workspace = document.getElementById('red-ui-workspace');
+        const sidebar = document.getElementById('red-ui-sidebar');
+        const chatWidget = document.getElementById('neuron-chat-widget');
+        
+        console.log('Body classes:', body.className);
+        console.log('Main container classes:', mainContainer ? mainContainer.className : 'NOT FOUND');
+        
+        if (workspace) {
+            const computedStyle = getComputedStyle(workspace);
+            console.log('Workspace - Right position:', computedStyle.right);
+            console.log('Workspace - Computed right:', workspace.getBoundingClientRect().right);
+        }
+        
+        if (sidebar) {
+            const computedStyle = getComputedStyle(sidebar);
+            console.log('Sidebar - Right position:', computedStyle.right);
+            console.log('Sidebar - Z-index:', computedStyle.zIndex);
+            console.log('Sidebar - Actual width:', sidebar.offsetWidth);
+            console.log('Sidebar - Computed right:', sidebar.getBoundingClientRect().right);
+        }
+        
+        if (chatWidget) {
+            const computedStyle = getComputedStyle(chatWidget);
+            console.log('Chat widget - Right position:', computedStyle.right);
+            console.log('Chat widget - Z-index:', computedStyle.zIndex);
+            console.log('Chat widget - Computed right:', chatWidget.getBoundingClientRect().right);
+        }
+        
+        console.log('=== END DEBUG ===');
+    };
+    
+    // Set up observer to watch for sidebar state changes
+    function setupSidebarStateObserver() {
+        const mainContainer = document.getElementById('red-ui-main-container');
+        
+        if (mainContainer) {
+            // Initial state check
+            updateSidebarStateClass();
+            
+            // Create observer to watch for class changes
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                        updateSidebarStateClass();
+                    }
+                });
+            });
+            
+            // Start observing
+            observer.observe(mainContainer, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    }
+    
     // Create floating chat widget
     function createChatWidget() {
         // Check if widget already exists
@@ -425,7 +697,7 @@
         widget.style.cssText = `
             position: fixed;
             top: 48px;
-            right: 0;
+            right: 0px;
             width: 380px;
             height: calc(100vh - 48px);
             background: #1D1D1D;
@@ -740,13 +1012,52 @@
         
         document.body.appendChild(widget);
         
+        // Set initial state
+        adjustSidebarForChatWidget(true);
+        
+        // Set up observer to watch for sidebar state changes
+        setupSidebarStateObserver();
+        
+        // Listen for Node-RED sidebar resize events
+        if (typeof RED !== 'undefined' && RED.events) {
+            RED.events.on("sidebar:resize", function() {
+                console.log('Sidebar resize event detected');
+                // Update positions when sidebar is manually resized
+                const chatOpen = document.body.classList.contains('neuron-chat-open');
+                updateLayoutPositions(chatOpen);
+            });
+        }
+        
+        // Force initial state check with retries to ensure DOM is ready
+        let retryCount = 0;
+        const maxRetries = 10;
+        
+        function initializeWithRetry() {
+            const success = updateSidebarStateClass();
+            if (success) {
+                console.log('DOM ready - initializing chat widget layout');
+                adjustSidebarForChatWidget(true);
+            } else if (retryCount < maxRetries) {
+                retryCount++;
+                console.log(`DOM not ready, retry ${retryCount}/${maxRetries} in 500ms`);
+                setTimeout(initializeWithRetry, 500);
+            } else {
+                console.log('Max retries reached - initializing without sidebar state detection');
+                // Initialize anyway but without sidebar state detection
+                document.body.classList.add('neuron-chat-open');
+                document.body.classList.remove('neuron-chat-closed');
+            }
+        }
+        
+        setTimeout(initializeWithRetry, 500);
+        
         // Add event listeners only if we have the necessary elements
         if (input && sendBtn) {
             setupChatEvents(widget);
-        } else {
-            // Even when not authenticated, we need to set up the minimize button
-            setupMinimizeButton(widget);
         }
+        
+        // Always set up the minimize button and new window button (regardless of auth state)
+        setupMinimizeButton(widget);
         
         // Style login container if it exists
         const loginContainer = widget.querySelector('.login-container');
@@ -2140,6 +2451,9 @@
                     widget.style.background = 'white';
                     hideNotificationIndicator();
                     
+                    // Move sidebar left to make room for chat widget
+                    adjustSidebarForChatWidget(true);
+                    
                     // Show header text
                     const headerText = widget.querySelector('.chat-header span');
                     if (headerText) headerText.style.display = 'block';
@@ -2162,10 +2476,28 @@
                     // Hide the main widget
                     widget.style.display = 'none';
                     
+                    // Reset sidebar position when chat is closed
+                    adjustSidebarForChatWidget(false);
+                    
                     // Create new chat bubble element
                     createChatBubble();
                 }
             });
+        }
+        
+        // New window button click handler - always attach regardless of auth state
+        const newWindowBtn = widget.querySelector('.chat-new-window');
+        if (newWindowBtn && !newWindowBtn.hasAttribute('data-handler-attached')) {
+            console.log('✅ Found new window button in setupMinimizeButton, attaching click handler');
+            newWindowBtn.addEventListener('click', () => {
+                console.log('🔄 [DEDICATED WINDOW] New window button clicked');
+                openChatInNewWindow();
+            });
+            newWindowBtn.setAttribute('data-handler-attached', 'true');
+        } else if (newWindowBtn) {
+            console.log('✅ New window button already has handler attached');
+        } else {
+            console.log('❌ New window button not found in setupMinimizeButton');
         }
     }
     
@@ -2446,20 +2778,22 @@
                 if (chatBubble) {
                     chatBubble.remove();
                 }
+                
+                // Move sidebar left to make room for chat widget
+                adjustSidebarForChatWidget(true);
             } else {
                 // Hide the main widget
                 widget.style.display = 'none';
+                
+                // Reset sidebar position when chat is closed
+                adjustSidebarForChatWidget(false);
                 
                 // Create new chat bubble element
                 createChatBubble();
             }
         });
         
-        // New window button click handler
-        const newWindowBtn = widget.querySelector('.chat-new-window');
-        newWindowBtn.addEventListener('click', () => {
-            openChatInNewWindow();
-        });
+        // Moved to setupMinimizeButton function to ensure it's always attached
         
         // Focus input when clicking on widget
         widget.addEventListener('click', (e) => {
@@ -2779,6 +3113,10 @@
                     if (widget) {
                         widget.style.display = 'flex';
                         console.log('🔄 [CHAT SYNC] Widget made visible from closing notification');
+                        
+                        // Reset the layout since chat widget is now visible again
+                        adjustSidebarForChatWidget(true);
+                        console.log('🔄 [CHAT SYNC] Layout restored from closing notification');
                     }
                     
                     // Clear messages and reload
@@ -3008,7 +3346,7 @@
             background: white;
             border-radius: 50%;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            z-index: 10000;
+            z-index: 10003;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -3049,6 +3387,8 @@
             const mainWidget = document.getElementById('neuron-chat-widget');
             if (mainWidget) {
                 mainWidget.style.display = 'flex';
+                // Move sidebar left to make room for chat widget
+                adjustSidebarForChatWidget(true);
             }
             
             // Remove the bubble
@@ -3071,6 +3411,18 @@
     
     // Open chat in new window
     async function openChatInNewWindow() {
+        console.log('🔄 [DEDICATED WINDOW] openChatInNewWindow function called');
+        
+        // Force a fresh flow sync before opening dedicated window
+        try {
+            console.log('🔄 [DEDICATED WINDOW] Forcing fresh flow sync...');
+            flowHasChanged = true; // Force sync
+            await syncFlowContext('dedicated-window-open');
+            console.log('🔄 [DEDICATED WINDOW] Fresh flow sync completed');
+        } catch (error) {
+            console.log('⚠️ [DEDICATED WINDOW] Flow sync failed, continuing with cached data:', error);
+        }
+        
         try {
             // Get existing chat data from localStorage to preserve message IDs and timestamps
             let chatData = getUserData('chat');
@@ -3173,10 +3525,15 @@
                         originalWidget.style.display = 'none';
                     }
                     
-                    // Hide chat bubble as well
+                    // Remove chat bubble completely
                     if (chatBubble) {
-                        chatBubble.style.display = 'none';
+                        chatBubble.remove();
+                        console.log('🔄 [CHAT SYNC] Removed chat bubble');
                     }
+                    
+                    // Reset the layout since chat widget is now hidden
+                    adjustSidebarForChatWidget(false);
+                    console.log('🔄 [CHAT SYNC] Layout reset - sidebar should return to normal position');
                     
                     // Verify data was saved and is accessible
                     console.log('🔄 [CHAT SYNC] Verifying data persistence after window open...');
@@ -3194,17 +3551,67 @@
                     }
                 }, 500);
                 
+                // Set up flow state monitoring for the dedicated window
+                let flowMonitorInterval = null;
+                
+                function startFlowMonitoring() {
+                    console.log('🔄 [FLOW MONITOR] Starting flow monitoring for dedicated window');
+                    flowMonitorInterval = setInterval(async () => {
+                        try {
+                            // Check if flow has changed by comparing node count
+                            const currentFlowContext = getCurrentFlowContext();
+                            const currentNodeCount = currentFlowContext?.nodeCount || 0;
+                            const lastNodeCount = window.lastMonitoredNodeCount || 0;
+                            
+                            if (currentNodeCount !== lastNodeCount) {
+                                console.log('🔄 [FLOW MONITOR] Flow change detected, syncing to dedicated window');
+                                console.log('🔄 [FLOW MONITOR] Node count changed:', lastNodeCount, '→', currentNodeCount);
+                                
+                                // Sync the flow context
+                                flowHasChanged = true;
+                                await syncFlowContext('flow-monitor');
+                                
+                                // Send updated flow context to dedicated window
+                                if (newWindow && !newWindow.closed) {
+                                    newWindow.postMessage({
+                                        type: 'FLOW_STATE_UPDATE',
+                                        flowContext: currentFlowContext,
+                                        timestamp: Date.now()
+                                    }, '*');
+                                    console.log('🔄 [FLOW MONITOR] Sent flow update to dedicated window');
+                                    console.log('🔄 [FLOW MONITOR] Flow context sent:', currentFlowContext);
+                                }
+                                
+                                // Update the last node count
+                                window.lastMonitoredNodeCount = currentNodeCount;
+                            } else {
+                                console.log('🔄 [FLOW MONITOR] No changes detected (nodeCount:', currentNodeCount, ')');
+                            }
+                        } catch (error) {
+                            console.log('⚠️ [FLOW MONITOR] Error during flow monitoring:', error);
+                        }
+                    }, 2000); // Check every 2 seconds
+                }
+                
+                // Start monitoring
+                startFlowMonitoring();
+                
                 // Listen for new window close event
                 const checkClosed = setInterval(() => {
                     if (newWindow.closed) {
                         clearInterval(checkClosed);
-                        // Show original widget and chat bubble again when new window closes
+                        
+                        // Stop flow monitoring when window closes
+                        if (flowMonitorInterval) {
+                            clearInterval(flowMonitorInterval);
+                            console.log('🔄 [FLOW MONITOR] Stopped flow monitoring - window closed');
+                        }
+                        // Show original widget when new window closes
                         if (originalWidget) {
                             originalWidget.style.display = 'flex';
+                            console.log('🔄 [CHAT SYNC] Restored original widget');
                         }
-                        if (chatBubble) {
-                            chatBubble.style.display = 'flex';
-                        }
+                        // Don't restore old bubble - let the layout logic create a new one if needed
                         
                         // Clear existing widget messages and load updated chat history from localStorage
                         setTimeout(() => {
@@ -3214,6 +3621,10 @@
                             if (originalWidget) {
                                 originalWidget.style.display = 'flex';
                                 console.log('🔄 [CHAT SYNC] Main widget made visible');
+                                
+                                // Reset the layout since chat widget is now visible again
+                                adjustSidebarForChatWidget(true);
+                                console.log('🔄 [CHAT SYNC] Layout restored - sidebar should move left for chat widget');
                             }
                             
                             // Clear messages
@@ -3405,6 +3816,10 @@
             if (widget && widget.style.display === 'none') {
                 console.log('🔄 [CHAT SYNC] Widget was hidden, making it visible...');
                 widget.style.display = 'flex';
+                
+                // Reset the layout since chat widget is now visible again
+                adjustSidebarForChatWidget(true);
+                console.log('🔄 [CHAT SYNC] Layout restored after making widget visible');
             }
             
             // Load chat data immediately (no additional timeout needed since we already debounced)
