@@ -51,7 +51,8 @@ body {
 .logo {
     width: 64px;
     height: 64px;
-    margin-bottom: 15px;
+    margin: 0 auto 15px auto;
+    display: block;
     animation: pulse 2s infinite;
 }
 

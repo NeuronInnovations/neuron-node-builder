@@ -182,6 +182,12 @@ function loadLogo() {
         return;
     }
     
+    // If logo already has a src, don't override it
+    if (logo.src && logo.src !== '') {
+        console.log('✅ Logo already has src, skipping JavaScript loading');
+        return;
+    }
+    
     console.log('🖼️ Starting logo loading process...');
     console.log('🔍 Logo element:', logo);
     console.log('🔍 Logo element dimensions:', logo.offsetWidth, 'x', logo.offsetHeight);

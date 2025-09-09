@@ -115,20 +115,33 @@ class LoadingServer {
 
             // Read and serve file
             try {
-                let content = fs.readFileSync(fullPath, 'utf8');
                 const mimeType = this.getMimeType(fullPath);
                 
-                // Inject version into HTML files
-                if (mimeType === 'text/html' && this.version) {
-                    content = content.replace(/v\d+\.\d+\.\d+/g, `v${this.version}`);
-                    console.log(`📝 Injected version ${this.version} into HTML`);
+                // Handle binary files (images, etc.) differently from text files
+                if (mimeType.startsWith('image/') || mimeType.startsWith('application/')) {
+                    // Read binary files without encoding
+                    const content = fs.readFileSync(fullPath);
+                    res.writeHead(200, { 
+                        'Content-Type': mimeType,
+                        'Cache-Control': 'no-cache'
+                    });
+                    res.end(content);
+                } else {
+                    // Read text files with UTF-8 encoding
+                    let content = fs.readFileSync(fullPath, 'utf8');
+                    
+                    // Inject version into HTML files
+                    if (mimeType === 'text/html' && this.version) {
+                        content = content.replace(/v\d+\.\d+\.\d+/g, `v${this.version}`);
+                        console.log(`📝 Injected version ${this.version} into HTML`);
+                    }
+                    
+                    res.writeHead(200, { 
+                        'Content-Type': mimeType,
+                        'Cache-Control': 'no-cache'
+                    });
+                    res.end(content);
                 }
-                
-                res.writeHead(200, { 
-                    'Content-Type': mimeType,
-                    'Cache-Control': 'no-cache'
-                });
-                res.end(content);
             } catch (error) {
                 console.error(`Error serving file ${filePath}:`, error.message);
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
