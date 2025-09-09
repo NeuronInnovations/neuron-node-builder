@@ -85,6 +85,25 @@ class MenuBarApp: NSObject {
         }
     }
     
+    private func openLoadingPage() {
+        let bundle = Bundle.main
+        let bundlePath = bundle.bundlePath
+        let loadingPagePath = "\(bundlePath)/Contents/Resources/loading.html"
+        
+        // Check if loading page exists
+        if FileManager.default.fileExists(atPath: loadingPagePath) {
+            let fileURL = URL(fileURLWithPath: loadingPagePath)
+            NSWorkspace.shared.open(fileURL)
+            print("🌐 Loading page opened in browser")
+        } else {
+            print("⚠️ Loading page not found at: \(loadingPagePath)")
+            // Fallback: open Node-RED directly after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                self.openNodeRed()
+            }
+        }
+    }
+    
     @objc private func restartServer() {
         stopServer()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -135,6 +154,11 @@ class MenuBarApp: NSObject {
         do {
             try process.run()
             serverProcess = process
+            
+            // Open loading page immediately for better user experience
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.openLoadingPage()
+            }
             
             // Update status after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {

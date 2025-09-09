@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuron Node Builder - Starting...</title>
+    <link rel="stylesheet" href="loading.css">
+    <link rel="icon" type="image/png" href="neuron-favicon.png">
+</head>
+<body>
+    <div class="container">
+        <div class="loading-card">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <img id="logo" alt="Neuron Logo" class="logo">
+                <h1 class="app-title">Neuron Node Builder</h1>
+            </div>
+            
+            <!-- Loading Animation -->
+            <div class="loading-section">
+                <div class="spinner"></div>
+                <div class="loading-text" id="loadingText">Starting Neuron Node Builder...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            
+            <!-- Status Messages -->
+            <div class="status-section">
+                <div class="status-message" id="statusMessage">Initializing application...</div>
+                <div class="status-details" id="statusDetails">Please wait while we set up your development environment.</div>
+            </div>
+            
+            <!-- Error Section (Hidden by default) -->
+            <div class="error-section" id="errorSection" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <div class="error-message" id="errorMessage">Something went wrong during startup.</div>
+                <div class="error-details" id="errorDetails">Please try restarting the application.</div>
+                <button class="retry-button" onclick="location.reload()">Retry</button>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>Neuron Node Builder v1.0.0</p>
+        </div>
+    </div>
+    
+    <script src="loading.js"></script>
+</body>
+</html>

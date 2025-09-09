@@ -118,6 +118,20 @@ if (fs.existsSync(iconPath)) {
     console.log('⚠️  Neuron favicon not found at:', iconPath);
 }
 
+// Copy loading page files
+const loadingFiles = ['loading.html', 'loading.css', 'loading.js', 'neuron-favicon.png'];
+loadingFiles.forEach(fileName => {
+    const sourcePath = path.join(baseDirectory, 'public', fileName);
+    const destPath = path.join(resourcesPath, fileName);
+    
+    if (fs.existsSync(sourcePath)) {
+        fs.copyFileSync(sourcePath, destPath);
+        console.log(`✅ ${fileName} copied to app bundle`);
+    } else {
+        console.log(`⚠️  ${fileName} not found at:`, sourcePath);
+    }
+});
+
 console.log(`App bundle created at: ${appPath}`);
 console.log(`App bundle name: ${appBundleName}.app`);
 console.log('You can now run `./sign-and-notarize-app.sh` to create file for distribution.');

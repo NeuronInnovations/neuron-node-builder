@@ -121,12 +121,24 @@ child.on('exit', (code) => {
     process.exit(code);
 });
 
-// Open browser to localhost:1880 after a short delay to allow Node-RED to start
+// Open loading page immediately for better user experience
 setTimeout(() => {
   try {
     const opener = require('opener');
-    opener('http://localhost:1880');
+    const path = require('path');
+    const loadingPagePath = path.resolve(__dirname, 'public', 'loading.html');
+    opener(`file://${loadingPagePath}`);
+    console.log('🌐 Loading page opened in browser');
   } catch (err) {
-    // Silently fail if browser cannot be opened
+    console.error('❌ Failed to open loading page:', err.message);
+    // Fallback: try to open Node-RED directly after a longer delay
+    setTimeout(() => {
+      try {
+        const opener = require('opener');
+        opener('http://localhost:1880');
+      } catch (fallbackErr) {
+        console.error('❌ Failed to open browser:', fallbackErr.message);
+      }
+    }, 10000); // Wait 10 seconds for Node-RED to start up
   }
-}, 3000); // Wait 3 seconds for Node-RED to start up
+}, 500); // Open loading page almost immediately (0.5 seconds)
