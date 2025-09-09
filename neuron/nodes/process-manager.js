@@ -611,6 +611,44 @@ class ProcessManager {
     }
 
     /**
+     * Shutdown all processes gracefully
+     * Called during Node-RED shutdown
+     */
+    async shutdownAllProcesses() {
+        console.log('🔄 Shutting down all processes...');
+        
+        const shutdownPromises = [];
+        
+        // 1. Stop all active processes
+        for (const [nodeId, process] of this.activeProcesses) {
+            console.log(`🛑 Stopping process for node ${nodeId}`);
+            shutdownPromises.push(this.stopProcess(nodeId, false));
+        }
+        
+        // 2. Clean up all restart timers
+        this.cleanupAllRestartTimers();
+        
+        // 3. Stop all health monitors
+        for (const [nodeId, interval] of this.healthMonitors) {
+            clearInterval(interval);
+            console.log(`Cleared health monitor for node ${nodeId}`);
+        }
+        this.healthMonitors.clear();
+        
+        // 4. Emergency cleanup of any remaining processes
+        console.log('🔄 Running emergency cleanup...');
+        shutdownPromises.push(this.emergencyCleanupAllProcesses());
+        
+        // Wait for all cleanup to complete
+        try {
+            await Promise.allSettled(shutdownPromises);
+            console.log('✅ All processes shut down successfully');
+        } catch (error) {
+            console.error('❌ Error during shutdown:', error.message);
+        }
+    }
+
+    /**
      * Get auto-restart status for a node
      */
     getAutoRestartStatus(nodeId) {
@@ -920,36 +958,61 @@ class ProcessManager {
     /**
      * Stop a process (during node removal) - Enhanced with cross-platform support
      */
-    async stopProcess(nodeId) {
-        console.log(`Stopping process for node ${nodeId}`);
+    async stopProcess(nodeId, force = false) {
+        console.log(`🛑 Stopping process for node ${nodeId}${force ? ' (forced)' : ''}`);
         
-        const goProcess = this.activeProcesses.get(nodeId);
-        if (goProcess && !goProcess.killed) {
+        try {
             // Stop health monitoring first
             this.stopHealthMonitoring(nodeId);
             
-            // Use cross-platform termination
-            await this.killProcessCrossPlatform(goProcess.pid, 'SIGTERM', 5000);
+            // Cancel any pending restarts
+            this.cancelAutoRestart(nodeId);
             
-            // Mark as killed to prevent further operations
-            goProcess.killed = true;
+            const goProcess = this.activeProcesses.get(nodeId);
+            if (goProcess && !goProcess.killed) {
+                // Try graceful termination first
+                if (!force) {
+                    console.log(`🔄 Attempting graceful termination for node ${nodeId} (PID: ${goProcess.pid})`);
+                    goProcess.kill('SIGTERM');
+                    
+                    // Wait for graceful shutdown
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                
+                // Force kill if still running
+                if (!goProcess.killed) {
+                    console.log(`⚡ Force killing process for node ${nodeId} (PID: ${goProcess.pid})`);
+                    goProcess.kill('SIGKILL');
+                }
+                
+                goProcess.killed = true;
+            }
+            
+            // Also try to kill any process from registry (for discovered processes)
+            const registryEntry = this.registry.getProcess(nodeId);
+            if (registryEntry && this.isProcessAlive(registryEntry.pid)) {
+                console.log(`🔄 Also terminating registry process PID ${registryEntry.pid} for node ${nodeId}`);
+                await this.killProcessCrossPlatform(registryEntry.pid, force ? 'SIGKILL' : 'SIGTERM', force ? 1000 : 5000);
+            }
+            
+            // Update registry
+            this.registry.markProcessStopped(nodeId);
+            
+            // Release port
+            this.portManager.releasePort(nodeId);
+            
+            // Clean up
+            this.activeProcesses.delete(nodeId);
+            
+            console.log(`✅ Process ${nodeId} stopped successfully`);
+        } catch (error) {
+            console.error(`❌ Error stopping process ${nodeId}:`, error.message);
+            
+            // Force cleanup even if there was an error
+            this.activeProcesses.delete(nodeId);
+            this.registry.markProcessStopped(nodeId);
+            this.portManager.releasePort(nodeId);
         }
-        
-        // Also try to kill any process from registry (for discovered processes)
-        const registryEntry = this.registry.getProcess(nodeId);
-        if (registryEntry && this.isProcessAlive(registryEntry.pid)) {
-            console.log(`Also terminating registry process PID ${registryEntry.pid} for node ${nodeId}`);
-            await this.killProcessCrossPlatform(registryEntry.pid, 'SIGTERM', 5000);
-        }
-        
-        // Update registry
-        this.registry.markProcessStopped(nodeId);
-        
-        // Release port
-        this.portManager.releasePort(nodeId);
-        
-        // Clean up
-        this.activeProcesses.delete(nodeId);
     }
 
     /**

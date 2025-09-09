@@ -21,9 +21,8 @@
         "docs": "grunt docs",
         "package": "node --max-old-space-size=8192 build.js",
         "copy-binaries": "node copy-binaries.js",
-        "create-app-bundle": "node create-app-bundle.js",
-        "create-dmg": "node create-dmg.js"
-    },
+        "create-app-bundle": "node create-app-bundle.js"
+     },
     "contributors": [
         {
             "name": "Nick O'Leary"

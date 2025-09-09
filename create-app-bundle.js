@@ -34,13 +34,51 @@ const appExecutable = path.join(macosPath, 'neuron-node-builder');
 fs.copyFileSync(executablePath, appExecutable);
 fs.chmodSync(appExecutable, 0o755);
 
+// Build and integrate the menu bar app
+console.log('Building menu bar app...');
+try {
+    execSync('./menubar/build-menubar.sh', { stdio: 'inherit' });
+    
+    // Copy the menu bar app executable
+    const menubarAppPath = path.join(baseDirectory, 'menubar', 'build', 'NeuronNodeBuilderMenuBar.app', 'Contents', 'MacOS', 'NeuronNodeBuilderMenuBar');
+    const menubarExecutablePath = path.join(macosPath, 'NeuronNodeBuilderMenuBar');
+    
+    if (fs.existsSync(menubarAppPath)) {
+        fs.copyFileSync(menubarAppPath, menubarExecutablePath);
+        fs.chmodSync(menubarExecutablePath, 0o755);
+        console.log('✅ Menu bar app integrated successfully');
+    } else {
+        console.log('⚠️  Menu bar app not found, falling back to simple launcher');
+        // Fallback to simple launcher
+        const launcherScript = `#!/bin/bash
+# Simple launcher for Neuron Node Builder
+cd "$(dirname "$0")"
+exec ./neuron-node-builder "$@"
+`;
+        const launcherPath = path.join(macosPath, 'Launcher');
+        fs.writeFileSync(launcherPath, launcherScript);
+        fs.chmodSync(launcherPath, 0o755);
+    }
+} catch (error) {
+    console.log('⚠️  Failed to build menu bar app, using simple launcher:', error.message);
+    // Fallback to simple launcher
+    const launcherScript = `#!/bin/bash
+# Simple launcher for Neuron Node Builder
+cd "$(dirname "$0")"
+exec ./neuron-node-builder "$@"
+`;
+    const launcherPath = path.join(macosPath, 'Launcher');
+    fs.writeFileSync(launcherPath, launcherScript);
+    fs.chmodSync(launcherPath, 0o755);
+}
+
 // Create Info.plist
 const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>neuron-node-builder</string>
+    <string>NeuronNodeBuilderMenuBar</string>
     <key>CFBundleIdentifier</key>
     <string>com.neuron.node-builder</string>
     <key>CFBundleName</key>
@@ -62,7 +100,7 @@ const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
     <key>LSBackgroundOnly</key>
     <false/>
     <key>LSUIElement</key>
-    <false/>
+    <true/>
 </dict>
 </plist>`;
 
@@ -72,11 +110,14 @@ fs.writeFileSync(path.join(contentsPath, 'Info.plist'), infoPlist);
 fs.writeFileSync(path.join(contentsPath, 'PkgInfo'), 'APPL????');
 
 // Copy icon if exists
-const iconPath = path.join(baseDirectory, 'neuron', 'theme', 'neuronLogo.png');
+const iconPath = path.join(baseDirectory, 'public', 'neuron-favicon.png');
 if (fs.existsSync(iconPath)) {
     fs.copyFileSync(iconPath, path.join(resourcesPath, 'AppIcon.png'));
+    console.log('✅ Neuron favicon copied to app bundle');
+} else {
+    console.log('⚠️  Neuron favicon not found at:', iconPath);
 }
 
 console.log(`App bundle created at: ${appPath}`);
 console.log(`App bundle name: ${appBundleName}.app`);
-console.log('You can now run `npm run create-dmg` to create the DMG file.');
+console.log('You can now run `./sign-and-notarize-app.sh` to create file for distribution.');

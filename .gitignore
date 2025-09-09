@@ -70,3 +70,10 @@ certificate_2_decoded.p12
 certificate_2.p12
 neuron/apple-credentials
 sign-and-notarize-app.sh
+# Build artifacts
+menubar/build/
+build/releases/
+
+# Temporary files
+*.log
+.DS_Store

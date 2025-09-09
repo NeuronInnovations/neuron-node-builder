@@ -63,10 +63,62 @@ const child = spawn(process.execPath, [cliPath, ...args], {
   }
 });
 
+// Global cleanup function
+async function globalCleanup(signal) {
+    console.log(`\n🛑 Received ${signal}, initiating graceful shutdown...`);
+    
+    try {
+        // 1. Stop all child processes via ProcessManager
+        const ProcessManager = require('./neuron/nodes/process-manager');
+        const processManager = new ProcessManager();
+        await processManager.shutdownAllProcesses();
+        
+        // 2. Kill the Node-RED child process gracefully
+        if (child && !child.killed) {
+            console.log('🔄 Terminating Node-RED process...');
+            child.kill('SIGTERM');
+            
+            // Wait for graceful shutdown, then force kill
+            setTimeout(() => {
+                if (!child.killed) {
+                    console.log('⚡ Force killing Node-RED process...');
+                    child.kill('SIGKILL');
+                }
+            }, 5000);
+        }
+        
+        console.log('✅ Cleanup completed');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Error during cleanup:', error.message);
+        process.exit(1);
+    }
+}
+
+// Register signal handlers for graceful shutdown
+process.on('SIGTERM', () => globalCleanup('SIGTERM'));
+process.on('SIGINT', () => globalCleanup('SIGINT'));
+process.on('SIGHUP', () => globalCleanup('SIGHUP'));
+process.on('SIGUSR1', () => globalCleanup('SIGUSR1'));
+process.on('SIGUSR2', () => globalCleanup('SIGUSR2'));
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+    console.error('💥 Uncaught Exception:', error);
+    globalCleanup('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+    globalCleanup('unhandledRejection');
+});
+
 child.on('exit', (code) => {
-  if (code !== 0) {
-    console.error(`Node-RED process exited with code: ${code}`);
-  }
+    if (code !== 0) {
+        console.error(`Node-RED process exited with code: ${code}`);
+    }
+    // Exit the parent process when Node-RED exits
+    process.exit(code);
 });
 
 // Open browser to localhost:1880 after a short delay to allow Node-RED to start
