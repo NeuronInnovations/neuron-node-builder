@@ -165,14 +165,26 @@ class LoadingManager {
 // Initialize the loading manager when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📄 Loading page loaded');
-    loadLogo();
+    
+    // Add a small delay to ensure DOM is fully ready
+    setTimeout(() => {
+        loadLogo();
+    }, 100);
+    
     new LoadingManager();
 });
 
 // Load logo with fallback
 function loadLogo() {
     const logo = document.getElementById('logo');
-    if (!logo) return;
+    if (!logo) {
+        console.error('❌ Logo element not found!');
+        return;
+    }
+    
+    console.log('🖼️ Starting logo loading process...');
+    console.log('🔍 Logo element:', logo);
+    console.log('🔍 Logo element dimensions:', logo.offsetWidth, 'x', logo.offsetHeight);
     
     // Try AppIcon.png first (for app bundle), then fallback to neuron-favicon.png
     const logoPaths = ['AppIcon.png', 'neuron-favicon.png'];
@@ -180,7 +192,17 @@ function loadLogo() {
     
     function tryNextLogo() {
         if (currentIndex >= logoPaths.length) {
-            console.warn('⚠️ Could not load any logo image');
+            console.warn('⚠️ Could not load any logo image - all paths failed');
+            // Set a placeholder or show error
+            logo.style.border = '2px dashed #ccc';
+            logo.style.backgroundColor = '#f0f0f0';
+            logo.style.display = 'flex';
+            logo.style.alignItems = 'center';
+            logo.style.justifyContent = 'center';
+            logo.style.fontSize = '12px';
+            logo.style.color = '#666';
+            logo.alt = 'Logo not found';
+            logo.textContent = 'N';
             return;
         }
         
@@ -191,9 +213,12 @@ function loadLogo() {
         img.onload = () => {
             console.log(`✅ Logo loaded successfully: ${logoPath}`);
             logo.src = logoPath;
+            logo.style.border = 'none'; // Remove any error styling
+            logo.style.display = 'block'; // Ensure it's visible
+            logo.style.backgroundColor = '#f0f0f0'; // Add background to make it visible
         };
-        img.onerror = () => {
-            console.log(`❌ Failed to load logo: ${logoPath}`);
+        img.onerror = (error) => {
+            console.log(`❌ Failed to load logo: ${logoPath}`, error);
             currentIndex++;
             tryNextLogo();
         };

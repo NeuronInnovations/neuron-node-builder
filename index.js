@@ -68,12 +68,18 @@ async function globalCleanup(signal) {
     console.log(`\n🛑 Received ${signal}, initiating graceful shutdown...`);
     
     try {
-        // 1. Stop all child processes via ProcessManager
+        // 1. Stop loading server if running
+        if (loadingServer) {
+            console.log('🛑 Stopping loading server...');
+            loadingServer.stop();
+        }
+        
+        // 2. Stop all child processes via ProcessManager
         const ProcessManager = require('./neuron/nodes/process-manager');
         const processManager = new ProcessManager();
         await processManager.shutdownAllProcesses();
         
-        // 2. Kill the Node-RED child process gracefully
+        // 3. Kill the Node-RED child process gracefully
         if (child && !child.killed) {
             console.log('🔄 Terminating Node-RED process...');
             child.kill('SIGTERM');
@@ -121,24 +127,44 @@ child.on('exit', (code) => {
     process.exit(code);
 });
 
-// Open loading page immediately for better user experience
+// Track if loading page was successfully opened
+let loadingPageOpened = false;
+let loadingServer = null;
+
+// Start loading server and open loading page immediately
 setTimeout(() => {
   try {
+    const LoadingServer = require('./loading-server');
     const opener = require('opener');
-    const path = require('path');
-    const loadingPagePath = path.resolve(__dirname, 'public', 'loading.html');
-    opener(`file://${loadingPagePath}`);
-    console.log('🌐 Loading page opened in browser');
+    
+    // Start the loading server
+    loadingServer = new LoadingServer(1881);
+    if (loadingServer.start()) {
+      // Open the loading page in browser
+      const loadingUrl = loadingServer.getUrl();
+      opener(loadingUrl);
+      console.log('🌐 Loading page opened in browser');
+      console.log(`📁 Loading page URL: ${loadingUrl}`);
+      loadingPageOpened = true;
+    } else {
+      console.log('⚠️ Loading server failed to start, will open Node-RED directly when ready');
+      loadingPageOpened = false;
+    }
   } catch (err) {
-    console.error('❌ Failed to open loading page:', err.message);
-    // Fallback: try to open Node-RED directly after a longer delay
-    setTimeout(() => {
-      try {
-        const opener = require('opener');
-        opener('http://localhost:1880');
-      } catch (fallbackErr) {
-        console.error('❌ Failed to open browser:', fallbackErr.message);
-      }
-    }, 10000); // Wait 10 seconds for Node-RED to start up
+    console.error('❌ Failed to start loading server:', err.message);
+    loadingPageOpened = false;
   }
-}, 500); // Open loading page almost immediately (0.5 seconds)
+}, 500); // Start loading server almost immediately (0.5 seconds)
+
+// Fallback: Open Node-RED when it's ready (only if loading page wasn't opened)
+setTimeout(() => {
+  if (!loadingPageOpened) {
+    try {
+      const opener = require('opener');
+      opener('http://localhost:1880');
+      console.log('🌐 Node-RED opened in browser (fallback)');
+    } catch (err) {
+      console.error('❌ Failed to open Node-RED:', err.message);
+    }
+  }
+}, 3000); // Wait 3 seconds for Node-RED to start up

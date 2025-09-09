@@ -17,19 +17,29 @@ class MenuBarApp: NSObject {
         // Create status item in menu bar
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         
-        // Set icon using the Neuron logo
+        // Set icon using the Neuron favicon
         if let button = statusItem.button {
-            // Try to load the Neuron logo from the app bundle
+            // Try to load the Neuron favicon from the app bundle
             let bundle = Bundle.main
-            let logoPath = "\(bundle.bundlePath)/Contents/Resources/AppIcon.png"
+            let faviconPath = "\(bundle.bundlePath)/Contents/Resources/neuron-favicon.png"
             
-            if let logoImage = NSImage(contentsOfFile: logoPath) {
+            if let faviconImage = NSImage(contentsOfFile: faviconPath) {
                 // Resize the image to fit the menu bar (typically 18x18 points)
-                logoImage.size = NSSize(width: 18, height: 18)
-                button.image = logoImage
+                faviconImage.size = NSSize(width: 18, height: 18)
+                button.image = faviconImage
+                print("✅ Neuron favicon loaded for menu bar")
             } else {
-                // Fallback to system icon if logo not found
-                button.image = NSImage(systemSymbolName: "brain.head.profile", accessibilityDescription: "Neuron Node Builder")
+                // Fallback to AppIcon.png if favicon not found
+                let appIconPath = "\(bundle.bundlePath)/Contents/Resources/AppIcon.png"
+                if let appIconImage = NSImage(contentsOfFile: appIconPath) {
+                    appIconImage.size = NSSize(width: 18, height: 18)
+                    button.image = appIconImage
+                    print("⚠️ Using AppIcon.png as fallback")
+                } else {
+                    // Final fallback to system icon
+                    button.image = NSImage(systemSymbolName: "brain.head.profile", accessibilityDescription: "Neuron Node Builder")
+                    print("⚠️ Using system icon as final fallback")
+                }
             }
         }
         
@@ -85,24 +95,6 @@ class MenuBarApp: NSObject {
         }
     }
     
-    private func openLoadingPage() {
-        let bundle = Bundle.main
-        let bundlePath = bundle.bundlePath
-        let loadingPagePath = "\(bundlePath)/Contents/Resources/loading.html"
-        
-        // Check if loading page exists
-        if FileManager.default.fileExists(atPath: loadingPagePath) {
-            let fileURL = URL(fileURLWithPath: loadingPagePath)
-            NSWorkspace.shared.open(fileURL)
-            print("🌐 Loading page opened in browser")
-        } else {
-            print("⚠️ Loading page not found at: \(loadingPagePath)")
-            // Fallback: open Node-RED directly after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-                self.openNodeRed()
-            }
-        }
-    }
     
     @objc private func restartServer() {
         stopServer()
@@ -155,10 +147,8 @@ class MenuBarApp: NSObject {
             try process.run()
             serverProcess = process
             
-            // Open loading page immediately for better user experience
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.openLoadingPage()
-            }
+            // Note: Loading page is now handled by the Node.js loading server
+            // No need to open it from Swift to avoid duplicate tabs
             
             // Update status after a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
