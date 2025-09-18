@@ -462,35 +462,54 @@ jobs:
           mkdir -p release-assets
           VERSION="${{ needs.security-and-build.outputs.version }}"
 
+          # Debug: Show what artifacts we have
+          echo "🔍 Available artifacts:"
+          find artifacts -type f -name "*" | head -20
+
           # Windows executable
           echo "📦 Preparing Windows package..."
-          cd "artifacts/build-artifacts-$VERSION/build/releases"
-          zip -r "../../../release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
-          cd ../../..
+          if [ -f "artifacts/build-artifacts-$VERSION/build/releases/latest-win-x64.exe" ]; then
+            cd "artifacts/build-artifacts-$VERSION/build/releases"
+            zip -r "../../../release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
+            cd ../../..
+            echo "✅ Windows package created"
+          else
+            echo "⚠️ Windows executable not found, skipping"
+          fi
 
           # Linux executable  
           echo "📦 Preparing Linux package..."
-          cd "artifacts/build-artifacts-$VERSION/build/releases"
-          zip -r "../../../release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
-          cd ../../..
+          if [ -f "artifacts/build-artifacts-$VERSION/build/releases/latest-linux-x64" ]; then
+            cd "artifacts/build-artifacts-$VERSION/build/releases"
+            zip -r "../../../release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
+            cd ../../..
+            echo "✅ Linux package created"
+          else
+            echo "⚠️ Linux executable not found, skipping"
+          fi
 
           # macOS signed application
           echo "📦 Preparing macOS package..."
-          cp "artifacts/macos-signed-$VERSION"/*.zip "release-assets/"
-          cp "artifacts/macos-signed-$VERSION"/*.sha256 "release-assets/"
+          if [ -d "artifacts/macos-signed-$VERSION" ]; then
+            cp "artifacts/macos-signed-$VERSION"/*.zip "release-assets/" 2>/dev/null || echo "⚠️ No macOS ZIP files found"
+            cp "artifacts/macos-signed-$VERSION"/*.sha256 "release-assets/" 2>/dev/null || echo "⚠️ No macOS SHA256 files found"
 
-          # Rename macOS package for consistency
-          cd release-assets
-          MACOS_ZIP=$(ls *-signed.zip | head -1)
-          if [ -n "$MACOS_ZIP" ]; then
-            mv "$MACOS_ZIP" "neuron-node-builder-macos-x64-v$VERSION.zip"
-            MACOS_SHA=$(ls *-signed.zip.sha256 | head -1)
-            [ -n "$MACOS_SHA" ] && mv "$MACOS_SHA" "neuron-node-builder-macos-x64-v$VERSION.zip.sha256"
+            # Rename macOS package for consistency
+            cd release-assets
+            MACOS_ZIP=$(ls *-signed.zip 2>/dev/null | head -1)
+            if [ -n "$MACOS_ZIP" ]; then
+              mv "$MACOS_ZIP" "neuron-node-builder-macos-x64-v$VERSION.zip"
+              MACOS_SHA=$(ls *-signed.zip.sha256 2>/dev/null | head -1)
+              [ -n "$MACOS_SHA" ] && mv "$MACOS_SHA" "neuron-node-builder-macos-x64-v$VERSION.zip.sha256"
+              echo "✅ macOS package renamed"
+            fi
+            cd ..
+          else
+            echo "⚠️ macOS signed artifacts not found, skipping"
           fi
-          cd ..
 
           echo "📋 Release assets prepared:"
-          ls -la release-assets/
+          ls -la release-assets/ || echo "No release assets created"
 
       - name: 📋 Generate comprehensive release notes
         run: |
