@@ -142,11 +142,11 @@ jobs:
   macos-sign-notarize:
     name: macOS Sign & Notarize
     needs: [security-and-build]
-    runs-on: macos-latest
+    runs-on: macos-13
     timeout-minutes: 45
 
     env:
-      MACOSX_DEPLOYMENT_TARGET: "10.13"
+      MACOSX_DEPLOYMENT_TARGET: "10.12"
 
     # Security: Only run for production tags or authorized manual triggers
     if: |
@@ -243,17 +243,34 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate securely
+          # Import certificate using OpenSSL extraction method (same as template.sh)
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
           echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
 
-          # Import with proper security settings
-          security import "$CERT_PATH" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A \
-            -t cert \
-            -f pkcs12
+          # Extract certificate and key using OpenSSL (more compatible)
+          TEMP_CERT="$RUNNER_TEMP/cert.crt"
+          TEMP_KEY="$RUNNER_TEMP/key.key"
+
+          IMPORT_SUCCESS=false
+
+          # Extract certificate and key separately
+          if openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -out "$TEMP_CERT" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -passout pass: 2>/dev/null && \
+             openssl pkcs12 -in "$CERT_PATH" -nocerts -nodes -out "$TEMP_KEY" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" 2>/dev/null; then
+            # Import certificate and key separately
+            if security import "$TEMP_CERT" -k "$KEYCHAIN_PATH" -A 2>/dev/null && \
+               security import "$TEMP_KEY" -k "$KEYCHAIN_PATH" -A 2>/dev/null; then
+              echo "Certificate imported using OpenSSL extraction method"
+              IMPORT_SUCCESS=true
+            fi
+          fi
+
+          # Clean up temporary files
+          rm -f "$TEMP_CERT" "$TEMP_KEY"
+
+          if [ "$IMPORT_SUCCESS" = false ]; then
+            echo "ERROR: Failed to import certificate using OpenSSL method"
+            exit 1
+          fi
 
           # Set keychain search list
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
