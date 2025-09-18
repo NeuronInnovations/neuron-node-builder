@@ -466,33 +466,56 @@ jobs:
           echo "🔍 Available artifacts:"
           find artifacts -type f -name "*" | head -20
 
+          # Find the actual build artifacts directory
+          BUILD_ARTIFACTS_DIR=$(find artifacts -name "build-artifacts-*" -type d | head -1)
+          MACOS_SIGNED_DIR=$(find artifacts -name "macos-signed-*" -type d | head -1)
+
+          echo "🔍 Build artifacts directory: $BUILD_ARTIFACTS_DIR"
+          echo "🔍 macOS signed directory: $MACOS_SIGNED_DIR"
+
           # Windows executable
           echo "📦 Preparing Windows package..."
-          if [ -f "artifacts/build-artifacts-$VERSION/build/releases/latest-win-x64.exe" ]; then
-            cd "artifacts/build-artifacts-$VERSION/build/releases"
+          WIN_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-win-x64.exe"
+          if [ -f "$WIN_EXE" ]; then
+            echo "✅ Found Windows executable: $WIN_EXE"
+            cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "../../../release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
             cd ../../..
             echo "✅ Windows package created"
           else
-            echo "⚠️ Windows executable not found, skipping"
+            echo "⚠️ Windows executable not found at: $WIN_EXE"
+            echo "🔍 Available files in build artifacts:"
+            ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
           # Linux executable  
           echo "📦 Preparing Linux package..."
-          if [ -f "artifacts/build-artifacts-$VERSION/build/releases/latest-linux-x64" ]; then
-            cd "artifacts/build-artifacts-$VERSION/build/releases"
+          LINUX_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-linux-x64"
+          if [ -f "$LINUX_EXE" ]; then
+            echo "✅ Found Linux executable: $LINUX_EXE"
+            cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "../../../release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
             cd ../../..
             echo "✅ Linux package created"
           else
-            echo "⚠️ Linux executable not found, skipping"
+            echo "⚠️ Linux executable not found at: $LINUX_EXE"
+            echo "🔍 Available files in build artifacts:"
+            ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
           # macOS signed application
           echo "📦 Preparing macOS package..."
-          if [ -d "artifacts/macos-signed-$VERSION" ]; then
-            cp "artifacts/macos-signed-$VERSION"/*.zip "release-assets/" 2>/dev/null || echo "⚠️ No macOS ZIP files found"
-            cp "artifacts/macos-signed-$VERSION"/*.sha256 "release-assets/" 2>/dev/null || echo "⚠️ No macOS SHA256 files found"
+          if [ -d "$MACOS_SIGNED_DIR" ] && [ -n "$MACOS_SIGNED_DIR" ]; then
+            # Copy macOS signed files
+            if ls "$MACOS_SIGNED_DIR"/*.zip >/dev/null 2>&1; then
+              cp "$MACOS_SIGNED_DIR"/*.zip release-assets/
+              echo "✅ macOS ZIP copied"
+            fi
+            
+            if ls "$MACOS_SIGNED_DIR"/*.sha256 >/dev/null 2>&1; then
+              cp "$MACOS_SIGNED_DIR"/*.sha256 release-assets/
+              echo "✅ macOS SHA256 copied"
+            fi
 
             # Rename macOS package for consistency
             cd release-assets
@@ -505,10 +528,10 @@ jobs:
             fi
             cd ..
           else
-            echo "⚠️ macOS signed artifacts not found, skipping"
+            echo "⚠️ macOS signed artifacts directory not found: $MACOS_SIGNED_DIR"
           fi
 
-          echo "📋 Release assets prepared:"
+          echo "📋 Final release assets:"
           ls -la release-assets/ || echo "No release assets created"
 
       - name: 📋 Generate comprehensive release notes
