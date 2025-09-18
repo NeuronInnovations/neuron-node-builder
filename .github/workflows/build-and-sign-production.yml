@@ -478,9 +478,11 @@ jobs:
           WIN_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-win-x64.exe"
           if [ -f "$WIN_EXE" ]; then
             echo "✅ Found Windows executable: $WIN_EXE"
+            # Use absolute paths to avoid relative path issues
+            CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
-            zip -r "../../../release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
-            cd ../../..
+            zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
+            cd "$CURRENT_DIR"
             echo "✅ Windows package created"
           else
             echo "⚠️ Windows executable not found at: $WIN_EXE"
@@ -493,9 +495,11 @@ jobs:
           LINUX_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-linux-x64"
           if [ -f "$LINUX_EXE" ]; then
             echo "✅ Found Linux executable: $LINUX_EXE"
+            # Use absolute paths to avoid relative path issues
+            CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
-            zip -r "../../../release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
-            cd ../../..
+            zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
+            cd "$CURRENT_DIR"
             echo "✅ Linux package created"
           else
             echo "⚠️ Linux executable not found at: $LINUX_EXE"
