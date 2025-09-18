@@ -19,7 +19,6 @@ on:
           - production
           - staging
 
-# Security: Remove deprecated unsafe commands
 env:
   NODE_VERSION: "18"
   ARTIFACT_RETENTION_DAYS: 1
@@ -436,6 +435,10 @@ jobs:
           [ -n "$CERT_PATH" ] && rm -f "$CERT_PATH" 2>/dev/null || true
           rm -f "$RUNNER_TEMP"/*.p8 2>/dev/null || true
           rm -f "$RUNNER_TEMP"/*.p12 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.crt 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.key 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/cert.* 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/key.* 2>/dev/null || true
 
   # ============================================================================
   # JOB 3: MULTI-PLATFORM RELEASE CREATION
