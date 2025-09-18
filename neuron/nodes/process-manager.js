@@ -341,7 +341,7 @@ class ProcessManager {
             const args = [
                 `--port=${port}`,
                // '--use-local-address',
-               '--enable-upnp',
+              // '--enable-upnp',
                 '--mode=peer',
                 `--buyer-or-seller=${nodeType}`,
                 nodeType === 'seller' ? '--list-of-buyers-source=env' : '--list-of-sellers-source=env',
@@ -710,43 +710,47 @@ class ProcessManager {
     async testWebSocketConnection(port, maxRetries = 10, nodeType = 'buyer') {
         const retryDelayMs = 1000;
         const endpoint = nodeType === 'seller' ? '/seller/p2p' : '/buyer/p2p';
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
+                console.log(`Attempting WebSocket connection to ws://localhost:${port}${endpoint} (attempt ${attempt}/${maxRetries})`);
                 const ws = new WebSocket(`ws://localhost:${port}${endpoint}`);
-                
+
                 const result = await new Promise((resolve) => {
                     const timeout = setTimeout(() => {
+                        console.log(`WebSocket connection timed out on port ${port}`);
                         ws.close();
                         resolve(false);
                     }, 2000);
-                    
+
                     ws.on('open', () => {
+                        console.log(`WebSocket connection opened successfully on port ${port}`);
                         clearTimeout(timeout);
                         ws.close();
                         resolve(true);
                     });
-                    
-                    ws.on('error', () => {
+
+                    ws.on('error', (error) => {
+                        console.error(`WebSocket error on port ${port}:`, error.message);
                         clearTimeout(timeout);
                         resolve(false);
                     });
                 });
-                
+
                 if (result) {
                     console.log(`WebSocket connection successful on port ${port} (attempt ${attempt})`);
                     return true;
                 }
             } catch (error) {
-                // Connection failed, continue to retry
+                console.error(`WebSocket connection attempt failed on port ${port} (attempt ${attempt}):`, error.message);
             }
-            
+
             if (attempt < maxRetries) {
-                console.log(`WebSocket connection failed on port ${port}, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxRetries})`);
+                console.log(`Retrying WebSocket connection to port ${port} in ${retryDelayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, retryDelayMs));
             }
         }
-        
+
         console.log(`WebSocket connection failed on port ${port} after ${maxRetries} attempts`);
         return false;
     }
@@ -1111,4 +1115,4 @@ module.exports.killPid = async function(pid, signal = 'SIGTERM') {
 module.exports.listProcesses = function() {
     const manager = new ProcessManager();
     return manager.listAllProcesses();
-}; 
+};

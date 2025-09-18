@@ -338,6 +338,7 @@ module.exports = function (RED) {
                 loadedDeviceInfo.deviceType = config.deviceType;
                 loadedDeviceInfo.price = config.price;
                 node.deviceInfo = loadedDeviceInfo;
+                node.deviceInfo.nodeType = "seller";
                 fs.writeFileSync(deviceFile, JSON.stringify(node.deviceInfo, null, 2), 'utf-8');
                 context.set('deviceInfo', node.deviceInfo);
                 node.status({ fill: "green", shape: "dot", text: "Device loaded." });
