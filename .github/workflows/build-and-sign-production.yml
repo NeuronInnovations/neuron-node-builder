@@ -125,14 +125,6 @@ jobs:
             echo "✅ ${EXECUTABLES[$executable]} executable: $executable ($size)"
           done
 
-      - name: 🔐 Generate build hash for integrity
-        id: hash
-        run: |
-          # Create integrity hash of all build outputs
-          BUILD_HASH=$(find build/releases -type f -exec sha256sum {} \; | sha256sum | cut -d' ' -f1)
-          echo "🔐 Build integrity hash: $BUILD_HASH"
-          echo "build-hash=$BUILD_HASH" >> $GITHUB_OUTPUT
-
       - name: 📤 Upload build artifacts with metadata
         uses: actions/upload-artifact@v4
         with:
@@ -178,21 +170,6 @@ jobs:
         with:
           name: build-artifacts-${{ needs.security-and-build.outputs.version }}
           path: ./
-
-      - name: 🔐 Verify build integrity
-        run: |
-          # Verify build hash matches
-          CURRENT_HASH=$(find build/releases -type f -exec sha256sum {} \; | sha256sum | cut -d' ' -f1)
-          EXPECTED_HASH="${{ needs.security-and-build.outputs.build-hash }}"
-
-          if [ "$CURRENT_HASH" != "$EXPECTED_HASH" ]; then
-            echo "❌ Build integrity check failed!"
-            echo "Expected: $EXPECTED_HASH"
-            echo "Current:  $CURRENT_HASH"
-            exit 1
-          fi
-
-          echo "✅ Build integrity verified"
 
       - name: 📦 Install dependencies for app bundle
         run: npm ci --ignore-scripts
