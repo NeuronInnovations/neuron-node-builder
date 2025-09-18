@@ -1,4 +1,4 @@
-name: 🚀 Production Build, Sign & Release
+name: Production Build, Sign & Release
 
 on:
   push:
@@ -22,31 +22,30 @@ on:
 # Security: Remove deprecated unsafe commands
 env:
   NODE_VERSION: "18"
-  ARTIFACT_RETENTION_DAYS: 30
+  ARTIFACT_RETENTION_DAYS: 1
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
 jobs:
   # ============================================================================
   # JOB 1: SECURITY VALIDATION & BUILD
   # ============================================================================
   security-and-build:
-    name: 🔒 Security Validation & Build
+    name: Security Validation & Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     outputs:
       version: ${{ steps.version.outputs.version }}
-      build-hash: ${{ steps.hash.outputs.build-hash }}
 
     steps:
-      - name: 🔍 Checkout code with token validation
+      - name: Checkout code with token validation
         uses: actions/checkout@v4
         with:
-          # Security: Fetch full history for proper validation
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: 🔐 Validate workflow trigger
+      - name: Validate workflow trigger
         run: |
-          echo "🔍 Validating workflow security context..."
+          echo "Validating workflow security context..."
           echo "Triggered by: ${{ github.event_name }}"
           echo "Actor: ${{ github.actor }}"
           echo "Repository: ${{ github.repository }}"
@@ -56,12 +55,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             AUTHORIZED_USERS=("dohoangviet" "admin")  # Add your authorized users
             if [[ ! " ${AUTHORIZED_USERS[@]} " =~ " ${{ github.actor }} " ]]; then
-              echo "❌ Unauthorized user: ${{ github.actor }}"
+              echo "Unauthorized user: ${{ github.actor }}"
               exit 1
             fi
           fi
 
-      - name: 📋 Extract and validate version
+      - name: Extract and validate version
         id: version
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
@@ -72,14 +71,14 @@ jobs:
 
           # Validate version format (semver)
           if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-            echo "❌ Invalid version format: $VERSION"
+            echo "Invalid version format: $VERSION"
             exit 1
           fi
 
-          echo "✅ Version validated: $VERSION"
+          echo "Version validated: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: 📦 Install dependencies securely
+      - name: Install dependencies securely
         run: |
           # Security: Use npm ci for reproducible builds
           if [ -f package-lock.json ]; then
@@ -92,20 +91,20 @@ jobs:
           # Verify package integrity
           npm ls --depth=0
 
-      - name: 🏗️ Build project
+      - name: Build project
         run: |
-          echo "🏗️ Building project..."
+          echo "Building project..."
           npm run build
 
           # Verify build outputs
           if [ ! -d "packages/node_modules/node-red" ]; then
-            echo "❌ Build failed: node-red not found"
+            echo "Build failed: node-red not found"
             exit 1
           fi
 
-      - name: 🔨 Build executables with validation
+      - name: Build executables with validation
         run: |
-          echo "🔨 Building executables..."
+          echo "Building executables..."
           npm run package
 
           # Comprehensive validation of all executables
@@ -117,15 +116,15 @@ jobs:
 
           for executable in "${!EXECUTABLES[@]}"; do
             if [ ! -f "$executable" ]; then
-              echo "❌ ${EXECUTABLES[$executable]} executable missing: $executable"
+              echo "${EXECUTABLES[$executable]} executable missing: $executable"
               exit 1
             fi
             
             size=$(du -h "$executable" | cut -f1)
-            echo "✅ ${EXECUTABLES[$executable]} executable: $executable ($size)"
+            echo "${EXECUTABLES[$executable]} executable: $executable ($size)"
           done
 
-      - name: 📤 Upload build artifacts with metadata
+      - name: Upload build artifacts with metadata
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ steps.version.outputs.version }}
@@ -141,10 +140,13 @@ jobs:
   # JOB 2: MACOS SIGNING & NOTARIZATION
   # ============================================================================
   macos-sign-notarize:
-    name: 🍎 macOS Sign & Notarize
+    name: macOS Sign & Notarize
     needs: [security-and-build]
-    runs-on: macos-latest
+    runs-on: macos-13
     timeout-minutes: 45
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "10.15"
 
     # Security: Only run for production tags or authorized manual triggers
     if: |
@@ -156,26 +158,28 @@ jobs:
       notarization-status: ${{ steps.notarize.outputs.status }}
 
     steps:
-      - name: 🔍 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: ⚙️ Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      - name: 📥 Download build artifacts
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ needs.security-and-build.outputs.version }}
           path: ./
 
-      - name: 📦 Install dependencies for app bundle
+      - name: Install dependencies for app bundle
         run: |
           # Check if we have a lockfile, if not create one
           if [ ! -f package-lock.json ]; then
-            echo "📋 No package-lock.json found, creating one..."
+            echo "No package-lock.json found, creating one..."
             npm install --package-lock-only
           fi
 
@@ -183,45 +187,45 @@ jobs:
           npm ci --ignore-scripts
 
           # Verify installation
-          echo "✅ Dependencies installed successfully"
+          echo "SUCCESS: Dependencies installed successfully"
 
-      - name: 🔧 Prepare macOS executable
+      - name: Prepare macOS executable
         run: |
           # Make executable runnable and verify
           chmod +x build/releases/latest-macos-x64
 
           # Verify it's a valid macOS binary
           if ! file build/releases/latest-macos-x64 | grep -q "Mach-O"; then
-            echo "❌ Invalid macOS binary"
+            echo "ERROR: Invalid macOS binary"
             exit 1
           fi
 
-          echo "✅ macOS executable validated"
+          echo "SUCCESS: macOS executable validated"
 
-      - name: 🏗️ Create app bundle
+      - name: Create app bundle
         id: bundle
         run: |
-          echo "🏗️ Creating macOS app bundle..."
+          echo "Creating macOS app bundle..."
           npm run create-app-bundle
 
           # Find and validate app bundle
           APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
           if [ ! -d "$APP_BUNDLE" ]; then
-            echo "❌ App bundle creation failed"
+            echo "ERROR: App bundle creation failed"
             exit 1
           fi
 
           APP_NAME=$(basename "$APP_BUNDLE")
-          echo "✅ App bundle created: $APP_NAME"
+          echo "SUCCESS: App bundle created: $APP_NAME"
           echo "app-name=$APP_NAME" >> $GITHUB_OUTPUT
 
           # Validate app bundle structure
           if [ ! -f "$APP_BUNDLE/Contents/Info.plist" ]; then
-            echo "❌ Invalid app bundle structure"
+            echo "ERROR: Invalid app bundle structure"
             exit 1
           fi
 
-      - name: 🔐 Setup signing keychain
+      - name: Setup signing keychain
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -229,7 +233,7 @@ jobs:
         run: |
           # Security: Validate all required secrets are present
           if [ -z "$APPLE_CERTIFICATE_BASE64" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ]; then
-            echo "❌ Missing required signing secrets"
+            echo "ERROR: Missing required signing secrets"
             exit 1
           fi
 
@@ -257,22 +261,22 @@ jobs:
           # Verify certificate installation
           CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1)
           if [ -z "$CERT_IDENTITY" ]; then
-            echo "❌ Developer ID certificate not found"
+            echo "ERROR: Developer ID certificate not found"
             exit 1
           fi
 
-          echo "✅ Certificate installed successfully"
+          echo "SUCCESS: Certificate installed successfully"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           echo "CERT_PATH=$CERT_PATH" >> $GITHUB_ENV
 
-      - name: ✍️ Code sign application
+      - name: Code sign application
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
 
-          echo "✍️ Signing app bundle: $APP_BUNDLE"
+          echo "Signing app bundle: $APP_BUNDLE"
 
           # Sign with all required security options
           codesign \
@@ -287,19 +291,19 @@ jobs:
             "$APP_BUNDLE"
 
           # Comprehensive signature verification
-          echo "🔍 Verifying code signature..."
+          echo "Verifying code signature..."
           codesign --verify --verbose=4 "$APP_BUNDLE"
           codesign --display --verbose=4 "$APP_BUNDLE"
 
           # Check signature validity
           if ! codesign --verify --strict "$APP_BUNDLE"; then
-            echo "❌ Code signature verification failed"
+            echo "ERROR: Code signature verification failed"
             exit 1
           fi
 
-          echo "✅ Code signing completed successfully"
+          echo "SUCCESS: Code signing completed successfully"
 
-      - name: 📦 Create notarization package
+      - name: Create notarization package
         run: |
           APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
           APP_NAME=$(basename "$APP_BUNDLE" .app)
@@ -312,14 +316,14 @@ jobs:
 
           # Verify ZIP was created
           if [ ! -f "$ZIP_NAME" ]; then
-            echo "❌ ZIP creation failed"
+            echo "ERROR: ZIP creation failed"
             exit 1
           fi
 
-          echo "📦 Notarization package created: $ZIP_NAME"
+          echo "Notarization package created: $ZIP_NAME"
           echo "ZIP_PATH=build/releases/$ZIP_NAME" >> $GITHUB_ENV
 
-      - name: 🔍 Submit for notarization
+      - name: Submit for notarization
         id: notarize
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -328,7 +332,7 @@ jobs:
         run: |
           # Security: Validate API credentials
           if [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_ISSUER_ID" ] || [ -z "$APPLE_API_KEY_BASE64" ]; then
-            echo "❌ Missing Apple API credentials"
+            echo "ERROR: Missing Apple API credentials"
             exit 1
           fi
 
@@ -338,7 +342,7 @@ jobs:
           chmod 600 "$API_KEY_PATH"
 
           # Submit for notarization with comprehensive error handling
-          echo "🚀 Submitting for notarization..."
+          echo "Submitting for notarization..."
           SUBMIT_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
             --key "$API_KEY_PATH" \
             --key-id "$APPLE_API_KEY_ID" \
@@ -350,14 +354,14 @@ jobs:
           echo "$SUBMIT_OUTPUT"
 
           if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
-            echo "✅ Notarization successful"
+            echo "SUCCESS: Notarization successful"
             echo "status=success" >> $GITHUB_OUTPUT
           elif echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
-            echo "❌ Notarization failed - Invalid submission"
+            echo "ERROR: Notarization failed - Invalid submission"
             echo "$SUBMIT_OUTPUT"
             exit 1
           else
-            echo "❌ Notarization failed or timed out"
+            echo "ERROR: Notarization failed or timed out"
             echo "$SUBMIT_OUTPUT"
             exit 1
           fi
@@ -365,23 +369,23 @@ jobs:
           # Clean up API key
           rm -f "$API_KEY_PATH"
 
-      - name: 🎯 Staple notarization
+      - name: Staple notarization
         run: |
           APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
 
-          echo "🎯 Stapling notarization to app bundle..."
+          echo "Stapling notarization to app bundle..."
           if xcrun stapler staple "$APP_BUNDLE"; then
-            echo "✅ Notarization stapled successfully"
+            echo "SUCCESS: Notarization stapled successfully"
           else
-            echo "⚠️ Could not staple notarization (app is still valid)"
+            echo "WARNING: Could not staple notarization (app is still valid)"
           fi
 
           # Final validation
-          echo "🔍 Final validation..."
-          xcrun stapler validate "$APP_BUNDLE" || echo "⚠️ Stapler validation warning (not critical)"
+          echo "Final validation..."
+          xcrun stapler validate "$APP_BUNDLE" || echo "WARNING: Stapler validation warning (not critical)"
           spctl --assess --verbose=4 --type execute "$APP_BUNDLE"
 
-      - name: 📦 Create final distribution package
+      - name: Create final distribution package
         run: |
           APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
           APP_NAME=$(basename "$APP_BUNDLE" .app)
@@ -395,10 +399,10 @@ jobs:
           # Generate checksums for integrity
           shasum -a 256 "$FINAL_ZIP" > "$FINAL_ZIP.sha256"
 
-          echo "📦 Final package created: $FINAL_ZIP"
+          echo "Final package created: $FINAL_ZIP"
           echo "FINAL_ZIP_PATH=build/releases/$FINAL_ZIP" >> $GITHUB_ENV
 
-      - name: 📤 Upload signed macOS application
+      - name: Upload signed macOS application
         uses: actions/upload-artifact@v4
         with:
           name: macos-signed-${{ needs.security-and-build.outputs.version }}
@@ -407,7 +411,7 @@ jobs:
             ${{ env.FINAL_ZIP_PATH }}.sha256
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
-      - name: 🧹 Security cleanup
+      - name: Security cleanup
         if: always()
         run: |
           # Clean up all sensitive files
@@ -420,7 +424,7 @@ jobs:
   # JOB 3: MULTI-PLATFORM RELEASE CREATION
   # ============================================================================
   create-release:
-    name: 🚀 Create Multi-Platform Release
+    name: Create Multi-Platform Release
     needs: [security-and-build, macos-sign-notarize]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -431,94 +435,96 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
 
     steps:
-      - name: 🔍 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: 📥 Download all build artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: 🔍 Verify artifact integrity
+      - name: Verify artifact integrity
         run: |
-          echo "🔍 Verifying downloaded artifacts..."
+          echo "Verifying downloaded artifacts..."
 
           # Check build artifacts
           if [ ! -d "artifacts/build-artifacts-${{ needs.security-and-build.outputs.version }}" ]; then
-            echo "❌ Build artifacts missing"
+            echo "ERROR: Build artifacts missing"
             exit 1
           fi
 
           # Check macOS signed artifacts
           if [ ! -d "artifacts/macos-signed-${{ needs.security-and-build.outputs.version }}" ]; then
-            echo "❌ macOS signed artifacts missing"
+            echo "ERROR: macOS signed artifacts missing"
             exit 1
           fi
 
-          echo "✅ All artifacts present"
+          echo "SUCCESS: All artifacts present"
 
-      - name: 📦 Prepare release assets
+      - name: Prepare release assets
         run: |
           mkdir -p release-assets
           VERSION="${{ needs.security-and-build.outputs.version }}"
 
           # Debug: Show what artifacts we have
-          echo "🔍 Available artifacts:"
+          echo "Available artifacts:"
           find artifacts -type f -name "*" | head -20
 
           # Find the actual build artifacts directory
           BUILD_ARTIFACTS_DIR=$(find artifacts -name "build-artifacts-*" -type d | head -1)
           MACOS_SIGNED_DIR=$(find artifacts -name "macos-signed-*" -type d | head -1)
 
-          echo "🔍 Build artifacts directory: $BUILD_ARTIFACTS_DIR"
-          echo "🔍 macOS signed directory: $MACOS_SIGNED_DIR"
+          echo "Build artifacts directory: $BUILD_ARTIFACTS_DIR"
+          echo "macOS signed directory: $MACOS_SIGNED_DIR"
 
           # Windows executable
-          echo "📦 Preparing Windows package..."
+          echo "Preparing Windows package..."
           WIN_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-win-x64.exe"
           if [ -f "$WIN_EXE" ]; then
-            echo "✅ Found Windows executable: $WIN_EXE"
+            echo "SUCCESS: Found Windows executable: $WIN_EXE"
             # Use absolute paths to avoid relative path issues
             CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
             cd "$CURRENT_DIR"
-            echo "✅ Windows package created"
+            echo "SUCCESS: Windows package created"
           else
-            echo "⚠️ Windows executable not found at: $WIN_EXE"
-            echo "🔍 Available files in build artifacts:"
+            echo "WARNING: Windows executable not found at: $WIN_EXE"
+            echo "Available files in build artifacts:"
             ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
           # Linux executable  
-          echo "📦 Preparing Linux package..."
+          echo "Preparing Linux package..."
           LINUX_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-linux-x64"
           if [ -f "$LINUX_EXE" ]; then
-            echo "✅ Found Linux executable: $LINUX_EXE"
+            echo "SUCCESS: Found Linux executable: $LINUX_EXE"
             # Use absolute paths to avoid relative path issues
             CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
             cd "$CURRENT_DIR"
-            echo "✅ Linux package created"
+            echo "SUCCESS: Linux package created"
           else
-            echo "⚠️ Linux executable not found at: $LINUX_EXE"
-            echo "🔍 Available files in build artifacts:"
+            echo "WARNING: Linux executable not found at: $LINUX_EXE"
+            echo "Available files in build artifacts:"
             ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
           # macOS signed application
-          echo "📦 Preparing macOS package..."
+          echo "Preparing macOS package..."
           if [ -d "$MACOS_SIGNED_DIR" ] && [ -n "$MACOS_SIGNED_DIR" ]; then
             # Copy macOS signed files
             if ls "$MACOS_SIGNED_DIR"/*.zip >/dev/null 2>&1; then
               cp "$MACOS_SIGNED_DIR"/*.zip release-assets/
-              echo "✅ macOS ZIP copied"
+              echo "SUCCESS: macOS ZIP copied"
             fi
             
             if ls "$MACOS_SIGNED_DIR"/*.sha256 >/dev/null 2>&1; then
               cp "$MACOS_SIGNED_DIR"/*.sha256 release-assets/
-              echo "✅ macOS SHA256 copied"
+              echo "SUCCESS: macOS SHA256 copied"
             fi
 
             # Rename macOS package for consistency
@@ -528,26 +534,26 @@ jobs:
               mv "$MACOS_ZIP" "neuron-node-builder-macos-x64-v$VERSION.zip"
               MACOS_SHA=$(ls *-signed.zip.sha256 2>/dev/null | head -1)
               [ -n "$MACOS_SHA" ] && mv "$MACOS_SHA" "neuron-node-builder-macos-x64-v$VERSION.zip.sha256"
-              echo "✅ macOS package renamed"
+              echo "SUCCESS: macOS package renamed"
             fi
             cd ..
           else
-            echo "⚠️ macOS signed artifacts directory not found: $MACOS_SIGNED_DIR"
+            echo "WARNING: macOS signed artifacts directory not found: $MACOS_SIGNED_DIR"
           fi
 
-          echo "📋 Final release assets:"
+          echo "Final release assets:"
           ls -la release-assets/ || echo "No release assets created"
 
-      - name: 📋 Generate comprehensive release notes
+      - name: Generate comprehensive release notes
         run: |
           VERSION="${{ needs.security-and-build.outputs.version }}"
 
           cat > release-notes.md << EOF
-          # 🚀 Neuron Node Builder v$VERSION
+          # Neuron Node Builder v$VERSION
 
-          ## 📥 Downloads
+          ## Downloads
 
-          ### macOS (Signed & Notarized) ✅
+          ### macOS (Signed & Notarized)
           - **Download**: [\`neuron-node-builder-macos-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip)
           - **SHA256**: [\`neuron-node-builder-macos-x64-v$VERSION.zip.sha256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip.sha256)
           - **Requirements**: macOS 10.15+ (Catalina)
@@ -561,10 +567,9 @@ jobs:
           - **Download**: [\`neuron-node-builder-linux-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-linux-x64-v$VERSION.zip)
           - **Requirements**: Linux x64 with glibc 2.17+
 
-          ## 🔐 Security Information
+          ## Security Information
 
           - **macOS**: Code signed with Developer ID and notarized by Apple
-          - **Build Hash**: \`${{ needs.security-and-build.outputs.build-hash }}\`
           - **Node.js Version**: ${{ env.NODE_VERSION }}
           - **Built**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
@@ -598,13 +603,13 @@ jobs:
           - [Discussions](https://github.com/${{ github.repository }}/discussions)
           EOF
 
-      - name: 🏷️ Create GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             release-assets/*
           tag_name: v${{ needs.security-and-build.outputs.version }}
-          name: "🚀 Neuron Node Builder v${{ needs.security-and-build.outputs.version }}"
+          name: "Neuron Node Builder v${{ needs.security-and-build.outputs.version }}"
           body_path: release-notes.md
           draft: false
           prerelease: ${{ contains(needs.security-and-build.outputs.version, '-') }}
@@ -612,14 +617,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📊 Release Summary
+      - name: Release Summary
         run: |
-          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **macOS Signing**: ${{ needs.macos-sign-notarize.outputs.notarization-status == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build Hash**: \`${{ needs.security-and-build.outputs.build-hash }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **macOS Signing**: ${{ needs.macos-sign-notarize.outputs.notarization-status == 'success' && 'Success' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Assets Created:" >> $GITHUB_STEP_SUMMARY
+          echo "### Assets Created:" >> $GITHUB_STEP_SUMMARY
           ls -la release-assets/ | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
