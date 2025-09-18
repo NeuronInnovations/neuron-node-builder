@@ -337,17 +337,6 @@ jobs:
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
           chmod 600 "$API_KEY_PATH"
 
-          # Test API key validity first
-          echo "🔍 Validating API key..."
-          if ! xcrun notarytool history \
-            --key "$API_KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --limit 1 > /dev/null 2>&1; then
-            echo "❌ Invalid Apple API credentials"
-            exit 1
-          fi
-
           # Submit for notarization with comprehensive error handling
           echo "🚀 Submitting for notarization..."
           SUBMIT_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
