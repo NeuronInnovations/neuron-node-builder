@@ -172,7 +172,18 @@ jobs:
           path: ./
 
       - name: 📦 Install dependencies for app bundle
-        run: npm ci --ignore-scripts
+        run: |
+          # Check if we have a lockfile, if not create one
+          if [ ! -f package-lock.json ]; then
+            echo "📋 No package-lock.json found, creating one..."
+            npm install --package-lock-only
+          fi
+
+          # Now install dependencies
+          npm ci --ignore-scripts
+
+          # Verify installation
+          echo "✅ Dependencies installed successfully"
 
       - name: 🔧 Prepare macOS executable
         run: |
