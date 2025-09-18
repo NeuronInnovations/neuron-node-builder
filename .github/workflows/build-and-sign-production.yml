@@ -142,11 +142,11 @@ jobs:
   macos-sign-notarize:
     name: macOS Sign & Notarize
     needs: [security-and-build]
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 45
 
     env:
-      MACOSX_DEPLOYMENT_TARGET: "10.15"
+      MACOSX_DEPLOYMENT_TARGET: "10.13"
 
     # Security: Only run for production tags or authorized manual triggers
     if: |

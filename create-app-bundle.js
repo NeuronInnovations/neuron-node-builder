@@ -108,7 +108,7 @@ const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.15</string>
+    <string>10.13</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>LSBackgroundOnly</key>
