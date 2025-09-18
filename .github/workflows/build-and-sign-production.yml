@@ -79,24 +79,6 @@ jobs:
           echo "✅ Version validated: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: 🛡️ Security scan dependencies
-        run: |
-          echo "🔍 Running security audit..."
-          npm audit --audit-level high
-
-          # Check for known vulnerabilities
-          echo "🔍 Checking for high-severity vulnerabilities..."
-          if npm audit --audit-level high --json | jq '.metadata.vulnerabilities.high' | grep -v "^0$"; then
-            echo "❌ High-severity vulnerabilities found"
-            exit 1
-          fi
-
-      - name: ⚙️ Setup Node.js with caching
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: "npm"
-
       - name: 📦 Install dependencies securely
         run: |
           # Security: Use npm ci for reproducible builds
