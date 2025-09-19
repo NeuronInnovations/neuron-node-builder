@@ -1,0 +1,5 @@
+- Purpose: Fork of Node-RED providing Neuron-specific buyer/seller nodes for machine-to-machine commerce on the Hedera blockchain. Bundles Node-RED runtime/editor plus custom Neuron flows and UI.
+- Tech stack: Node.js (>=18.5, .nvmrc pins 20), Node-RED 4.x, frontend assets built with Grunt (JS bundling, SASS), Go-based Hedera SDK binaries loaded at runtime, optional Electron/DMG packaging scripts for macOS.
+- Structure highlights: `neuron/` holds custom nodes, routes, services, userdir; `packages/` vendors Node-RED core/editor modules; `entry/` bootstraps CLI; `scripts/` and root shell files support signing/notarization; `build/` hosts packaging outputs/config; `public/` generated editor assets; `test/` contains unit/editor tests.
+- Key configs: `neuron-settings.js` configures Node-RED runtime and env vars; `.env` template expects Hedera credentials and path to compiled Go wrapper.
+- External deps: requires locally compiled `neuron-go-hedera-sdk` and `neuron-nodered-sdk-wrapper` binaries (Go 1.19+) placed alongside runtime and referenced by `NEURON_SDK_PATH`.
