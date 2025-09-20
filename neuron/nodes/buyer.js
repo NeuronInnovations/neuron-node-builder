@@ -317,11 +317,33 @@ module.exports = function (RED) {
 
         (async () => {
             let loadedDeviceInfo = null;
+            let isDeviceReinstatement = false;
 
-            const contextDevice = context.get('deviceInfo');
-            if (contextDevice) {
-                loadedDeviceInfo = contextDevice;
-                console.log(`Node ${node.id}: Device loaded from context.`);
+            // Check if a device was loaded from the dropdown (device reinstatement)
+            if (config.loadedDeviceFilename && config.loadedDeviceFilename.trim() !== '') {
+                try {
+                    const deviceManager = require('../lib/deviceManager');
+                    loadedDeviceInfo = deviceManager.loadDeviceFile(config.loadedDeviceFilename);
+                    isDeviceReinstatement = true;
+                    console.log(`Node ${node.id}: Device reinstatement - loaded device from: ${config.loadedDeviceFilename}`);
+                    
+                    // Rename the device file to match the new node ID if needed
+                    if (config.loadedDeviceFilename !== `${node.id}.json`) {
+                        console.log(`Node ${node.id}: Renaming device file from ${config.loadedDeviceFilename} to ${node.id}.json`);
+                        deviceManager.renameDeviceFile(config.loadedDeviceFilename, node.id);
+                    }
+                } catch (err) {
+                    node.warn(`Node ${node.id}: Failed to load device from filename ${config.loadedDeviceFilename}. Error: ${err.message}`);
+                }
+            }
+
+            // Fallback to existing logic for context and disk loading
+            if (!loadedDeviceInfo) {
+                const contextDevice = context.get('deviceInfo');
+                if (contextDevice) {
+                    loadedDeviceInfo = contextDevice;
+                    console.log(`Node ${node.id}: Device loaded from context.`);
+                }
             }
 
             if (!loadedDeviceInfo && fs.existsSync(deviceFile)) {
@@ -335,6 +357,7 @@ module.exports = function (RED) {
             }
 
             if (loadedDeviceInfo) {
+                // Update configuration fields while preserving existing Hedera account data
                 loadedDeviceInfo.sellerEvmAddress = config.sellerEvmAddress;
                 loadedDeviceInfo.description = config.description;
                 loadedDeviceInfo.deviceName = config.deviceName;
@@ -342,11 +365,29 @@ module.exports = function (RED) {
                 loadedDeviceInfo.serialNumber = config.serialNumber;
                 loadedDeviceInfo.deviceType = config.deviceType;
                 loadedDeviceInfo.price = config.price;
+                
+                // Set smart contract from configuration
+                const contracts = {
+                    "jetvision": process.env.JETVISION_CONTRACT_EVM,
+                    "chat": process.env.CHAT_CONTRACT_EVM,
+                    "challenges": process.env.CHALLENGES_CONTRACT_EVM,
+                };
+                loadedDeviceInfo.smartContract = contracts[config.smartContract.toLowerCase()];
+                
                 node.deviceInfo = loadedDeviceInfo;
                 node.deviceInfo.nodeType = "buyer";
+                node.deviceInfo.nodeId = node.id;
+                
+                // Save the updated device info
                 fs.writeFileSync(deviceFile, JSON.stringify(node.deviceInfo, null, 2), 'utf-8');
                 context.set('deviceInfo', node.deviceInfo);
-                node.status({ fill: "green", shape: "dot", text: "Device loaded." });
+                
+                if (isDeviceReinstatement) {
+                    node.status({ fill: "green", shape: "dot", text: "Device reinstated." });
+                    console.log(`Node ${node.id}: Device reinstatement completed - using existing Hedera account and topics`);
+                } else {
+                    node.status({ fill: "green", shape: "dot", text: "Device loaded." });
+                }
             }
 
             if (!node.deviceInfo) {
@@ -1256,7 +1297,7 @@ module.exports = function (RED) {
     RED.httpAdmin.get('/buyer/last-seen/:topicId', async function (req, res) {
         const topicId = req.params.topicId;
         
-        console.log(`[DEBUG] Last seen requested for topic: ${topicId}`);
+      //  console.log(`[DEBUG] Last seen requested for topic: ${topicId}`);
         
         try {
             if (!hederaService) {
@@ -1275,7 +1316,7 @@ module.exports = function (RED) {
                 // Handle timestamp format: '1753899626.468846000'
                 // This is Unix timestamp in seconds with nanosecond precision
                 const timestampString = lastMessage.timestamp;
-                console.log(`[DEBUG] Raw timestamp: ${timestampString}`);
+               // console.log(`[DEBUG] Raw timestamp: ${timestampString}`);
                 
                 // Parse the timestamp string as a float (seconds.nanoseconds)
                 const timestampSeconds = parseFloat(timestampString);
@@ -1290,7 +1331,7 @@ module.exports = function (RED) {
                 const millisecondsAgo = now - lastSeenTime;
                 const secondsAgo = Math.floor(millisecondsAgo / 1000);
                 
-                console.log(`[DEBUG] Timestamp: ${timestampString}, LastSeenTime: ${lastSeenTime}ms, Now: ${now}ms, SecondsAgo: ${secondsAgo}`);
+              //  console.log(`[DEBUG] Timestamp: ${timestampString}, LastSeenTime: ${lastSeenTime}ms, Now: ${now}ms, SecondsAgo: ${secondsAgo}`);
                 
                 res.json({
                     success: true,
@@ -1400,6 +1441,169 @@ module.exports = function (RED) {
             res.status(500).json({
                 success: false,
                 error: `Failed to check device file: ${error.message}`
+            });
+        }
+    });
+
+    // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
+    
+    // Import deviceManager for new endpoints
+    const deviceManager = require('../lib/deviceManager');
+
+    // Endpoint for Buyer Device List - Get eligible buyer devices for reinstatement
+    RED.httpAdmin.get('/buyer/devices/eligible', function (req, res) {
+        try {
+            // Get currently active node IDs to exclude from the list
+            const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            
+            // Get eligible buyer devices
+            const eligibleDevices = deviceManager.listEligibleDevices('buyer', activeNodeIds);
+            
+            console.log(`[BUYER DEVICES] Found ${eligibleDevices.length} eligible buyer devices (excluding ${activeNodeIds.length} active nodes)`);
+            
+            res.json({
+                success: true,
+                devices: eligibleDevices,
+                activeNodeIds: activeNodeIds,
+                count: eligibleDevices.length
+            });
+            
+        } catch (error) {
+            console.error('[BUYER DEVICES] Error fetching eligible buyer devices:', error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch eligible buyer devices: ${error.message}`
+            });
+        }
+    });
+
+    // Endpoint for Device File Content - Get complete device data by filename
+    RED.httpAdmin.get('/device/:filename', function (req, res) {
+        const filename = req.params.filename;
+        
+        try {
+            const deviceData = deviceManager.loadDeviceFile(filename);
+            
+            console.log(`[DEVICE LOAD] Successfully loaded device file: ${filename}.json`);
+            
+            res.json({
+                success: true,
+                filename: filename,
+                data: deviceData
+            });
+            
+        } catch (error) {
+            console.error(`[DEVICE LOAD] Error loading device file ${filename}:`, error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to load device file: ${error.message}`
+            });
+        }
+    });
+
+    // Endpoint to get balance by account ID (efficient direct access)
+    RED.httpAdmin.get('/device/balance/by-account/:accountId', async function (req, res) {
+        const accountId = req.params.accountId;
+        
+        try {
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    success: false, 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+            
+            console.log(`[DEVICE BALANCE] Fetching balance for account ID: ${accountId}`);
+            
+            // Get balance in tinybars directly using account ID
+            const balanceTinybars = await hederaService.getAccountBalanceTinybars(accountId);
+            
+            // Convert to HBAR (1 HBAR = 100,000,000 tinybars)
+            const balanceHbar = (balanceTinybars / 100000000).toFixed(8);
+            
+            console.log(`[DEVICE BALANCE] Balance for ${accountId}: ${balanceHbar} HBAR`);
+            
+            res.json({
+                success: true,
+                balance: balanceHbar,
+                balanceTinybars: balanceTinybars.toString(),
+                accountId: accountId,
+                unit: 'HBAR'
+            });
+            
+        } catch (error) {
+            console.error(`[DEVICE BALANCE] Error fetching balance for ${accountId}:`, error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch balance: ${error.message}`
+            });
+        }
+    });
+
+    // Endpoint to get balance by EVM address (fallback method)
+    RED.httpAdmin.get('/device/balance/:evmAddress', async function (req, res) {
+        const evmAddress = req.params.evmAddress;
+        
+        try {
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    success: false, 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+            
+            console.log(`[DEVICE BALANCE] Fetching balance for EVM address: ${evmAddress}`);
+            
+            // Find the device file that contains this EVM address
+            const deviceManager = require('../lib/deviceManager');
+            const allFiles = deviceManager.listAllDeviceFiles();
+            let accountId = null;
+            let deviceData = null;
+            
+            // Search through device files to find the one with matching EVM address
+            for (const filename of allFiles) {
+                try {
+                    const data = deviceManager.loadDeviceFile(filename);
+                    if (data.evmAddress && data.evmAddress.toLowerCase() === evmAddress.toLowerCase()) {
+                        accountId = data.accountId;
+                        deviceData = data;
+                        break;
+                    }
+                } catch (error) {
+                    console.error(`[DEVICE BALANCE] Error loading device file ${filename}:`, error);
+                    continue;
+                }
+            }
+            
+            if (!accountId) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Device not found for EVM address'
+                });
+            }
+            
+            // Get balance in tinybars
+            const balanceTinybars = await hederaService.getAccountBalanceTinybars(accountId);
+            
+            // Convert to HBAR (1 HBAR = 100,000,000 tinybars)
+            const balanceHbar = (balanceTinybars / 100000000).toFixed(8);
+            
+            console.log(`[DEVICE BALANCE] Balance for ${evmAddress} (${accountId}): ${balanceHbar} HBAR`);
+            
+            res.json({
+                success: true,
+                balance: balanceHbar,
+                balanceTinybars: balanceTinybars.toString(),
+                accountId: accountId,
+                evmAddress: evmAddress,
+                unit: 'HBAR'
+            });
+            
+        } catch (error) {
+            console.error(`[DEVICE BALANCE] Error fetching balance for ${evmAddress}:`, error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch balance: ${error.message}`
             });
         }
     });

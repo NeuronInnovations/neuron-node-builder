@@ -77,3 +77,4 @@ build/releases/
 # Temporary files
 *.log
 .DS_Store
+.cursor/rules/directive.mdc

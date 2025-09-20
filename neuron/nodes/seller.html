@@ -1,16 +1,10 @@
 <script type="text/html" data-template-name="seller config">
+     <!-- Device Reinstatement Section -->
+     
 <div class="neuron-seller-config">
     <div class="form-row">
         <label for="node-input-name"> <span>Name</span></label>
         <input type="text" id="node-input-name" placeholder="Node name">
-    </div>
-    <div class="form-row">
-        <label for="node-input-deviceName"><span>Device Name</span></label>
-        <input type="text" id="node-input-deviceName" placeholder="Enter Device Name">
-    </div>
-    <div class="form-row">
-        <label for="node-input-deviceRole"><span>Device Role</span></label>
-        <input type="text" id="node-input-deviceRole" placeholder="Enter Device Role">
     </div>
     <div class="form-row">
         <label for="node-input-smartContract"> <span>Smart Contract</span></label>
@@ -21,6 +15,33 @@
            <!-- <option value="Weather">Weather</option> -->
         </select>
     </div>
+
+    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;">
+        <label for="node-input-loadDevice">Reinstantiate Device</span></label>
+             <select id="node-input-loadDevice" style="flex: 1;">
+                <option value="">Create new device configuration</option>
+            </select>
+            <button type="button" id="refresh-devices-btn" class="red-ui-button" title="Refresh device list">
+                <i class="fa fa-refresh"></i>
+            </button>
+       
+        <div style="margin-top: 5px; font-size: 12px; color: #888;">
+            <i>Select an existing device to reinstantiate its configuration</i>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-deviceName"><span>Device Name</span></label>
+        <input type="text" id="node-input-deviceName" placeholder="Enter Device Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-deviceRole"><span>Device Role</span></label>
+        <input type="text" id="node-input-deviceRole" placeholder="Enter Device Role">
+    </div>
+
+
+   
+
     <div class="form-row">
         <label for="node-input-serialNumber"> <span>Serial Number</span></label>
         <input type="text" id="node-input-serialNumber" placeholder="Enter Serial Number">
@@ -46,6 +67,9 @@
         <label for="node-input-description"><span>Description</span></label>
         <input type="text" id="node-input-description" placeholder="Description (optional)">
     </div>
+    
+    <!-- Hidden field to store loaded device filename -->
+    <input type="hidden" id="node-input-loadedDeviceFilename" />
     <div class="form-row">
         <div width="100%"><span>Allowed buyers: Everyone</span></div>
         <button class="red-ui-button disabled" style="margin-left: 10px; float:right;">Setup buyer whitelist</button>
@@ -212,6 +236,8 @@
             buyerEvmAddress: { value: [] },
             buyerDevices: { value: [] },
             publicKey: { value: "" },
+            // Device reinstatement field
+            loadedDeviceFilename: { value: "" },
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
             stdErrTopic: { value: "" }
@@ -230,6 +256,204 @@
 
             // Store all intervals for cleanup
             const intervals = {};
+
+            // ===== DEVICE REINSTATEMENT FUNCTIONALITY =====
+            
+            // Load eligible devices into dropdown
+            async function loadEligibleDevices() {
+                try {
+                    const response = await fetch('/seller/devices/eligible');
+                    const data = await response.json();
+                    
+                    const dropdown = $('#node-input-loadDevice');
+                    const currentValue = dropdown.val();
+                    
+                    // Clear existing options except the first one
+                    dropdown.find('option:not(:first)').remove();
+                    
+                    if (data.success && data.devices.length > 0) {
+                        data.devices.forEach(device => {
+                            const option = $(`<option value="${device.filename}">${device.deviceName} (${device.evmAddress.substring(0, 8)}...)</option>`);
+                            dropdown.append(option);
+                        });
+                        console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} eligible devices`);
+                    } else {
+                        console.log('[SELLER DEVICE LOAD] No eligible devices found');
+                    }
+                    
+                    // Restore previous selection if it still exists
+                    if (currentValue && dropdown.find(`option[value="${currentValue}"]`).length > 0) {
+                        dropdown.val(currentValue);
+                    }
+                    
+                } catch (error) {
+                    console.error('[SELLER DEVICE LOAD] Error loading eligible devices:', error);
+                }
+            }
+            
+            // Load device configuration when selected
+            async function loadDeviceConfiguration(filename) {
+                if (!filename) {
+                    console.log('[SELLER DEVICE LOAD] No device selected, keeping current configuration');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/device/${filename}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.data) {
+                        const deviceData = data.data;
+                        console.log('[SELLER DEVICE LOAD] Loading device configuration:', filename);
+                        
+                        // Pre-fill form fields with loaded device data
+                        if (deviceData.deviceName) $('#node-input-deviceName').val(deviceData.deviceName);
+                        if (deviceData.deviceRole) $('#node-input-deviceRole').val(deviceData.deviceRole);
+                        if (deviceData.serialNumber) $('#node-input-serialNumber').val(deviceData.serialNumber);
+                        if (deviceData.deviceType) $('#node-input-deviceType').val(deviceData.deviceType);
+                        if (deviceData.price) $('#node-input-price').val(deviceData.price);
+                        if (deviceData.description) $('#node-input-description').val(deviceData.description);
+                        
+                        // ===== POPULATE RUNTIME INFORMATION =====
+                        
+                        // Show the runtime information section and hide the "no device" message
+                        $('#runtime-information-section').show();
+                        $('#no-device-message').hide();
+                        
+                        // Populate EVM Address
+                        if (deviceData.evmAddress) {
+                            $('#node-input-evmAddress').val(deviceData.evmAddress);
+                        }
+                        
+                        // Populate Public Key (fetch fresh from EVM address)
+                        if (deviceData.evmAddress) {
+                            try {
+                                const publicKeyResponse = await fetch(`/buyer/evm-to-publickey/${deviceData.evmAddress}`);
+                                const publicKeyData = await publicKeyResponse.json();
+                                
+                                if (publicKeyData.success && publicKeyData.publicKey) {
+                                    $('#node-input-publicKey').val(publicKeyData.publicKey);
+                                    console.log('[SELLER DEVICE LOAD] Fetched fresh public key from EVM address');
+                                } else if (deviceData.publicKey) {
+                                    // Fallback to stored public key if fetch fails
+                                    $('#node-input-publicKey').val(deviceData.publicKey);
+                                    console.log('[SELLER DEVICE LOAD] Using stored public key (fetch failed)');
+                                }
+                            } catch (error) {
+                                console.error('[SELLER DEVICE LOAD] Error fetching public key:', error);
+                                if (deviceData.publicKey) {
+                                    $('#node-input-publicKey').val(deviceData.publicKey);
+                                }
+                            }
+                        } else if (deviceData.publicKey) {
+                            $('#node-input-publicKey').val(deviceData.publicKey);
+                        }
+                        
+                        // Populate Topics from topics array
+                        if (deviceData.topics && Array.isArray(deviceData.topics)) {
+                            // Map topics array to individual fields (typically [stdIn, stdOut, stdErr])
+                            if (deviceData.topics.length >= 3) {
+                                $('#node-input-stdInTopic').val(deviceData.topics[0] || '');
+                                $('#node-input-stdOutTopic').val(deviceData.topics[1] || '');
+                                $('#node-input-stdErrTopic').val(deviceData.topics[2] || '');
+                            } else if (deviceData.topics.length >= 1) {
+                                // If only one topic, assume it's stdOut
+                                $('#node-input-stdOutTopic').val(deviceData.topics[0]);
+                            }
+                        }
+                        
+                        // Populate individual topic fields if they exist
+                        if (deviceData.stdInTopic) $('#node-input-stdInTopic').val(deviceData.stdInTopic);
+                        if (deviceData.stdOutTopic) $('#node-input-stdOutTopic').val(deviceData.stdOutTopic);
+                        if (deviceData.stdErrTopic) $('#node-input-stdErrTopic').val(deviceData.stdErrTopic);
+                        
+                        // Fetch and populate balance using accountId from device data
+                        if (deviceData.accountId) {
+                            try {
+                                const balanceResponse = await fetch(`/device/balance/by-account/${deviceData.accountId}`);
+                                const balanceData = await balanceResponse.json();
+                                
+                                if (balanceData.success && balanceData.balance) {
+                                    $('#node-input-balance').val(`${balanceData.balance} ${balanceData.unit}`);
+                                    console.log('[SELLER DEVICE LOAD] Fetched current balance:', balanceData.balance, balanceData.unit);
+                                } else {
+                                    $('#node-input-balance').val('Balance not available');
+                                    console.log('[SELLER DEVICE LOAD] Balance fetch failed:', balanceData.error);
+                                }
+                            } catch (error) {
+                                console.error('[SELLER DEVICE LOAD] Error fetching balance:', error);
+                                $('#node-input-balance').val('Balance fetch error');
+                            }
+                        } else if (deviceData.evmAddress) {
+                            // Fallback to EVM address method if accountId is not available
+                            try {
+                                const balanceResponse = await fetch(`/device/balance/${deviceData.evmAddress}`);
+                                const balanceData = await balanceResponse.json();
+                                
+                                if (balanceData.success && balanceData.balance) {
+                                    $('#node-input-balance').val(`${balanceData.balance} ${balanceData.unit}`);
+                                    console.log('[SELLER DEVICE LOAD] Fetched current balance via EVM:', balanceData.balance, balanceData.unit);
+                                } else {
+                                    $('#node-input-balance').val('Balance not available');
+                                    console.log('[SELLER DEVICE LOAD] Balance fetch failed:', balanceData.error);
+                                }
+                            } catch (error) {
+                                console.error('[SELLER DEVICE LOAD] Error fetching balance:', error);
+                                $('#node-input-balance').val('Balance fetch error');
+                            }
+                        }
+                        
+                        // Store the loaded device filename for later use
+                        node.loadedDeviceFilename = filename;
+                        $('#node-input-loadedDeviceFilename').val(filename);
+                        
+                        console.log('[SELLER DEVICE LOAD] Device configuration and runtime information loaded successfully');
+                    } else {
+                        console.error('[SELLER DEVICE LOAD] Failed to load device data:', data.error);
+                    }
+                    
+                } catch (error) {
+                    console.error('[SELLER DEVICE LOAD] Error loading device configuration:', error);
+                }
+            }
+            
+            // Event handlers for device loading
+            $('#refresh-devices-btn').on('click', function() {
+                console.log('[SELLER DEVICE LOAD] Refreshing device list...');
+                loadEligibleDevices();
+            });
+            
+            $('#node-input-loadDevice').on('change', function() {
+                const selectedFilename = $(this).val();
+                console.log('[SELLER DEVICE LOAD] Device selection changed:', selectedFilename);
+                
+                if (selectedFilename && selectedFilename !== '') {
+                    // Load the selected device
+                    loadDeviceConfiguration(selectedFilename);
+                } else {
+                    // Clear loaded device and restore auto-refresh
+                    console.log('[SELLER DEVICE LOAD] No device selected - clearing loaded device data');
+                    node.loadedDeviceFilename = '';
+                    $('#node-input-loadedDeviceFilename').val('');
+                    
+                    // Hide runtime information section and show "no device" message
+                    $('#runtime-information-section').hide();
+                    $('#no-device-message').show();
+                    
+                    // Clear all runtime fields
+                    $('#node-input-evmAddress').val('');
+                    $('#node-input-publicKey').val('');
+                    $('#node-input-stdInTopic').val('');
+                    $('#node-input-stdOutTopic').val('');
+                    $('#node-input-stdErrTopic').val('');
+                    $('#node-input-balance').val('');
+                    
+                    // Auto-refresh functions will now resume normal operation
+                }
+            });
+            
+            // Initialize device dropdown on dialog open
+            loadEligibleDevices();
 
             $('<style>')
                 .text(`
@@ -300,50 +524,78 @@
 
             // Fetch and populate EVM address and publicKey if available
             function updateEvmAddressAndPublicKeyAndTopics() {
+                // Skip auto-refresh if a device has been loaded - preserve loaded device data
+                if (node.loadedDeviceFilename) {
+                    console.log(`[SELLER AUTO-REFRESH] Skipping update - device loaded: ${node.loadedDeviceFilename}`);
+                    return;
+                }
+                
                 if (node.id) {
-                    console.log(`Fetching seller device info for node ID: ${node.id}`);
-                    $.get(`/seller/device-info/${node.id}`)
-                        .done(function (data) {
-                            console.log(`Seller device info received for ${node.id}:`, data);
-                            if (data.evmAddress) {
-                                $('#node-input-evmAddress').val(data.evmAddress);
-                            } else {
-                                $('#node-input-evmAddress').val('Not initialized yet');
-                            }
+                    // First check if device file exists to avoid 404 errors for new nodes
+                    $.get(`/seller/device-exists/${node.id}`)
+                        .done(function (existsData) {
+                            if (existsData.exists) {
+                                console.log(`Fetching seller device info for node ID: ${node.id}`);
+                                $.get(`/seller/device-info/${node.id}`)
+                                    .done(function (data) {
+                                        console.log(`Seller device info received for ${node.id}:`, data);
+                                        if (data.evmAddress) {
+                                            $('#node-input-evmAddress').val(data.evmAddress);
+                                        } else {
+                                            $('#node-input-evmAddress').val('Not initialized yet');
+                                        }
 
-                            // Handle publicKey
-                            if (data.publicKey) {
-                                $('#node-input-publicKey').val(data.publicKey);
-                            } else {
-                                $('#node-input-publicKey').val('Not initialized yet');
-                            }
+                                        // Handle publicKey
+                                        if (data.publicKey) {
+                                            $('#node-input-publicKey').val(data.publicKey);
+                                        } else {
+                                            $('#node-input-publicKey').val('Not initialized yet');
+                                        }
 
-                            // Handle Topics
-                            if (data.stdInTopic) {
-                                $('#node-input-stdInTopic').val(data.stdInTopic);
-                            } else {
-                                $('#node-input-stdInTopic').val('Not initialized yet');
-                            }
+                                        // Handle Topics
+                                        if (data.stdInTopic) {
+                                            $('#node-input-stdInTopic').val(data.stdInTopic);
+                                        } else {
+                                            $('#node-input-stdInTopic').val('Not initialized yet');
+                                        }
 
-                            if (data.stdOutTopic) {
-                                $('#node-input-stdOutTopic').val(data.stdOutTopic);
-                            } else {
-                                $('#node-input-stdOutTopic').val('Not initialized yet');
-                            }
+                                        if (data.stdOutTopic) {
+                                            $('#node-input-stdOutTopic').val(data.stdOutTopic);
+                                        } else {
+                                            $('#node-input-stdOutTopic').val('Not initialized yet');
+                                        }
 
-                            if (data.stdErrTopic) {
-                                $('#node-input-stdErrTopic').val(data.stdErrTopic);
+                                        if (data.stdErrTopic) {
+                                            $('#node-input-stdErrTopic').val(data.stdErrTopic);
+                                        } else {
+                                            $('#node-input-stdErrTopic').val('Not initialized yet');
+                                        }
+                                    })
+                                    .fail(function (xhr, status, error) {
+                                        console.error(`Failed to fetch seller device info for ${node.id}:`, error);
+                                        $('#node-input-evmAddress').val('EVM address not initialized yet');
+                                        $('#node-input-publicKey').val('public key not initialized yet');
+                                        $('#node-input-stdInTopic').val('StdIn topic not initialized yet');
+                                        $('#node-input-stdOutTopic').val('StdOut topic not initialized yet');
+                                        $('#node-input-stdErrTopic').val('StdErr topic not initialized yet');
+                                    });
                             } else {
-                                $('#node-input-stdErrTopic').val('Not initialized yet');
+                                // Device file doesn't exist - this is a new node
+                                console.log(`Seller node ${node.id} is new - device file doesn't exist yet`);
+                                $('#node-input-evmAddress').val('New node');
+                                $('#node-input-publicKey').val('New node');
+                                $('#node-input-stdInTopic').val('New node');
+                                $('#node-input-stdOutTopic').val('New node');
+                                $('#node-input-stdErrTopic').val('New node');
                             }
                         })
-                        .fail(function (xhr, status, error) {
-                            console.error(`Failed to fetch seller device info for ${node.id}:`, error);
-                            $('#node-input-evmAddress').val('EVM address not initialized yet');
-                            $('#node-input-publicKey').val('public key not initialized yet');
-                            $('#node-input-stdInTopic').val('StdIn topic not initialized yet');
-                            $('#node-input-stdOutTopic').val('StdOut topic not initialized yet');
-                            $('#node-input-stdErrTopic').val('StdErr topic not initialized yet');
+                        .fail(function () {
+                            console.error(`Failed to check if seller device exists for ${node.id}`);
+                            $('#node-input-evmAddress').val('New node');
+                            $('#node-input-publicKey').val('New node');
+                            $('#node-input-stdInTopic').val('New node');
+                            $('#node-input-stdOutTopic').val('New node');
+                            $('#node-input-stdErrTopic').val('New node');
                         });
                 } else {
                     $('#node-input-evmAddress').val('New node - EVM address will be generated after deployment');
@@ -356,17 +608,37 @@
 
             // Fetch and populate device balance if available
             function updateDeviceBalance() {
+                // Skip auto-refresh if a device has been loaded - preserve loaded device data
+                if (node.loadedDeviceFilename) {
+                    console.log(`[SELLER AUTO-REFRESH] Skipping balance update - device loaded: ${node.loadedDeviceFilename}`);
+                    return;
+                }
+                
                 if (node.id) {
-                    $.get(`/seller/device-balance/${node.id}`)
-                        .done(function (data) {
-                            if (data.success && data.balance) {
-                                $('#node-input-balance').val(data.balance + ' USDC');
+                    // First check if device file exists to avoid 404 errors for new nodes
+                    $.get(`/seller/device-exists/${node.id}`)
+                        .done(function (existsData) {
+                            if (existsData.exists) {
+                                $.get(`/seller/device-balance/${node.id}`)
+                                    .done(function (data) {
+                                        if (data.success && data.balance) {
+                                            $('#node-input-balance').val(data.balance + ' USDC');
+                                        } else {
+                                            $('#node-input-balance').val('Not initialized yet');
+                                        }
+                                    })
+                                    .fail(function () {
+                                        $('#node-input-balance').val('Not initialized yet');
+                                    });
                             } else {
-                                $('#node-input-balance').val('Not initialized yet');
+                                // Device file doesn't exist - this is a new node
+                                console.log(`Seller node ${node.id} is new - device file doesn't exist yet`);
+                                $('#node-input-balance').val('New node');
                             }
                         })
                         .fail(function () {
-                            $('#node-input-balance').val('Not initialized yet');
+                            console.error(`Failed to check if seller device exists for ${node.id}`);
+                            $('#node-input-balance').val('New node');
                         });
                 } else {
                     $('#node-input-balance').val('New node - balance will be available after deployment');
@@ -375,17 +647,37 @@
 
             // Fetch and populate publicKey if available
             function updatePublicKey() {
+                // Skip auto-refresh if a device has been loaded - preserve loaded device data
+                if (node.loadedDeviceFilename) {
+                    console.log(`[SELLER AUTO-REFRESH] Skipping public key update - device loaded: ${node.loadedDeviceFilename}`);
+                    return;
+                }
+                
                 if (node.id) {
-                    $.get(`/seller/device-info/${node.id}`)
-                        .done(function (data) {
-                            if (data.publicKey) {
-                                $('#node-input-publicKey').val(data.publicKey);
+                    // First check if device file exists to avoid 404 errors for new nodes
+                    $.get(`/seller/device-exists/${node.id}`)
+                        .done(function (existsData) {
+                            if (existsData.exists) {
+                                $.get(`/seller/device-info/${node.id}`)
+                                    .done(function (data) {
+                                        if (data.publicKey) {
+                                            $('#node-input-publicKey').val(data.publicKey);
+                                        } else {
+                                            $('#node-input-publicKey').val('Not initialized yet');
+                                        }
+                                    })
+                                    .fail(function () {
+                                        $('#node-input-publicKey').val('Not initialized yet');
+                                    });
                             } else {
-                                $('#node-input-publicKey').val('Not initialized yet');
+                                // Device file doesn't exist - this is a new node
+                                console.log(`Seller node ${node.id} is new - device file doesn't exist yet`);
+                                $('#node-input-publicKey').val('New node');
                             }
                         })
                         .fail(function () {
-                            $('#node-input-publicKey').val('Not initialized yet');
+                            console.error(`Failed to check if seller device exists for ${node.id}`);
+                            $('#node-input-publicKey').val('New node');
                         });
                 } else {
                     $('#node-input-publicKey').val('New node - Public key will be generated after deployment');
@@ -954,6 +1246,19 @@
 
         async function loadConnectionStatus(isInitialLoad = false) {
             try {
+                // First check if device file exists to avoid 404 errors for new nodes
+                const existsResponse = await fetch(`/seller/device-exists/${nodeId}`);
+                if (!existsResponse.ok) {
+                    console.log(`[DEBUG] Failed to check device existence for ${nodeId}`);
+                    return;
+                }
+                
+                const existsData = await existsResponse.json();
+                if (!existsData.exists) {
+                    console.log(`[DEBUG] Device file doesn't exist for ${nodeId} - skipping connection status`);
+                    return;
+                }
+
                 // Show loading state
                 if (peersLoading && peersContent) {
                     peersLoading.style.display = 'block';
@@ -1054,6 +1359,23 @@
             }
 
             try {
+                // First check if device file exists to avoid 404 errors for new nodes
+                const existsResponse = await fetch(`/seller/device-exists/${nodeId}`);
+                if (!existsResponse.ok) {
+                    if (window.SELLER_AUTO_REFRESH_DEBUG) {
+                        console.log(`[DEBUG] Failed to check device existence for ${nodeId}`);
+                    }
+                    return;
+                }
+                
+                const existsData = await existsResponse.json();
+                if (!existsData.exists) {
+                    if (window.SELLER_AUTO_REFRESH_DEBUG) {
+                        console.log(`[DEBUG] Device file doesn't exist for ${nodeId} - skipping auto-refresh`);
+                    }
+                    return;
+                }
+
                 // Optional verbose logging (enable with: window.SELLER_AUTO_REFRESH_DEBUG = true)
                 if (window.SELLER_AUTO_REFRESH_DEBUG) {
                     console.log(`[DEBUG] Auto-refreshing peer data every second...`);
