@@ -273,7 +273,9 @@
                     
                     if (data.success && data.devices.length > 0) {
                         data.devices.forEach(device => {
-                            const option = $(`<option value="${device.filename}">${device.deviceName} (${device.evmAddress.substring(0, 8)}...)</option>`);
+                            const formattedAddress = formatEvmAddress(device.evmAddress);
+                            const truncatedAddress = formattedAddress.substring(0, 10) + '...';
+                            const option = $(`<option value="${device.filename}">${device.deviceName} (${truncatedAddress})</option>`);
                             dropdown.append(option);
                         });
                         console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} eligible devices`);
@@ -322,7 +324,7 @@
                         
                         // Populate EVM Address
                         if (deviceData.evmAddress) {
-                            $('#node-input-evmAddress').val(deviceData.evmAddress);
+                            $('#node-input-evmAddress').val(formatEvmAddress(deviceData.evmAddress));
                         }
                         
                         // Populate Public Key (fetch fresh from EVM address)
@@ -540,7 +542,7 @@
                                     .done(function (data) {
                                         console.log(`Seller device info received for ${node.id}:`, data);
                                         if (data.evmAddress) {
-                                            $('#node-input-evmAddress').val(data.evmAddress);
+                                            $('#node-input-evmAddress').val(formatEvmAddress(data.evmAddress));
                                         } else {
                                             $('#node-input-evmAddress').val('Not initialized yet');
                                         }
@@ -681,6 +683,21 @@
                         });
                 } else {
                     $('#node-input-publicKey').val('New node - Public key will be generated after deployment');
+                }
+            }
+
+            // Helper function to ensure EVM address has '0x' prefix
+            function formatEvmAddress(evmAddress) {
+                if (!evmAddress || evmAddress.trim() === '') {
+                    return evmAddress;
+                }
+                
+                const trimmedAddress = evmAddress.trim();
+                if (trimmedAddress.startsWith('0x')) {
+                    // Remove any spaces after '0x' and return the clean address
+                    return '0x' + trimmedAddress.substring(2).trim();
+                } else {
+                    return '0x' + trimmedAddress;
                 }
             }
 
@@ -1197,8 +1214,9 @@
                             .then(response => response.json())
                             .then(data => {
                                 if (data.success && data.evmAddress) {
-                                    evmCell.textContent = data.evmAddress;
-                                    evmCell.title = data.evmAddress;
+                                    const formattedAddress = formatEvmAddress(data.evmAddress);
+                                    evmCell.textContent = formattedAddress;
+                                    evmCell.title = formattedAddress;
                                 } else {
                                     evmCell.textContent = 'Conversion failed';
                                     evmCell.title = 'Could not convert public key to EVM address';

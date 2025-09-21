@@ -6,6 +6,23 @@ const ProcessRegistry = require('./process-registry');
 const PortManager = require('./port-manager');
 
 /**
+ * Helper function to ensure EVM address has '0x' prefix
+ */
+function formatEvmAddress(evmAddress) {
+    if (!evmAddress || evmAddress.trim() === '') {
+        return evmAddress;
+    }
+    
+    const trimmedAddress = evmAddress.trim();
+    if (trimmedAddress.startsWith('0x')) {
+        // Remove any spaces after '0x' and return the clean address
+        return '0x' + trimmedAddress.substring(2).trim();
+    } else {
+        return '0x' + trimmedAddress;
+    }
+}
+
+/**
  * ProcessManager - Orchestrates Go process lifecycle management
  * Handles process discovery, spawning, and persistence across redeploys
  */
@@ -152,7 +169,8 @@ class ProcessManager {
         // Wait for WebSocket to be ready
         const isReady = await this.testWebSocketConnection(port, 60, nodeType); // Wait up to 60 seconds
         if (isReady) {
-            node.status({ fill: "green", shape: "dot", text: `Active on ${port}. EVM: ${deviceInfo.evmAddress}` });
+            const formattedEvmAddress = formatEvmAddress(deviceInfo.evmAddress);
+            node.status({ fill: "green", shape: "dot", text: `Active on ${port}. EVM: ${formattedEvmAddress}` });
             console.log(`Go process for node ${node.id} is ready on port ${port}`);
         } else {
             throw new Error(`Go process for node ${node.id} failed to become ready on port ${port}`);

@@ -327,8 +327,15 @@ module.exports = function (RED) {
                         console.log(`Node ${node.id}: Renaming device file from ${config.loadedDeviceFilename} to ${node.id}.json`);
                         deviceManager.renameDeviceFile(config.loadedDeviceFilename, node.id);
                     }
+                    
+                    // Clear the loadedDeviceFilename to forget about the old file
+                    // From now on, this node will use its own file (node.id.json)
+                    config.loadedDeviceFilename = '';
+                    console.log(`Node ${node.id}: Device reinstatement complete - now using standard deployment flow`);
                 } catch (err) {
-                    node.warn(`Node ${node.id}: Failed to load device from filename ${config.loadedDeviceFilename}. Error: ${err.message}`);
+                    node.warn(`Node ${node.id}: Failed to load device from filename ${config.loadedDeviceFilename}. Error: ${err.message}. Creating new device instead.`);
+                    // Clear the failed filename and proceed with new device creation
+                    config.loadedDeviceFilename = '';
                 }
             }
 
