@@ -8,7 +8,7 @@
 
     <div class="form-row">
         <label for="node-input-smartContract"><i class="fa fa-file-contract"></i> <span>Smart Contract</span></label>
-        <select id="node-input-smartContract">
+        <select id="node-input-smartContract" style="width: 70%;">
             <option value="jetvision" selected>JETVISION DEMO</option>
             <option value="chat">P2P CHAT DEMO</option>
             <option value="challenges">DEVELOPER OPEN CHALLENGES</option>
@@ -16,18 +16,19 @@
 
         </select>
     </div>
-
-    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;">
+    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;"> </div>
+    <div style="margin-top: 5px; font-size: 12px; color: #888;">
+        <i>Select an existing device to reinstantiate its configuration</i>
+    </div>
+    <div class="form-row">
         <label for="node-input-loadDevice">Reinstantiate Device</span></label>
-         <select id="node-input-loadDevice" style="flex: 1;">
+         <select id="node-input-loadDevice" style="width: 70%;">
             <option value="">Create new device configuration</option>
         </select>
         <button type="button" id="refresh-devices-btn" class="red-ui-button" title="Refresh device list">
             <i class="fa fa-refresh"></i>
         </button>
-     <div style="margin-top: 5px; font-size: 12px; color: #888;">
-        <i>Select an existing device to reinstantiate its configuration</i>
-    </div>
+
 </div>
 
     <!-- Device Reinstatement Section -->
@@ -41,7 +42,7 @@
     <!-- Hidden field to store loaded device filename -->
     <input type="hidden" id="node-input-loadedDeviceFilename" />
     <!-- Replace the existing seller selection section with this inline version -->
-    <span><i>Sellers I want data from (Should be in selected Smart Contract above )</i></span>
+    <span style="margin-top:20px;"><i>Sellers I want data from (Should be in selected Smart Contract above )</i></span>
     <div class="form-row">
         <div style="margin-top: 10px;">
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -185,6 +186,20 @@
 <script type="text/javascript">
     // Move shared variables/functions outside the IIFE
 
+    // Global helper function to ensure EVM address has '0x' prefix
+    window.formatEvmAddress = function(evmAddress) {
+        if (!evmAddress || evmAddress.trim() === '') {
+            return evmAddress;
+        }
+        
+        const trimmedAddress = evmAddress.trim();
+        if (trimmedAddress.startsWith('0x')) {
+            // Remove any spaces after '0x' and return the clean address
+            return '0x' + trimmedAddress.substring(2).trim();
+        } else {
+            return '0x' + trimmedAddress;
+        }
+    };
 
     RED.nodes.registerType('buyer config', {
         category: 'Neuron',
@@ -234,6 +249,9 @@
                     console.log('[DEBUG] Auto-update interval cleared');
                 }
             };
+
+            // Helper function to ensure EVM address has '0x' prefix (defined locally for compatibility)
+            const formatEvmAddress = window.formatEvmAddress;
 
             // ===== DEVICE REINSTATEMENT FUNCTIONALITY =====
 
@@ -916,21 +934,6 @@
                         });
                 } else {
                     $('#node-input-balance').val('New node - balance will be available after deployment');
-                }
-            }
-
-            // Helper function to ensure EVM address has '0x' prefix
-            function formatEvmAddress(evmAddress) {
-                if (!evmAddress || evmAddress.trim() === '') {
-                    return evmAddress;
-                }
-                
-                const trimmedAddress = evmAddress.trim();
-                if (trimmedAddress.startsWith('0x')) {
-                    // Remove any spaces after '0x' and return the clean address
-                    return '0x' + trimmedAddress.substring(2).trim();
-                } else {
-                    return '0x' + trimmedAddress;
                 }
             }
 
