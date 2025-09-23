@@ -18,6 +18,7 @@
         wrapper.style.verticalAlign = 'middle';
         wrapper.style.position = 'relative';
         wrapper.style.cursor = 'pointer';
+        wrapper.style.transform = 'translateY(3px)'; /* Move down 3px for better alignment */
 
         // Icon
         var icon = document.createElement('span');
