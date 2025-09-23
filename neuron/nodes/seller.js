@@ -333,7 +333,8 @@ module.exports = function (RED) {
                     config.loadedDeviceFilename = '';
                     console.log(`Node ${node.id}: Device reinstatement complete - now using standard deployment flow`);
                 } catch (err) {
-                    node.warn(`Node ${node.id}: Failed to load device from filename ${config.loadedDeviceFilename}. Error: ${err.message}. Creating new device instead.`);
+                    // This is expected behavior - the device file may have been renamed in a previous deployment
+                    console.log(`Node ${node.id}: Device file ${config.loadedDeviceFilename}.json not found (likely renamed in previous deployment). Proceeding with new device creation.`);
                     // Clear the failed filename and proceed with new device creation
                     config.loadedDeviceFilename = '';
                 }

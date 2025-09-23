@@ -88,10 +88,21 @@
     <div id="runtime-information-section" style="display: none;">
         <h4 style="margin: 10px 0; color:#28a745;">Runtime Information</h4>
 
+        
+
         <div class="form-row">
-            <label for="node-input-evmAddress"><span>EVM</span></label>
-            <input type="text" id="node-input-evmAddress" placeholder="EVM Address will appear here after initialization" readonly>
+            <label for="node-input-evmAddress"><span>EVM Address</span></label>
+            <div style="display: flex; align-items: center; gap: 5px; width: 75%;">
+                <input type="text" id="node-input-evmAddress" placeholder="EVM address will appear here after initialization" readonly style="flex: 1;">
+                <button type="button" id="copy-evm-address-btn" class="red-ui-button" style="padding: 4px 8px; font-size: 12px; min-width: auto;" title="Copy EVM Address">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
+
         <div class="form-row">
             <label for="node-input-balance"><span>Balance</span></label>
             <input type="text" id="node-input-balance" placeholder="Account balance will appear here after initialization" readonly>
@@ -256,6 +267,102 @@
 
             // Store all intervals for cleanup
             const intervals = {};
+
+            // Initialize loadedDeviceFilename from hidden field if it exists
+            // This ensures auto-refresh functions respect previously loaded devices
+            const loadedFilename = $('#node-input-loadedDeviceFilename').val();
+            if (loadedFilename && loadedFilename.trim() !== '') {
+                node.loadedDeviceFilename = loadedFilename;
+                console.log(`[SELLER INIT] Restored loaded device filename: ${node.loadedDeviceFilename}`);
+            }
+
+            // Function to make configuration fields readonly after deployment
+            async function makeFieldsReadonlyIfDeployed() {
+                if (node.id) {
+                    try {
+                        const response = await fetch(`/seller/device-exists/${node.id}`);
+                        const data = await response.json();
+                        
+                        if (data.success && data.exists) {
+                            // Node has been deployed, make fields readonly (except name)
+                            const readonlyInputFields = [
+                                'node-input-deviceRole',
+                                'node-input-serialNumber', 
+                                'node-input-deviceType',
+                                'node-input-price',
+                                'node-input-description'
+                            ];
+                            
+                            const readonlySelectFields = [
+                                'node-input-smartContract'
+                            ];
+                            
+                            // Make input fields readonly
+                            readonlyInputFields.forEach(fieldId => {
+                                const field = $(`#${fieldId}`);
+                                if (field.length) {
+                                    field.prop('readonly', true);
+                                    field.css('background-color', 'var(--red-ui-form-input-background-disabled)');
+                                    field.css('color', 'var(--red-ui-form-text-color-disabled)');
+                                    field.attr('title', 'This field cannot be changed after deployment');
+                                }
+                            });
+                            
+                            // Make select fields disabled
+                            readonlySelectFields.forEach(fieldId => {
+                                const field = $(`#${fieldId}`);
+                                if (field.length) {
+                                    field.prop('disabled', true);
+                                    field.css('background-color', 'var(--red-ui-form-input-background-disabled)');
+                                    field.css('color', 'var(--red-ui-form-text-color-disabled)');
+                                    field.attr('title', 'This field cannot be changed after deployment');
+                                }
+                            });
+                            
+                            console.log(`[SELLER READONLY] Made configuration fields readonly for deployed node: ${node.id}`);
+                        } else {
+                            // Node not deployed, ensure fields are editable
+                            const editableInputFields = [
+                                'node-input-deviceRole',
+                                'node-input-serialNumber',
+                                'node-input-deviceType', 
+                                'node-input-price',
+                                'node-input-description'
+                            ];
+                            
+                            const editableSelectFields = [
+                                'node-input-smartContract'
+                            ];
+                            
+                            // Make input fields editable
+                            editableInputFields.forEach(fieldId => {
+                                const field = $(`#${fieldId}`);
+                                if (field.length) {
+                                    field.prop('readonly', false);
+                                    field.css('background-color', '');
+                                    field.css('color', '');
+                                    field.removeAttr('title');
+                                }
+                            });
+                            
+                            // Make select fields enabled
+                            editableSelectFields.forEach(fieldId => {
+                                const field = $(`#${fieldId}`);
+                                if (field.length) {
+                                    field.prop('disabled', false);
+                                    field.css('background-color', '');
+                                    field.css('color', '');
+                                    field.removeAttr('title');
+                                }
+                            });
+                            
+                            console.log(`[SELLER READONLY] Made configuration fields editable for new node: ${node.id}`);
+                        }
+                    } catch (error) {
+                        console.error(`[SELLER READONLY] Error checking deployment status:`, error);
+                    }
+                }
+            }
 
             // Helper function to ensure EVM address has '0x' prefix (defined locally for compatibility)
             const formatEvmAddress = window.formatEvmAddress;
@@ -459,6 +566,74 @@
             
             // Initialize device dropdown on dialog open
             loadEligibleDevices();
+
+            // Copy EVM Address functionality
+            $('#copy-evm-address-btn').on('click', function() {
+                const evmAddress = $('#node-input-evmAddress').val();
+                if (evmAddress && evmAddress.trim() !== '' && evmAddress !== 'New node' && evmAddress !== 'Not initialized yet' && evmAddress !== 'EVM address not initialized yet') {
+                    // Use the modern Clipboard API if available
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(evmAddress).then(function() {
+                            // Show success feedback
+                            const originalHTML = $(this).html();
+                            $(this).html('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>');
+                            setTimeout(() => {
+                                $(this).html(originalHTML);
+                            }, 1000);
+                        }.bind(this)).catch(function(err) {
+                            console.error('Failed to copy EVM address:', err);
+                            // Fallback to manual copy
+                            copyToClipboardFallback(evmAddress, this);
+                        });
+                    } else {
+                        // Fallback for older browsers or non-secure contexts
+                        copyToClipboardFallback(evmAddress, this);
+                    }
+                } else {
+                    // Show error feedback
+                    const originalHTML = $(this).html();
+                    $(this).html('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+                    setTimeout(() => {
+                        $(this).html(originalHTML);
+                    }, 1000);
+                }
+            });
+
+            // Fallback copy function for older browsers
+            function copyToClipboardFallback(text, button) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        // Show success feedback
+                        const originalHTML = $(button).html();
+                        $(button).html('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>');
+                        setTimeout(() => {
+                            $(button).html(originalHTML);
+                        }, 1000);
+                    } else {
+                        throw new Error('Copy command failed');
+                    }
+                } catch (err) {
+                    console.error('Failed to copy EVM address:', err);
+                    // Show error feedback
+                    const originalHTML = $(button).html();
+                    $(button).html('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+                    setTimeout(() => {
+                        $(button).html(originalHTML);
+                    }, 1000);
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
 
             $('<style>')
                 .text(`
@@ -691,6 +866,14 @@
 
             // Check if device exists and show/hide runtime information section
             function checkDeviceExistsAndShowRuntime() {
+                // If a device has been loaded from dropdown, show runtime information section
+                if (node.loadedDeviceFilename) {
+                    console.log(`[SELLER DEVICE EXISTS] Device loaded from dropdown: ${node.loadedDeviceFilename}, showing runtime information`);
+                    $('#runtime-information-section').show();
+                    $('#no-device-message').hide();
+                    return;
+                }
+                
                 if (node.id) {
                     console.log(`[SELLER DEVICE EXISTS] Checking device file for node ID: ${node.id}`);
                     $.get(`/seller/device-exists/${node.id}`)
@@ -725,14 +908,29 @@
 
             checkDeviceExistsAndShowRuntime();
 
-            // Update EVM address on dialog open
-            updateEvmAddressAndPublicKeyAndTopics();
+            // Make configuration fields readonly if node has been deployed
+            makeFieldsReadonlyIfDeployed();
 
-            // Update balance ONCE on dialog open (NO REFRESH)
-            updateDeviceBalance();
+            // Update EVM address on dialog open (only if no device is loaded)
+            if (!node.loadedDeviceFilename) {
+                updateEvmAddressAndPublicKeyAndTopics();
+            } else {
+                console.log(`[SELLER INIT] Skipping EVM update - device already loaded: ${node.loadedDeviceFilename}`);
+            }
 
-            // Update publicKey ONCE on dialog open (NO REFRESH)
-            updatePublicKey();
+            // Update balance ONCE on dialog open (NO REFRESH) (only if no device is loaded)
+            if (!node.loadedDeviceFilename) {
+                updateDeviceBalance();
+            } else {
+                console.log(`[SELLER INIT] Skipping balance update - device already loaded: ${node.loadedDeviceFilename}`);
+            }
+
+            // Update publicKey ONCE on dialog open (NO REFRESH) (only if no device is loaded)
+            if (!node.loadedDeviceFilename) {
+                updatePublicKey();
+            } else {
+                console.log(`[SELLER INIT] Skipping public key update - device already loaded: ${node.loadedDeviceFilename}`);
+            }
 
             // Set up refresh intervals
             if (node.id) {
@@ -1737,7 +1935,8 @@
 
 /* Readonly fields styling */
 .neuron-seller-config input[readonly] {
-    color: #555;
+    color: var(--red-ui-form-text-color-disabled);
+    background-color: var(--red-ui-form-input-background-disabled);
 }
 
 /* Table consistency */
