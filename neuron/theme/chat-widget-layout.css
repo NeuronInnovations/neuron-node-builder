@@ -1,0 +1,106 @@
+/* Clean Sidebar Layout - Simple Approach */
+
+/* Chat widget positioning */
+#neuron-chat-widget {
+    position: fixed !important;
+    top: 48px !important;
+    right: 0px !important;
+    width: 380px !important;
+    height: calc(100vh - 48px) !important;
+    z-index: 10000 !important;
+    background: #1D1D1D !important;
+    border: 1px solid #333 !important;
+}
+
+/* Chat bubble positioning - above sidebar */
+#neuron-chat-bubble {
+    z-index: 10003 !important; /* Above sidebar (10001) and separator (10002) */
+}
+
+/* SCENARIO 1: Chat open - Move sidebar left by 380px */
+body.neuron-chat-open #red-ui-sidebar {
+    right: 380px !important;
+    z-index: 10001 !important;
+    /* Let Node-RED manage width naturally */
+}
+
+/* SCENARIO 2: Chat closed - Sidebar at normal position (right edge) */
+body.neuron-chat-closed #red-ui-sidebar {
+    right: 0px !important;
+    z-index: 10001 !important;
+    /* Let Node-RED manage width naturally */
+}
+
+/* Sidebar separator (resize bar) positioning */
+/* When chat open: separator = sidebar_width + 380px (chat width) */
+body.neuron-chat-open #red-ui-sidebar-separator {
+    z-index: 10002 !important;
+    /* Position will be calculated by JavaScript based on actual sidebar width */
+}
+
+/* When chat closed: separator = sidebar_width */
+body.neuron-chat-closed #red-ui-sidebar-separator {
+    z-index: 10002 !important;
+    /* Position will be calculated by JavaScript based on actual sidebar width */
+}
+
+/* Canvas (workspace) positioning */
+/* Canvas positioning when sidebar is open - handled by JavaScript */
+/* These rules are intentionally empty as positioning is calculated dynamically */
+
+/* When sidebar is closed */
+body.red-ui-sidebar-closed.neuron-chat-open #red-ui-workspace {
+    right: 380px !important; /* Just chat width */
+}
+
+body.red-ui-sidebar-closed.neuron-chat-closed #red-ui-workspace {
+    right: 0px !important; /* Full width */
+}
+
+body.red-ui-sidebar-closed #red-ui-editor-stack {
+    right: 1px !important;
+}
+
+/* Override Node-RED's sidebar separator positioning with maximum specificity */
+#red-ui-main-container.red-ui-sidebar-closed body.neuron-chat-open #red-ui-sidebar-separator,
+body.neuron-chat-open #red-ui-main-container.red-ui-sidebar-closed #red-ui-sidebar-separator,
+html body.neuron-chat-open .red-ui-sidebar-closed #red-ui-sidebar-separator,
+html #red-ui-main-container.red-ui-sidebar-closed body.neuron-chat-open #red-ui-sidebar-separator {
+    right: 380px !important; /* Force separator to chat's left edge when sidebar closed */
+}
+
+/* Additional override with style attribute specificity simulation */
+body.neuron-chat-open #red-ui-sidebar-separator[style] {
+    right: 380px !important;
+}
+
+#red-ui-main-container.red-ui-sidebar-closed body.neuron-chat-closed #red-ui-sidebar-separator,
+body.neuron-chat-closed #red-ui-main-container.red-ui-sidebar-closed #red-ui-sidebar-separator,
+html body.neuron-chat-closed .red-ui-sidebar-closed #red-ui-sidebar-separator {
+    right: 0px !important; /* Force separator to right edge when both closed */
+}
+
+/* Ensure UI elements appear above everything */
+.red-ui-menu-dropdown,
+#template-browser-dialog,
+.red-ui-dialog,
+.ui-dialog,
+.red-ui-popover,
+.popover,
+.red-ui-tourGuide,
+.red-ui-notifications,
+.red-ui-menu,
+.dropdown-menu,
+.context-menu,
+.red-ui-editor-tray,
+#red-ui-header .red-ui-menu-dropdown {
+    z-index: 11000 !important;
+}
+
+/* Smooth transitions */
+#red-ui-workspace,
+#red-ui-editor-stack,
+#red-ui-sidebar,
+#red-ui-sidebar-separator {
+    transition: right 0.3s ease !important;
+}

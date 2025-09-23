@@ -18,13 +18,28 @@
                 newMenuItem.style.cssText = 'margin: 0; padding: 0;';
                 
                 newMenuItem.innerHTML = `
-                    <a href="https://docs.neuron.world" target="_blank" rel="noopener noreferrer">
-                        <i class="fa fa-external-link"></i>
-                        <span class="red-ui-menu-label">Neuron AI Node Builder</span>
+                    <a href="https://docs.neuron.world" target="_blank" rel="noopener noreferrer"
+                       style="display: block !important; white-space: nowrap !important; padding: 3px 10px 3px 30px !important; color: inherit !important; text-decoration: none !important;">
+                        <i class="fa fa-external-link" style="margin-right: 10px !important; width: 16px !important; display: inline-block !important; vertical-align: middle !important;"></i>
+                        <span class="red-ui-menu-label" style="white-space: nowrap !important; vertical-align: middle !important;">Neuron documentation</span>
                     </a>
                 `;
                 
-                // Add custom event handlers to prevent interference
+                // Create the tutorials menu item
+                const tutorialsMenuItem = document.createElement('li');
+                tutorialsMenuItem.id = 'menu-item-neuron-tutorials';
+                tutorialsMenuItem.className = 'neuron-tutorials-item custom-menu-item';
+                tutorialsMenuItem.style.cssText = 'margin: 0; padding: 0;';
+                
+                tutorialsMenuItem.innerHTML = `
+                    <a href="https://docs.neuron.world/node-builder-software/" target="_blank" rel="noopener noreferrer" 
+                       style="display: block !important; white-space: nowrap !important; padding: 3px 10px 3px 30px !important; color: inherit !important; text-decoration: none !important;">
+                        <i class="fa fa-graduation-cap" style="margin-right: 10px !important; width: 16px !important; display: inline-block !important; vertical-align: middle !important;"></i>
+                        <span class="red-ui-menu-label" style="white-space: nowrap !important; vertical-align: middle !important;">Tutorials</span>
+                    </a>
+                `;
+                
+                // Add custom event handlers for documentation menu item
                 const link = newMenuItem.querySelector('a');
                 link.addEventListener('mouseenter', function(e) {
                     e.stopPropagation();
@@ -38,23 +53,40 @@
                     this.style.color = 'inherit';
                 });
                 
+                // Add custom event handlers for tutorials menu item
+                const tutorialsLink = tutorialsMenuItem.querySelector('a');
+                tutorialsLink.addEventListener('mouseenter', function(e) {
+                    e.stopPropagation();
+                    this.style.backgroundColor = '#2a2a2a';
+                    this.style.color = '#ffffff';
+                });
+                
+                tutorialsLink.addEventListener('mouseleave', function(e) {
+                    e.stopPropagation();
+                    this.style.backgroundColor = 'transparent';
+                    this.style.color = 'inherit';
+                });
+                
                 // Create a separator first
                 const separator = document.createElement('li');
                 separator.className = 'red-ui-menu-divider';
                 
-                // Insert separator and menu item after the version number
+                // Insert separator and menu items after the version number
                 const versionItem = document.querySelector('#menu-item-node-red-version');
                 if (versionItem) {
                     // Insert separator after the version item
                     versionItem.parentNode.insertBefore(separator, versionItem.nextSibling);
-                    // Then insert our menu item after the separator
+                    // Then insert documentation menu item after the separator
                     versionItem.parentNode.insertBefore(newMenuItem, separator.nextSibling);
+                    // Then insert tutorials menu item after the documentation item
+                    versionItem.parentNode.insertBefore(tutorialsMenuItem, newMenuItem.nextSibling);
                     
                     // Debug: Log the DOM structure
                     console.log('🔍 DOM Structure after insertion:');
                     console.log('Version item:', versionItem);
                     console.log('Separator:', separator);
-                    console.log('Our menu item:', newMenuItem);
+                    console.log('Documentation menu item:', newMenuItem);
+                    console.log('Tutorials menu item:', tutorialsMenuItem);
                     console.log('Version item next sibling:', versionItem.nextSibling);
                     
                     // Force the version item to maintain its styling with maximum specificity
@@ -90,7 +122,7 @@
                     }
                 }
                 
-                console.log('✅ Custom menu item injected successfully!');
+                console.log('✅ Custom menu items injected successfully! (Documentation + Tutorials)');
             } else {
                 console.log('⚠️ Keyboard shortcuts menu item not found, retrying...');
                 // Retry after a short delay
@@ -110,9 +142,10 @@
     const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             if (mutation.type === 'childList') {
-                // Check if our custom item exists
-                const existingItem = document.querySelector('#menu-item-neuron-docs');
-                if (!existingItem) {
+                // Check if our custom items exist
+                const existingDocsItem = document.querySelector('#menu-item-neuron-docs');
+                const existingTutorialsItem = document.querySelector('#menu-item-neuron-tutorials');
+                if (!existingDocsItem || !existingTutorialsItem) {
                     injectCustomMenuItem();
                 }
             }

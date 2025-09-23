@@ -974,52 +974,78 @@
                 }
             }
             
+            // Use updated flow context if available, otherwise fall back to localStorage
+            let flowContextToUse = null;
+            let rawFlowJsonToUse = null;
+            
+            if (window.currentFlowContext) {
+                flowContextToUse = window.currentFlowContext;
+                rawFlowJsonToUse = window.currentFlowContext.rawFlowJson;
+                console.log('🔄 [FLOW SYNC] Using real-time flow context from main window');
+            } else {
+                console.log('⚠️ [FLOW SYNC] No real-time context, checking localStorage...');
+                // Fall back to localStorage
+                const chatData = getUserData('chat');
+                if (chatData?.flowContext) {
+                    flowContextToUse = chatData.flowContext;
+                    rawFlowJsonToUse = chatData.rawFlowJson;
+                    console.log('🔄 [FLOW SYNC] Using flow context from localStorage');
+                }
+            }
+            
             const requestBody = {
                 message: message,
                 context: 'Neuron software context',
-                flowContext: null,  // Will be populated if available
-                rawFlowJson: null   // Will be populated if available
+                flowContext: flowContextToUse,
+                rawFlowJson: rawFlowJsonToUse
             };
             
-            // Try to get flow context from localStorage if available
-            try {
-                const chatData = getUserData('chat');
-                console.log('📱 [SERVER DEBUG] Retrieved chat data for flow context:', chatData);
-                
-                if (chatData && chatData.flowContext) {
-                    requestBody.flowContext = chatData.flowContext;
-                    console.log('📱 [SERVER DEBUG] Using flow context from localStorage:', chatData.flowContext.flowName);
-                }
-                
-                if (chatData && chatData.rawFlowJson) {
-                    requestBody.rawFlowJson = chatData.rawFlowJson;
-                    console.log('📱 [SERVER DEBUG] Using raw flow JSON from localStorage, nodes:', chatData.rawFlowJson.length);
-                }
-                
-                // If we don't have raw flow JSON, try to get it from the parent window
-                if (!requestBody.rawFlowJson && window.opener && !window.opener.closed) {
-                    try {
-                        console.log('📱 [SERVER DEBUG] Attempting to get raw flow JSON from parent window...');
-                        // Try to access the parent window's RED object
-                        if (window.opener.RED && window.opener.RED.nodes && typeof window.opener.RED.nodes.createCompleteNodeSet === 'function') {
-                            requestBody.rawFlowJson = window.opener.RED.nodes.createCompleteNodeSet();
-                            console.log('📱 [SERVER DEBUG] Successfully got raw flow JSON from parent window, nodes:', requestBody.rawFlowJson.length);
-                }
-            } catch (error) {
-                        console.warn('📱 [SERVER DEBUG] Could not get raw flow JSON from parent window:', error);
-                    }
-                }
-                
-                console.log('📱 [SERVER DEBUG] Final request body flow context:', {
-                    hasFlowContext: !!requestBody.flowContext,
-                    hasRawFlowJson: !!requestBody.rawFlowJson,
-                    flowContextKeys: requestBody.flowContext ? Object.keys(requestBody.flowContext) : [],
-                    rawFlowJsonNodeCount: requestBody.rawFlowJson ? requestBody.rawFlowJson.length : 0
-                });
-                
-            } catch (error) {
-                console.warn('📱 [SERVER DEBUG] Could not get flow context from localStorage:', error);
+            // Log flow context usage with detailed debugging
+            console.log('🔍 [DEBUG] Checking flow context availability...');
+            console.log('🔍 [DEBUG] window.currentFlowContext exists:', !!window.currentFlowContext);
+            console.log('🔍 [DEBUG] window.currentFlowContext value:', window.currentFlowContext);
+            console.log('🔍 [DEBUG] window.lastFlowUpdate:', window.lastFlowUpdate);
+            
+            if (window.currentFlowContext) {
+                console.log('🔄 [FLOW SYNC] Using updated flow context in dedicated window');
+                console.log('🔄 [FLOW SYNC] Flow name:', window.currentFlowContext.flowName);
+                console.log('🔄 [FLOW SYNC] Node count:', window.currentFlowContext.nodeCount);
+                console.log('🔄 [FLOW SYNC] Last update:', new Date(window.lastFlowUpdate || 0).toLocaleTimeString());
+            } else {
+                console.log('⚠️ [FLOW SYNC] No current flow context available in dedicated window');
+                console.log('⚠️ [FLOW SYNC] Falling back to localStorage flow context');
             }
+            
+            // Log what we're actually sending (removed localStorage override)
+            console.log('📱 [SERVER DEBUG] Final flow context being sent:', requestBody.flowContext);
+            if (requestBody.flowContext) {
+                console.log('📱 [SERVER DEBUG] Flow name:', requestBody.flowContext.flowName);
+                console.log('📱 [SERVER DEBUG] Node count:', requestBody.flowContext.nodeCount);
+                console.log('📱 [SERVER DEBUG] Node types:', requestBody.flowContext.nodeTypes);
+            } else {
+                console.log('⚠️ [SERVER DEBUG] No flow context available for AI request');
+            }
+            
+            // If we don't have raw flow JSON, try to get it from the parent window
+            if (!requestBody.rawFlowJson && window.opener && !window.opener.closed) {
+                try {
+                    console.log('📱 [SERVER DEBUG] Attempting to get raw flow JSON from parent window...');
+                    // Try to access the parent window's RED object
+                    if (window.opener.RED && window.opener.RED.nodes && typeof window.opener.RED.nodes.createCompleteNodeSet === 'function') {
+                        requestBody.rawFlowJson = window.opener.RED.nodes.createCompleteNodeSet();
+                        console.log('📱 [SERVER DEBUG] Successfully got raw flow JSON from parent window, nodes:', requestBody.rawFlowJson.length);
+                    }
+                } catch (error) {
+                    console.warn('📱 [SERVER DEBUG] Could not get raw flow JSON from parent window:', error);
+                }
+            }
+                
+            console.log('📱 [SERVER DEBUG] Final request body flow context:', {
+                hasFlowContext: !!requestBody.flowContext,
+                hasRawFlowJson: !!requestBody.rawFlowJson,
+                flowContextKeys: requestBody.flowContext ? Object.keys(requestBody.flowContext) : [],
+                rawFlowJsonNodeCount: requestBody.rawFlowJson ? requestBody.rawFlowJson.length : 0
+            });
             
             // Get authentication token if available
             const authToken = localStorage.getItem('chat-token');
@@ -1159,6 +1185,15 @@
                     console.log('📱 [DEDICATED CHAT] Reloading chat data...');
                     loadChatData();
                 }, 100);
+            } else if (event.data && event.data.type === 'FLOW_STATE_UPDATE') {
+                console.log('🔄 [FLOW SYNC] Received flow state update from main window');
+                console.log('🔄 [FLOW SYNC] New flow context:', event.data.flowContext);
+                
+                // Store the updated flow context for use in chat messages
+                window.currentFlowContext = event.data.flowContext;
+                window.lastFlowUpdate = event.data.timestamp;
+                
+                console.log('🔄 [FLOW SYNC] Flow context updated in dedicated window');
             }
         });
         
