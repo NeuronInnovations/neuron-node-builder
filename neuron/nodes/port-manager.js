@@ -59,31 +59,40 @@ class PortManager {
     }
 
     /**
-     * Reserve a port for a specific node
+     * Reserve a port for a specific node (with optional flow isolation)
      */
-    async reservePort(nodeId, preferredPort = null) {
+    async reservePort(nodeId, preferredPort = null, flowId = null) {
+        // Clean up expired reservations first
+        this.cleanupExpiredReservations();
+        
+        // Create a unique key that includes flow information if provided
+        const reservationKey = flowId ? `${flowId}:${nodeId}` : nodeId;
+        
         // Check if we already have a reservation for this node
-        const existingReservation = this.reservations.get(nodeId);
+        const existingReservation = this.reservations.get(reservationKey);
         if (existingReservation && !this.isReservationExpired(existingReservation)) {
             // Verify the port is still available
             if (await this.isPortAvailable(existingReservation.port)) {
-                console.log(`Reusing reserved port ${existingReservation.port} for node ${nodeId}`);
+                console.log(`Reusing reserved port ${existingReservation.port} for node ${nodeId}${flowId ? ` (flow: ${flowId})` : ''}`);
+                this.updateLastUsed(reservationKey);
                 return existingReservation.port;
             } else {
-                console.warn(`Reserved port ${existingReservation.port} is no longer available for node ${nodeId}`);
-                this.reservations.delete(nodeId);
+                console.warn(`Reserved port ${existingReservation.port} is no longer available for node ${nodeId}${flowId ? ` (flow: ${flowId})` : ''}`);
+                console.warn(`This indicates a port conflict - another process may be using the port`);
+                this.reservations.delete(reservationKey);
+                this.saveReservations();
             }
         }
 
         // Try preferred port if specified
         if (preferredPort && await this.isPortAvailable(preferredPort)) {
-            this.addReservation(nodeId, preferredPort);
+            this.addReservation(reservationKey, preferredPort, flowId);
             return preferredPort;
         }
 
         // Find a new available port
         const port = await this.findAvailablePort();
-        this.addReservation(nodeId, port);
+        this.addReservation(reservationKey, port, flowId);
         return port;
     }
 
@@ -124,28 +133,30 @@ class PortManager {
     /**
      * Add a new port reservation
      */
-    addReservation(nodeId, port) {
+    addReservation(reservationKey, port, flowId = null) {
         const reservation = {
             port: port,
-            nodeId: nodeId,
+            nodeId: reservationKey,
+            flowId: flowId,
             reservedAt: new Date().toISOString(),
             lastUsed: new Date().toISOString()
         };
         
-        this.reservations.set(nodeId, reservation);
+        this.reservations.set(reservationKey, reservation);
         this.saveReservations();
-        console.log(`Reserved port ${port} for node ${nodeId}`);
+        console.log(`Reserved port ${port} for node ${reservationKey}${flowId ? ` (flow: ${flowId})` : ''}`);
     }
 
     /**
      * Release a port reservation
      */
-    releasePort(nodeId) {
-        const reservation = this.reservations.get(nodeId);
+    releasePort(nodeId, flowId = null) {
+        const reservationKey = flowId ? `${flowId}:${nodeId}` : nodeId;
+        const reservation = this.reservations.get(reservationKey);
         if (reservation) {
-            this.reservations.delete(nodeId);
+            this.reservations.delete(reservationKey);
             this.saveReservations();
-            console.log(`Released port ${reservation.port} for node ${nodeId}`);
+            console.log(`Released port ${reservation.port} for node ${nodeId}${flowId ? ` (flow: ${flowId})` : ''}`);
             return reservation.port;
         }
         return null;
@@ -154,8 +165,8 @@ class PortManager {
     /**
      * Update last used timestamp for a reservation
      */
-    updateLastUsed(nodeId) {
-        const reservation = this.reservations.get(nodeId);
+    updateLastUsed(reservationKey) {
+        const reservation = this.reservations.get(reservationKey);
         if (reservation) {
             reservation.lastUsed = new Date().toISOString();
             this.saveReservations();
@@ -165,8 +176,9 @@ class PortManager {
     /**
      * Get port for a specific node
      */
-    getPortForNode(nodeId) {
-        const reservation = this.reservations.get(nodeId);
+    getPortForNode(nodeId, flowId = null) {
+        const reservationKey = flowId ? `${flowId}:${nodeId}` : nodeId;
+        const reservation = this.reservations.get(reservationKey);
         return reservation ? reservation.port : null;
     }
 
@@ -215,6 +227,43 @@ class PortManager {
                typeof reservation.reservedAt === 'string' &&
                reservation.port >= this.portRangeStart &&
                reservation.port <= this.portRangeEnd;
+    }
+
+    /**
+     * Detect and resolve port conflicts
+     */
+    async detectAndResolveConflicts() {
+        console.log('🔍 Detecting port conflicts...');
+        const conflicts = [];
+        
+        for (const [nodeId, reservation] of this.reservations) {
+            const isAvailable = await this.isPortAvailable(reservation.port);
+            if (!isAvailable) {
+                conflicts.push({
+                    nodeId,
+                    port: reservation.port,
+                    reservation
+                });
+                console.warn(`⚠️  Port conflict detected: Node ${nodeId} has reserved port ${reservation.port} but it's in use`);
+            }
+        }
+        
+        if (conflicts.length > 0) {
+            console.log(`🚨 Found ${conflicts.length} port conflicts`);
+            
+            // Remove conflicting reservations
+            for (const conflict of conflicts) {
+                this.reservations.delete(conflict.nodeId);
+                console.log(`✅ Removed conflicting reservation for node ${conflict.nodeId} on port ${conflict.port}`);
+            }
+            
+            this.saveReservations();
+            console.log('✅ Port conflicts resolved');
+        } else {
+            console.log('✅ No port conflicts detected');
+        }
+        
+        return conflicts;
     }
 
     /**
