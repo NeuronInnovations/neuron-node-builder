@@ -1,0 +1,1 @@
+Mac release process requires separating the Neuron wrapper into ARM and Darwin 64 builds. Ensure wrapper binaries are compiled for each architecture, publish matching neuron-node-builder releases (3 total or manual placements), split the account.neuron.world download button into ARM vs Darwin64, and make sure the auto version fetcher understands the new naming scheme.

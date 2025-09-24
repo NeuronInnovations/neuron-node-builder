@@ -218,6 +218,8 @@ git push origin v1.0.0-test
 1. Go to **Releases** tab in your repository
 2. Find **"Release v1.0.0-test"**
 3. Verify all files are present:
+   - `neuron-node-builder-macos-arm64-v1.0.0-test.zip`
+   - `neuron-node-builder-macos-arm64-v1.0.0-test.zip.sha256`
    - `neuron-node-builder-macos-x64-v1.0.0-test.zip`
    - `neuron-node-builder-macos-x64-v1.0.0-test.zip.sha256`
    - `neuron-node-builder-win-x64-v1.0.0-test.zip`
@@ -227,7 +229,8 @@ git push origin v1.0.0-test
 
 ```bash
 # Download the macOS ZIP from the release
-curl -L -o test-app.zip "https://github.com/YOUR_REPO/releases/download/v1.0.0-test/neuron-node-builder-macos-x64-v1.0.0-test.zip"
+ARCH=arm64  # or x64 for Intel Macs
+curl -L -o test-app.zip "https://github.com/YOUR_REPO/releases/download/v1.0.0-test/neuron-node-builder-macos-${ARCH}-v1.0.0-test.zip"
 
 # Extract and verify
 unzip test-app.zip

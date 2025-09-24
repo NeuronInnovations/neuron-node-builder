@@ -177,18 +177,20 @@ if [ -f "package.json" ] && command_exists npm; then
         print_result 0 "Package command works"
         
         # Check if executables were created
-        if [ -f "build/releases/latest-macos-x64" ]; then
-            print_result 0 "macOS executable created"
-        else
-            print_result 1 "macOS executable not found"
-        fi
-        
+        for ARCH in x64 arm64; do
+            if [ -f "build/releases/latest-macos-${ARCH}" ]; then
+                print_result 0 "macOS ${ARCH} executable created"
+            else
+                print_result 1 "macOS ${ARCH} executable not found"
+            fi
+        done
+
         if [ -f "build/releases/latest-win-x64.exe" ]; then
             print_result 0 "Windows executable created"
         else
             print_result 1 "Windows executable not found"
         fi
-        
+
         if [ -f "build/releases/latest-linux-x64" ]; then
             print_result 0 "Linux executable created"
         else
@@ -202,30 +204,33 @@ else
 fi
 
 # Test 7: Test app bundle creation (macOS only)
-if [ "$SKIP_MACOS_TESTS" != "true" ] && [ -f "build/releases/latest-macos-x64" ]; then
-    echo -e "\n${YELLOW}📋 Test 7: App Bundle Creation${NC}"
-    
-    echo -e "${BLUE}   Creating app bundle...${NC}"
-    if npm run create-app-bundle >/dev/null 2>&1; then
-        print_result 0 "App bundle creation succeeded"
-        
-        # Find the app bundle
-        APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
-        if [ -n "$APP_BUNDLE" ]; then
-            print_result 0 "App bundle found: $(basename "$APP_BUNDLE")"
+if [ "$SKIP_MACOS_TESTS" != "true" ]; then
+    VERSION=$(node -p "require('./package.json').version")
+    for ARCH in x64 arm64; do
+        if [ -f "build/releases/latest-macos-${ARCH}" ]; then
+            echo -e "\n${YELLOW}📋 Test 7 (${ARCH}): App Bundle Creation${NC}"
             
-            # Check app bundle structure
-            if [ -f "$APP_BUNDLE/Contents/Info.plist" ]; then
-                print_result 0 "App bundle structure is valid"
+            echo -e "${BLUE}   Creating app bundle for ${ARCH}...${NC}"
+            if npm run create-app-bundle -- --arch=${ARCH} --version=${VERSION} >/dev/null 2>&1; then
+                print_result 0 "App bundle creation succeeded (${ARCH})"
+                
+                APP_BUNDLE="build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app"
+                if [ -d "$APP_BUNDLE" ]; then
+                    print_result 0 "App bundle found: $(basename "$APP_BUNDLE")"
+                    
+                    if [ -f "$APP_BUNDLE/Contents/Info.plist" ]; then
+                        print_result 0 "App bundle structure is valid (${ARCH})"
+                    else
+                        print_result 1 "App bundle structure is invalid (${ARCH})"
+                    fi
+                else
+                    print_result 1 "App bundle not found after creation (${ARCH})"
+                fi
             else
-                print_result 1 "App bundle structure is invalid"
+                print_result 1 "App bundle creation failed (${ARCH})"
             fi
-        else
-            print_result 1 "App bundle not found after creation"
         fi
-    else
-        print_result 1 "App bundle creation failed"
-    fi
+    done
 fi
 
 # Test 8: Workflow YAML validation

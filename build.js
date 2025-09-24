@@ -80,6 +80,10 @@ async function build() {
         url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin64`,
       },
       {
+        name: "neuron-wrapper-darwin-arm64",
+        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin-arm64`,
+      },
+      {
         name: "neuron-wrapper-linux32",
         url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux32`,
       },
@@ -150,6 +154,7 @@ async function build() {
   const buildBinPath = path.join(baseDirectory, "build", "bin");
   const requiredBinaries = [
     "neuron-wrapper-darwin64",
+    "neuron-wrapper-darwin-arm64",
     "neuron-wrapper-linux32",
     "neuron-wrapper-linux64",
     "neuron-wrapper-win32.exe",
@@ -349,6 +354,10 @@ async function build() {
     "node18-macos-x64": {
       bin: "neuron-wrapper-darwin64",
       output: "latest-macos-x64",
+    },
+    "node18-macos-arm64": {
+      bin: "neuron-wrapper-darwin-arm64",
+      output: "latest-macos-arm64",
     },
     "node18-linux-x64": {
       bin: "neuron-wrapper-linux64",

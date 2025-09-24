@@ -2,26 +2,57 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-// Read version from package.json
 const packageJson = require("./package.json");
-const version = packageJson.version; // e.g., "4.0.10"
 
-const baseDirectory = path.resolve(__dirname);
-const buildPath = path.join(baseDirectory, "build", "releases");
-const executablePath = path.join(buildPath, "latest-macos-x64");
-const appBundleName = `neuron-node-builder-macos-x64-v${version}`;
-const appPath = path.join(buildPath, `${appBundleName}.app`);
+const SUPPORTED_ARCHES = new Set(["x64", "arm64"]);
 
-console.log("Creating macOS app bundle...");
+function getArgValue(flag, defaultValue) {
+  const prefix = `--${flag}=`;
+  const arg = process.argv.find((item) => item.startsWith(prefix));
+  if (!arg) return defaultValue;
+  return arg.slice(prefix.length);
+}
 
-// Check if executable exists
-if (!fs.existsSync(executablePath)) {
-  console.error(`Executable not found at: ${executablePath}`);
-  console.error("Please build the application first using `npm run package`");
+const arch = getArgValue("arch", "x64");
+
+if (!SUPPORTED_ARCHES.has(arch)) {
+  console.error(
+    `Unsupported architecture "${arch}". Supported values: ${Array.from(
+      SUPPORTED_ARCHES
+    ).join(", ")}`
+  );
   process.exit(1);
 }
 
-// Create app bundle structure
+const versionArg = getArgValue("version", "");
+const version = versionArg || packageJson.version;
+
+if (!version) {
+  console.error(
+    "Unable to determine version. Pass --version=<semver> or set package.json version."
+  );
+  process.exit(1);
+}
+
+const baseDirectory = path.resolve(__dirname);
+const buildPath = path.join(baseDirectory, "build", "releases");
+const executableName = `latest-macos-${arch}`;
+const executablePath = path.join(buildPath, executableName);
+const appBundleName = `neuron-node-builder-macos-${arch}-v${version}`;
+const appPath = path.join(buildPath, `${appBundleName}.app`);
+
+console.log(`Creating macOS app bundle for ${arch.toUpperCase()}...`);
+
+if (!fs.existsSync(executablePath)) {
+  console.error(`Executable not found at: ${executablePath}`);
+  console.error("Please build the application first using `npm run package`.");
+  process.exit(1);
+}
+
+if (fs.existsSync(appPath)) {
+  fs.rmSync(appPath, { recursive: true, force: true });
+}
+
 const contentsPath = path.join(appPath, "Contents");
 const macosPath = path.join(contentsPath, "MacOS");
 const resourcesPath = path.join(contentsPath, "Resources");
@@ -29,17 +60,21 @@ const resourcesPath = path.join(contentsPath, "Resources");
 fs.mkdirSync(macosPath, { recursive: true });
 fs.mkdirSync(resourcesPath, { recursive: true });
 
-// Copy executable
 const appExecutable = path.join(macosPath, "neuron-node-builder");
 fs.copyFileSync(executablePath, appExecutable);
 fs.chmodSync(appExecutable, 0o755);
 
-// Build and integrate the menu bar app
+const launcherScript = [
+  "#!/bin/bash",
+  "# Simple launcher for Neuron Node Builder",
+  'cd "$(dirname "$0")"',
+  'exec ./neuron-node-builder "$@"',
+].join("\n");
+
 console.log("Building menu bar app...");
 try {
   execSync("./menubar/build-menubar.sh", { stdio: "inherit" });
 
-  // Copy the menu bar app executable
   const menubarAppPath = path.join(
     baseDirectory,
     "menubar",
@@ -60,12 +95,6 @@ try {
     console.log("✅ Menu bar app integrated successfully");
   } else {
     console.log("⚠️  Menu bar app not found, falling back to simple launcher");
-    // Fallback to simple launcher
-    const launcherScript = `#!/bin/bash
-# Simple launcher for Neuron Node Builder
-cd "$(dirname "$0")"
-exec ./neuron-node-builder "$@"
-`;
     const launcherPath = path.join(macosPath, "Launcher");
     fs.writeFileSync(launcherPath, launcherScript);
     fs.chmodSync(launcherPath, 0o755);
@@ -75,18 +104,11 @@ exec ./neuron-node-builder "$@"
     "⚠️  Failed to build menu bar app, using simple launcher:",
     error.message
   );
-  // Fallback to simple launcher
-  const launcherScript = `#!/bin/bash
-# Simple launcher for Neuron Node Builder
-cd "$(dirname "$0")"
-exec ./neuron-node-builder "$@"
-`;
   const launcherPath = path.join(macosPath, "Launcher");
   fs.writeFileSync(launcherPath, launcherScript);
   fs.chmodSync(launcherPath, 0o755);
 }
 
-// Create Info.plist
 const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -119,11 +141,8 @@ const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>`;
 
 fs.writeFileSync(path.join(contentsPath, "Info.plist"), infoPlist);
-
-// Create PkgInfo
 fs.writeFileSync(path.join(contentsPath, "PkgInfo"), "APPL????");
 
-// Copy icon if exists
 const iconPath = path.join(baseDirectory, "public", "neuron-favicon.png");
 if (fs.existsSync(iconPath)) {
   fs.copyFileSync(iconPath, path.join(resourcesPath, "AppIcon.png"));
@@ -132,7 +151,6 @@ if (fs.existsSync(iconPath)) {
   console.log("⚠️  Neuron favicon not found at:", iconPath);
 }
 
-// Copy loading page files
 const loadingFiles = [
   "loading.html",
   "loading.css",
@@ -152,7 +170,7 @@ loadingFiles.forEach((fileName) => {
 });
 
 console.log(`App bundle created at: ${appPath}`);
-console.log(`App bundle name: ${appBundleName}.app`);
 console.log(
-  "You can now run `./sign-and-notarize-app.sh` to create file for distribution."
+  `App bundle name: ${appBundleName}.app (architecture: ${arch.toUpperCase()})`
 );
+console.log("You can now run the signing workflow to create distributable artifacts.");

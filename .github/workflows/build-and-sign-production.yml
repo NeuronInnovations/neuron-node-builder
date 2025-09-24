@@ -108,7 +108,8 @@ jobs:
 
           # Comprehensive validation of all executables
           declare -A EXECUTABLES=(
-            ["build/releases/latest-macos-x64"]="macOS"
+            ["build/releases/latest-macos-x64"]="macOS x64"
+            ["build/releases/latest-macos-arm64"]="macOS arm64"
             ["build/releases/latest-win-x64.exe"]="Windows"  
             ["build/releases/latest-linux-x64"]="Linux"
           )
@@ -139,22 +140,19 @@ jobs:
   # JOB 2: MACOS SIGNING & NOTARIZATION
   # ============================================================================
   macos-sign-notarize:
-    name: macOS Sign & Notarize
+    name: macOS Sign & Notarize (${{ matrix.arch }})
     needs: [security-and-build]
     runs-on: macos-13
     timeout-minutes: 45
-
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
     env:
       MACOSX_DEPLOYMENT_TARGET: "10.12"
-
-    # Security: Only run for production tags or authorized manual triggers
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && contains(fromJSON('["dohoangviet", "admin"]'), github.actor))
-
-    outputs:
-      signed-app-name: ${{ steps.bundle.outputs.app-name }}
-      notarization-status: ${{ steps.notarize.outputs.status }}
 
     steps:
       - name: Checkout code
@@ -176,49 +174,64 @@ jobs:
 
       - name: Install dependencies for app bundle
         run: |
-          # Check if we have a lockfile, if not create one
           if [ ! -f package-lock.json ]; then
             echo "No package-lock.json found, creating one..."
             npm install --package-lock-only
           fi
 
-          # Now install dependencies
           npm ci --ignore-scripts
-
-          # Verify installation
           echo "SUCCESS: Dependencies installed successfully"
 
       - name: Prepare macOS executable
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
-          # Make executable runnable and verify
-          chmod +x build/releases/latest-macos-x64
+          EXECUTABLE_NAME="latest-macos-${ARCH}"
+          EXECUTABLE_PATH="build/releases/${EXECUTABLE_NAME}"
 
-          # Verify it's a valid macOS binary
-          if ! file build/releases/latest-macos-x64 | grep -q "Mach-O"; then
-            echo "ERROR: Invalid macOS binary"
+          echo "Preparing ${EXECUTABLE_NAME}..."
+          chmod +x "$EXECUTABLE_PATH"
+
+          if ! file "$EXECUTABLE_PATH" | grep -q "Mach-O"; then
+            echo "ERROR: Invalid macOS binary at $EXECUTABLE_PATH"
+            file "$EXECUTABLE_PATH" || true
             exit 1
           fi
 
-          echo "SUCCESS: macOS executable validated"
+          EXPECTED_ARCH="x86_64"
+          if [ "$ARCH" = "arm64" ]; then
+            EXPECTED_ARCH="arm64"
+          fi
+
+          if ! file "$EXECUTABLE_PATH" | grep -q "$EXPECTED_ARCH"; then
+            echo "ERROR: $ARCH executable does not advertise architecture $EXPECTED_ARCH"
+            file "$EXECUTABLE_PATH"
+            exit 1
+          fi
+
+          echo "SUCCESS: macOS ${ARCH} executable validated"
 
       - name: Create app bundle
         id: bundle
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
         run: |
-          echo "Creating macOS app bundle..."
-          npm run create-app-bundle
+          echo "Creating macOS app bundle for ${ARCH}..."
+          npm run create-app-bundle -- --arch=${ARCH} --version=${VERSION}
 
-          # Find and validate app bundle
-          APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
+          APP_BUNDLE="build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app"
+
           if [ ! -d "$APP_BUNDLE" ]; then
-            echo "ERROR: App bundle creation failed"
+            echo "ERROR: App bundle creation failed for ${ARCH}"
+            ls -R build/releases || true
             exit 1
           fi
 
-          APP_NAME=$(basename "$APP_BUNDLE")
-          echo "SUCCESS: App bundle created: $APP_NAME"
-          echo "app-name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "SUCCESS: App bundle created: $(basename \"$APP_BUNDLE\")"
+          echo "app-name=$(basename "$APP_BUNDLE")" >> $GITHUB_OUTPUT
+          echo "APP_BUNDLE=$APP_BUNDLE" >> $GITHUB_ENV
 
-          # Validate app bundle structure
           if [ ! -f "$APP_BUNDLE/Contents/Info.plist" ]; then
             echo "ERROR: Invalid app bundle structure"
             exit 1
@@ -230,32 +243,25 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Security: Validate all required secrets are present
           if [ -z "$APPLE_CERTIFICATE_BASE64" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ]; then
             echo "ERROR: Missing required signing secrets"
             exit 1
           fi
 
-          # Create secure temporary keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate using OpenSSL extraction method (same as template.sh)
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
           echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
 
-          # Extract certificate and key using OpenSSL (more compatible)
           TEMP_CERT="$RUNNER_TEMP/cert.crt"
           TEMP_KEY="$RUNNER_TEMP/key.key"
-
           IMPORT_SUCCESS=false
 
-          # Extract certificate and key separately
           if openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -out "$TEMP_CERT" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -passout pass: 2>/dev/null && \
              openssl pkcs12 -in "$CERT_PATH" -nocerts -nodes -out "$TEMP_KEY" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" 2>/dev/null; then
-            # Import certificate and key separately
             if security import "$TEMP_CERT" -k "$KEYCHAIN_PATH" -A 2>/dev/null && \
                security import "$TEMP_KEY" -k "$KEYCHAIN_PATH" -A 2>/dev/null; then
               echo "Certificate imported using OpenSSL extraction method"
@@ -263,7 +269,6 @@ jobs:
             fi
           fi
 
-          # Clean up temporary files
           rm -f "$TEMP_CERT" "$TEMP_KEY"
 
           if [ "$IMPORT_SUCCESS" = false ]; then
@@ -271,10 +276,8 @@ jobs:
             exit 1
           fi
 
-          # Set keychain search list
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
 
-          # Verify certificate installation
           CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1)
           if [ -z "$CERT_IDENTITY" ]; then
             echo "ERROR: Developer ID certificate not found"
@@ -289,12 +292,10 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
         run: |
-          APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
-
           echo "Signing app bundle: $APP_BUNDLE"
 
-          # Sign with all required security options
           codesign \
             --force \
             --deep \
@@ -306,12 +307,10 @@ jobs:
             --keychain "$KEYCHAIN_PATH" \
             "$APP_BUNDLE"
 
-          # Comprehensive signature verification
           echo "Verifying code signature..."
           codesign --verify --verbose=4 "$APP_BUNDLE"
           codesign --display --verbose=4 "$APP_BUNDLE"
 
-          # Check signature validity
           if ! codesign --verify --strict "$APP_BUNDLE"; then
             echo "ERROR: Code signature verification failed"
             exit 1
@@ -320,24 +319,26 @@ jobs:
           echo "SUCCESS: Code signing completed successfully"
 
       - name: Create notarization package
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
         run: |
-          APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
           APP_NAME=$(basename "$APP_BUNDLE" .app)
-          ZIP_NAME="${APP_NAME}-v${{ needs.security-and-build.outputs.version }}.zip"
+          ZIP_NAME="${APP_NAME}.zip"
 
           cd build/releases
-
-          # Use ditto for proper app bundle compression
           /usr/bin/ditto -c -k --keepParent "$(basename "$APP_BUNDLE")" "$ZIP_NAME"
+          cd - >/dev/null
 
-          # Verify ZIP was created
-          if [ ! -f "$ZIP_NAME" ]; then
+          ZIP_PATH="build/releases/$ZIP_NAME"
+          if [ ! -f "$ZIP_PATH" ]; then
             echo "ERROR: ZIP creation failed"
             exit 1
           fi
 
-          echo "Notarization package created: $ZIP_NAME"
-          echo "ZIP_PATH=build/releases/$ZIP_NAME" >> $GITHUB_ENV
+          echo "Notarization package created: $ZIP_PATH"
+          echo "ZIP_PATH=$ZIP_PATH" >> $GITHUB_ENV
 
       - name: Submit for notarization
         id: notarize
@@ -346,18 +347,15 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
         run: |
-          # Security: Validate API credentials
           if [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_ISSUER_ID" ] || [ -z "$APPLE_API_KEY_BASE64" ]; then
             echo "ERROR: Missing Apple API credentials"
             exit 1
           fi
 
-          # Create API key file securely
           API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
           chmod 600 "$API_KEY_PATH"
 
-          # Submit for notarization with comprehensive error handling
           echo "Submitting for notarization..."
           SUBMIT_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
             --key "$API_KEY_PATH" \
@@ -371,24 +369,20 @@ jobs:
 
           if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
             echo "SUCCESS: Notarization successful"
-            echo "status=success" >> $GITHUB_OUTPUT
           elif echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
             echo "ERROR: Notarization failed - Invalid submission"
-            echo "$SUBMIT_OUTPUT"
             exit 1
           else
             echo "ERROR: Notarization failed or timed out"
-            echo "$SUBMIT_OUTPUT"
             exit 1
           fi
 
-          # Clean up API key
           rm -f "$API_KEY_PATH"
 
       - name: Staple notarization
+        env:
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
         run: |
-          APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
-
           echo "Stapling notarization to app bundle..."
           if xcrun stapler staple "$APP_BUNDLE"; then
             echo "SUCCESS: Notarization stapled successfully"
@@ -396,32 +390,32 @@ jobs:
             echo "WARNING: Could not staple notarization (app is still valid)"
           fi
 
-          # Final validation
           echo "Final validation..."
           xcrun stapler validate "$APP_BUNDLE" || echo "WARNING: Stapler validation warning (not critical)"
           spctl --assess --verbose=4 --type execute "$APP_BUNDLE"
 
       - name: Create final distribution package
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
         run: |
-          APP_BUNDLE=$(find build/releases -name "*.app" -type d | head -1)
           APP_NAME=$(basename "$APP_BUNDLE" .app)
-          FINAL_ZIP="${APP_NAME}-v${{ needs.security-and-build.outputs.version }}-signed.zip"
+          FINAL_ZIP="${APP_NAME}-signed.zip"
 
           cd build/releases
-
-          # Create final signed package
           /usr/bin/ditto -c -k --keepParent "$(basename "$APP_BUNDLE")" "$FINAL_ZIP"
-
-          # Generate checksums for integrity
           shasum -a 256 "$FINAL_ZIP" > "$FINAL_ZIP.sha256"
+          cd - >/dev/null
 
-          echo "Final package created: $FINAL_ZIP"
-          echo "FINAL_ZIP_PATH=build/releases/$FINAL_ZIP" >> $GITHUB_ENV
+          FINAL_ZIP_PATH="build/releases/$FINAL_ZIP"
+          echo "Final package created: $FINAL_ZIP_PATH"
+          echo "FINAL_ZIP_PATH=$FINAL_ZIP_PATH" >> $GITHUB_ENV
 
       - name: Upload signed macOS application
         uses: actions/upload-artifact@v4
         with:
-          name: macos-signed-${{ needs.security-and-build.outputs.version }}
+          name: macos-signed-${{ matrix.arch }}-${{ needs.security-and-build.outputs.version }}
           path: |
             ${{ env.FINAL_ZIP_PATH }}
             ${{ env.FINAL_ZIP_PATH }}.sha256
@@ -430,7 +424,6 @@ jobs:
       - name: Security cleanup
         if: always()
         run: |
-          # Clean up all sensitive files
           [ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
           [ -n "$CERT_PATH" ] && rm -f "$CERT_PATH" 2>/dev/null || true
           rm -f "$RUNNER_TEMP"/*.p8 2>/dev/null || true
@@ -439,7 +432,6 @@ jobs:
           rm -f "$RUNNER_TEMP"/*.key 2>/dev/null || true
           rm -f "$RUNNER_TEMP"/cert.* 2>/dev/null || true
           rm -f "$RUNNER_TEMP"/key.* 2>/dev/null || true
-
   # ============================================================================
   # JOB 3: MULTI-PLATFORM RELEASE CREATION
   # ============================================================================
@@ -476,35 +468,38 @@ jobs:
           fi
 
           # Check macOS signed artifacts
-          if [ ! -d "artifacts/macos-signed-${{ needs.security-and-build.outputs.version }}" ]; then
-            echo "ERROR: macOS signed artifacts missing"
-            exit 1
-          fi
+          VERSION="${{ needs.security-and-build.outputs.version }}"
+          for ARCH in x64 arm64; do
+            DIR="artifacts/macos-signed-${ARCH}-${VERSION}"
+            if [ ! -d "$DIR" ]; then
+              echo "ERROR: macOS signed artifacts missing for ${ARCH} (expected $DIR)"
+              ls -R artifacts || true
+              exit 1
+            fi
+          done
 
           echo "SUCCESS: All artifacts present"
 
       - name: Prepare release assets
         run: |
+          set -euo pipefail
           mkdir -p release-assets
           VERSION="${{ needs.security-and-build.outputs.version }}"
 
-          # Debug: Show what artifacts we have
           echo "Available artifacts:"
           find artifacts -type f -name "*" | head -20
 
-          # Find the actual build artifacts directory
           BUILD_ARTIFACTS_DIR=$(find artifacts -name "build-artifacts-*" -type d | head -1)
-          MACOS_SIGNED_DIR=$(find artifacts -name "macos-signed-*" -type d | head -1)
-
+          if [ -z "$BUILD_ARTIFACTS_DIR" ]; then
+            echo "ERROR: Build artifacts directory not found"
+            exit 1
+          fi
           echo "Build artifacts directory: $BUILD_ARTIFACTS_DIR"
-          echo "macOS signed directory: $MACOS_SIGNED_DIR"
 
           # Windows executable
           echo "Preparing Windows package..."
           WIN_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-win-x64.exe"
           if [ -f "$WIN_EXE" ]; then
-            echo "SUCCESS: Found Windows executable: $WIN_EXE"
-            # Use absolute paths to avoid relative path issues
             CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
@@ -516,12 +511,10 @@ jobs:
             ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
-          # Linux executable  
+          # Linux executable
           echo "Preparing Linux package..."
           LINUX_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-linux-x64"
           if [ -f "$LINUX_EXE" ]; then
-            echo "SUCCESS: Found Linux executable: $LINUX_EXE"
-            # Use absolute paths to avoid relative path issues
             CURRENT_DIR=$(pwd)
             cd "$BUILD_ARTIFACTS_DIR/build/releases"
             zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
@@ -533,33 +526,27 @@ jobs:
             ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
-          # macOS signed application
-          echo "Preparing macOS package..."
-          if [ -d "$MACOS_SIGNED_DIR" ] && [ -n "$MACOS_SIGNED_DIR" ]; then
-            # Copy macOS signed files
-            if ls "$MACOS_SIGNED_DIR"/*.zip >/dev/null 2>&1; then
-              cp "$MACOS_SIGNED_DIR"/*.zip release-assets/
-              echo "SUCCESS: macOS ZIP copied"
-            fi
-            
-            if ls "$MACOS_SIGNED_DIR"/*.sha256 >/dev/null 2>&1; then
-              cp "$MACOS_SIGNED_DIR"/*.sha256 release-assets/
-              echo "SUCCESS: macOS SHA256 copied"
+          # macOS signed applications
+          for ARCH in x64 arm64; do
+            echo "Preparing macOS package for ${ARCH}..."
+            SIGNED_DIR="artifacts/macos-signed-${ARCH}-${VERSION}"
+            if [ ! -d "$SIGNED_DIR" ]; then
+              echo "ERROR: macOS signed artifacts directory not found for ${ARCH} ($SIGNED_DIR)"
+              exit 1
             fi
 
-            # Rename macOS package for consistency
-            cd release-assets
-            MACOS_ZIP=$(ls *-signed.zip 2>/dev/null | head -1)
-            if [ -n "$MACOS_ZIP" ]; then
-              mv "$MACOS_ZIP" "neuron-node-builder-macos-x64-v$VERSION.zip"
-              MACOS_SHA=$(ls *-signed.zip.sha256 2>/dev/null | head -1)
-              [ -n "$MACOS_SHA" ] && mv "$MACOS_SHA" "neuron-node-builder-macos-x64-v$VERSION.zip.sha256"
-              echo "SUCCESS: macOS package renamed"
+            ZIP_SRC=$(find "$SIGNED_DIR" -maxdepth 1 -name '*.zip' | head -1)
+            if [ -z "$ZIP_SRC" ]; then
+              echo "ERROR: macOS ${ARCH} zip not found in $SIGNED_DIR"
+              ls -la "$SIGNED_DIR" || true
+              exit 1
             fi
-            cd ..
-          else
-            echo "WARNING: macOS signed artifacts directory not found: $MACOS_SIGNED_DIR"
-          fi
+
+            DEST_ZIP="release-assets/neuron-node-builder-macos-${ARCH}-v$VERSION.zip"
+            cp "$ZIP_SRC" "$DEST_ZIP"
+            shasum -a 256 "$DEST_ZIP" > "$DEST_ZIP.sha256"
+            echo "SUCCESS: macOS ${ARCH} package prepared -> $DEST_ZIP"
+          done
 
           echo "Final release assets:"
           ls -la release-assets/ || echo "No release assets created"
@@ -574,8 +561,8 @@ jobs:
           ## Downloads
 
           ### macOS (Signed & Notarized)
-          - **Download**: [\`neuron-node-builder-macos-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip)
-          - **SHA256**: [\`neuron-node-builder-macos-x64-v$VERSION.zip.sha256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip.sha256)
+          - **Apple Silicon (ARM64)**: [\`neuron-node-builder-macos-arm64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-arm64-v$VERSION.zip) • [\`SHA256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-arm64-v$VERSION.zip.sha256)
+          - **Intel (x64)**: [\`neuron-node-builder-macos-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip) • [\`SHA256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip.sha256)
           - **Requirements**: macOS 10.15+ (Catalina)
           - **Installation**: Extract and drag to Applications folder
 
@@ -596,7 +583,7 @@ jobs:
           ## 📖 Installation Instructions
 
           ### macOS
-          1. Download the macOS ZIP file
+          1. Download the macOS ZIP for your architecture (ARM64 for Apple Silicon, x64 for Intel)
           2. Extract the ZIP file
           3. Drag "Neuron Node Builder.app" to your Applications folder
           4. Launch from Applications (no security warnings!)
@@ -632,7 +619,7 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **macOS Signing**: ${{ needs.macos-sign-notarize.outputs.notarization-status == 'success' && 'Success' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **macOS Signing**: Completed for arm64 and x64" >> $GITHUB_STEP_SUMMARY
           echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Assets Created:" >> $GITHUB_STEP_SUMMARY

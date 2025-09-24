@@ -79,3 +79,4 @@ build/releases/
 .DS_Store
 
 credentials
+.cursor/rules/directive.mdc

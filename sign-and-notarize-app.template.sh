@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Neuron Node Builder - Code Signing and Notarization Script
-# Signs and notarizes the macOS executable for distribution
+# Signs and notarizes the macOS app bundle for distribution
 
 set -e
 
@@ -10,8 +10,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Read version from package.json
 VERSION=$(node -p "require('./package.json').version")
-APP_BUNDLE_NAME="neuron-node-builder-macos-x64-v${VERSION}"
-EXECUTABLE_PATH="$SCRIPT_DIR/build/releases/${APP_BUNDLE_NAME}.app"
+ARCH="x64"
+for arg in "$@"; do
+    case $arg in
+        --arch=*)
+            ARCH="${arg#*=}"
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--arch=x64|arm64]"
+            exit 0
+            ;;
+    esac
+done
+
+if [ "$ARCH" != "x64" ] && [ "$ARCH" != "arm64" ]; then
+    echo "Unsupported architecture: $ARCH (expected x64 or arm64)"
+    exit 1
+fi
+
+APP_BUNDLE_NAME="neuron-node-builder-macos-${ARCH}-v${VERSION}"
+APP_BUNDLE_PATH="$SCRIPT_DIR/build/releases/${APP_BUNDLE_NAME}.app"
 P12_FILE="$SCRIPT_DIR/certificate_2_decoded.p12"
 P12_PASSWORD="**************************"
 BUNDLE_ID="*****************************"
@@ -46,9 +65,9 @@ extract_api_key() {
 # Step 1: Validate prerequisites
 echo -e "${YELLOW}📋 Step 1: Validating prerequisites...${NC}"
 
-if [ ! -d "$EXECUTABLE_PATH" ]; then
-    echo -e "${RED}❌ Executable not found: $EXECUTABLE_PATH${NC}"
-    echo "Run 'npm run package' first to build the executable"
+if [ ! -d "$APP_BUNDLE_PATH" ]; then
+    echo -e "${RED}❌ App bundle not found: $APP_BUNDLE_PATH${NC}"
+    echo "Run 'npm run create-app-bundle -- --arch=${ARCH}' first to build the bundle"
     exit 1
 fi
 
@@ -165,8 +184,8 @@ fi
 echo -e "${YELLOW}📋 Step 3: Signing the app bundle...${NC}"
 
 # Create signed copy
-SIGNED_EXECUTABLE="$SCRIPT_DIR/build/releases/${APP_BUNDLE_NAME}-signed.app"
-cp -R "$EXECUTABLE_PATH" "$SIGNED_EXECUTABLE"
+SIGNED_APP_BUNDLE="$SCRIPT_DIR/build/releases/${APP_BUNDLE_NAME}-signed.app"
+cp -R "$APP_BUNDLE_PATH" "$SIGNED_APP_BUNDLE"
 
 # Sign with hardened runtime, timestamp, and entitlements (deep sign for app bundles)
 if [ "$USE_TEMP_KEYCHAIN" = true ]; then
@@ -178,7 +197,7 @@ if [ "$USE_TEMP_KEYCHAIN" = true ]; then
         --identifier "$BUNDLE_ID" \
         --keychain "$KEYCHAIN_TO_USE" \
         --entitlements "$SCRIPT_DIR/entitlements.plist" \
-        "$SIGNED_EXECUTABLE"
+        "$SIGNED_APP_BUNDLE"
 else
     codesign --force \
         --deep \
@@ -187,12 +206,12 @@ else
         --timestamp \
         --identifier "$BUNDLE_ID" \
         --entitlements "$SCRIPT_DIR/entitlements.plist" \
-        "$SIGNED_EXECUTABLE"
+        "$SIGNED_APP_BUNDLE"
 fi
 
 # Verify signature
-if codesign --verify --verbose "$SIGNED_EXECUTABLE"; then
-    echo -e "${GREEN}✅ Executable signed successfully${NC}"
+if codesign --verify --verbose "$SIGNED_APP_BUNDLE"; then
+    echo -e "${GREEN}✅ App bundle signed successfully${NC}"
 else
     echo -e "${RED}❌ Signature verification failed${NC}"
     security delete-keychain "$TEMP_KEYCHAIN"
@@ -203,8 +222,8 @@ fi
 echo -e "${YELLOW}📋 Step 4: Creating ZIP archive for notarization...${NC}"
 
 ZIP_FILE="$SCRIPT_DIR/build/releases/${APP_BUNDLE_NAME}-app.zip"
-cd "$(dirname "$SIGNED_EXECUTABLE")"
-zip -r "${APP_BUNDLE_NAME}-app.zip" "$(basename "$SIGNED_EXECUTABLE")"
+cd "$(dirname "$SIGNED_APP_BUNDLE")"
+zip -r "${APP_BUNDLE_NAME}-app.zip" "$(basename "$SIGNED_APP_BUNDLE")"
 mv "${APP_BUNDLE_NAME}-app.zip" "$ZIP_FILE"
 
 echo -e "${GREEN}✅ ZIP archive created: $ZIP_FILE${NC}"
@@ -270,10 +289,10 @@ fi
 if [ "$NOTARIZATION_SUCCESS" = true ]; then
     echo -e "${YELLOW}📋 Step 7: Stapling notarization...${NC}"
     
-    if xcrun stapler staple "$SIGNED_EXECUTABLE"; then
+    if xcrun stapler staple "$SIGNED_APP_BUNDLE"; then
         echo -e "${GREEN}✅ Notarization stapled successfully${NC}"
     else
-        echo -e "${YELLOW}⚠️  Could not staple notarization (executable still valid)${NC}"
+        echo -e "${YELLOW}⚠️  Could not staple notarization (app bundle still valid)${NC}"
     fi
 fi
 
@@ -294,21 +313,21 @@ echo -e "${GREEN}✅ Cleanup completed${NC}"
 echo -e "${YELLOW}📋 Step 9: Final verification...${NC}"
 
 echo "Signature verification:"
-codesign --verify --verbose "$SIGNED_EXECUTABLE"
+codesign --verify --verbose "$SIGNED_APP_BUNDLE"
 
 echo -e "\nNotarization status:"
-spctl --assess --verbose "$SIGNED_EXECUTABLE"
+spctl --assess --verbose "$SIGNED_APP_BUNDLE"
 
 echo -e "\n${GREEN}🎉 Code signing and notarization process completed!${NC}"
 echo "=================================================="
-echo -e "📁 Signed executable: ${BLUE}$SIGNED_EXECUTABLE${NC}"
+echo -e "📁 Signed app bundle: ${BLUE}$SIGNED_APP_BUNDLE${NC}"
 echo -e "📦 Notarized archive: ${BLUE}$ZIP_FILE${NC}"
 
 if [ "$NOTARIZATION_SUCCESS" = true ]; then
-    echo -e "\n${GREEN}✅ Your executable is now signed and notarized!${NC}"
+    echo -e "\n${GREEN}✅ Your app bundle is now signed and notarized!${NC}"
     echo "Users can double-click it without security warnings."
 else
-    echo -e "\n${YELLOW}⚠️  Your executable is signed but notarization had issues.${NC}"
+    echo -e "\n${YELLOW}⚠️  Your app bundle is signed but notarization had issues.${NC}"
     echo "It will still work but may show security warnings on first run."
 fi
 

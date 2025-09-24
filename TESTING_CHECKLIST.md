@@ -47,7 +47,9 @@ git push origin v1.0.0-test
 ### 4. Verify Results
 
 - [ ] All 3 workflow jobs complete successfully
-- [ ] GitHub release is created with 4 files:
+- [ ] GitHub release is created with 6 files:
+  - [ ] `neuron-node-builder-macos-arm64-v1.0.0-test.zip`
+  - [ ] `neuron-node-builder-macos-arm64-v1.0.0-test.zip.sha256`
   - [ ] `neuron-node-builder-macos-x64-v1.0.0-test.zip`
   - [ ] `neuron-node-builder-macos-x64-v1.0.0-test.zip.sha256`
   - [ ] `neuron-node-builder-win-x64-v1.0.0-test.zip`
@@ -57,8 +59,9 @@ git push origin v1.0.0-test
 
 ```bash
 # Download macOS app from the release
-# Extract and test
-unzip neuron-node-builder-macos-x64-v1.0.0-test.zip
+# Replace ARCH with arm64 or x64 as needed
+ARCH=arm64
+unzip neuron-node-builder-macos-${ARCH}-v1.0.0-test.zip
 APP_BUNDLE=$(find . -name "*.app" -type d | head -1)
 
 # Verify signature and notarization

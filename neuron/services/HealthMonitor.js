@@ -76,10 +76,10 @@ async function checkMirrorNode() {
     const url = `http://localhost:1880/buyer/last-seen/${topic}`;
     try {
         const result = await fetchJson(url, 2000);
-        if (result && result.lastSeenFormatted && result.lastSeenFormatted !== 'Never') {
+        if (result && result.lastSeen && result.lastSeen !== 'Never') {
             return { ok: true, lastSeen: result.lastSeenFormatted };
         } else {
-            return { ok: false, error: 'No recent message', lastSeen: result.lastSeenFormatted };
+            return { ok: false, error: 'No recent message', lastSeen: result.lastSeen };
         }
     } catch (e) {
         return { ok: false, error: e.message };
