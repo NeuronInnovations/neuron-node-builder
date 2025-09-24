@@ -10,6 +10,9 @@ on:
         description: "Version to build (e.g., 1.0.0)"
         required: true
         default: "1.0.0"
+      wrapper_tag:
+        description: "Optional neuron-wrapper tag override (e.g., v1.0.0)"
+        required: false
       environment:
         description: "Deployment environment"
         required: true
@@ -69,13 +72,25 @@ jobs:
           fi
 
           # Validate version format (semver)
-          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+          SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\-\.]+)?(\+[0-9A-Za-z\-\.]+)?$'
+          if [[ ! $VERSION =~ $SEMVER_REGEX ]]; then
             echo "Invalid version format: $VERSION"
+            echo "Expected SemVer (e.g., 1.2.3, 1.2.3-beta, 1.2.3-beta.1+build)"
             exit 1
           fi
 
           echo "Version validated: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine neuron-wrapper tag
+        id: wrapper_tag
+        run: |
+          WRAPPER_TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.wrapper_tag || '' }}"
+          if [ -z "$WRAPPER_TAG" ]; then
+            WRAPPER_TAG="v${{ steps.version.outputs.version }}"
+          fi
+          echo "Resolved wrapper tag: $WRAPPER_TAG"
+          echo "wrapper_tag=$WRAPPER_TAG" >> $GITHUB_OUTPUT
 
       - name: Install dependencies securely
         run: |
@@ -102,6 +117,8 @@ jobs:
           fi
 
       - name: Build executables with validation
+        env:
+          NEURON_WRAPPER_TAG: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
         run: |
           echo "Building executables..."
           npm run package

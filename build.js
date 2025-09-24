@@ -39,12 +39,20 @@ async function build() {
     headers["Authorization"] = `Bearer ${process.env.GH_BUILD_TOKEN}`;
   }
 
+  const defaultWrapperTag = "v0.0.1-alpha";
+
   async function getLatestTag() {
-    // Use direct download approach - skip GitHub API entirely
+    const overrideTag = process.env.NEURON_WRAPPER_TAG || process.env.WRAPPER_TAG;
+
+    if (overrideTag) {
+      console.log(chalk.blue(`🔖 Using wrapper tag override: ${overrideTag}`));
+      return overrideTag;
+    }
+
     console.log(
       chalk.blue("📥 Using direct download approach to avoid rate limits")
     );
-    return "v0.0.1-alpha";
+    return defaultWrapperTag;
   }
 
   // Check for no-prompt mode (CI environment or explicit flag)
@@ -69,97 +77,139 @@ async function build() {
 
   console.log(chalk.green.underline("Finding Assets"));
 
-  async function getAssets() {
-    // Use hardcoded asset list to avoid GitHub API rate limits
-    console.log(
-      chalk.blue("📋 Using hardcoded asset list for direct downloads")
-    );
-    return [
-      {
-        name: "neuron-wrapper-darwin64",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin64`,
-      },
-      {
-        name: "neuron-wrapper-darwin-arm64",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-darwin-arm64`,
-      },
-      {
-        name: "neuron-wrapper-linux32",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux32`,
-      },
-      {
-        name: "neuron-wrapper-linux64",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-linux64`,
-      },
-      {
-        name: "neuron-wrapper-win32.exe",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win32.exe`,
-      },
-      {
-        name: "neuron-wrapper-win64.exe",
-        url: `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tag}/neuron-wrapper-win64.exe`,
-      },
-    ];
-  }
+  const wrapperAssets = [
+    {
+      id: "macos-x64",
+      bin: "neuron-wrapper-darwin64",
+      candidates: ["neuron-wrapper-darwin64"],
+    },
+    {
+      id: "macos-arm64",
+      bin: "neuron-wrapper-darwin-arm64",
+      candidates: [
+        "neuron-wrapper-darwin-arm64",
+        "neuron-wrapper-macos-arm64",
+        "neuron-wrapper-arm64",
+      ],
+    },
+    {
+      id: "linux-x86",
+      bin: "neuron-wrapper-linux32",
+      candidates: ["neuron-wrapper-linux32"],
+    },
+    {
+      id: "linux-x64",
+      bin: "neuron-wrapper-linux64",
+      candidates: ["neuron-wrapper-linux64"],
+    },
+    {
+      id: "win-x86",
+      bin: "neuron-wrapper-win32.exe",
+      candidates: ["neuron-wrapper-win32.exe"],
+    },
+    {
+      id: "win-x64",
+      bin: "neuron-wrapper-win64.exe",
+      candidates: ["neuron-wrapper-win64.exe"],
+    },
+  ];
 
-  const assets = await getAssets();
-
-  console.log(chalk.blue(`Found ${assets.length} assets`));
-
+  console.log(chalk.blue(`📋 Preparing to download ${wrapperAssets.length} wrapper assets`));
   console.log(chalk.green.underline("Downloading Assets"));
 
+  const wrapperTagCandidates = Array.from(new Set([tag, defaultWrapperTag]));
+  console.log(
+    chalk.blue(`Wrapper tag resolution order: ${wrapperTagCandidates.join(' -> ')}`)
+  );
+
   async function downloadAsset(asset) {
-    try {
-      console.log(chalk.blue(`Downloading asset: ${asset.name}`));
-
-      const binDir = directories[1];
-
-      if (!fs.existsSync(binDir)) {
-        fs.mkdirSync(binDir, { recursive: true });
-      }
-
-      const downloadResponse = await axios.get(asset.url, {
-        responseType: "stream",
-      });
-
-      const filePath = path.join(binDir, asset.name);
-      const writer = fs.createWriteStream(filePath);
-
-      downloadResponse.data.pipe(writer);
-
-      return new Promise((resolve, reject) => {
-        writer.on("finish", () => {
-          // Make the file executable on Unix-like systems
-          if (process.platform !== "win32") {
-            fs.chmodSync(filePath, 0o755);
-          }
-          console.log(chalk.blue(`Downloaded ${asset.name} to ${filePath}`));
-          resolve(filePath);
-        });
-        writer.on("error", reject);
-      });
-    } catch (error) {
-      console.error(chalk.red("Error downloading asset:"), error.message);
-
-      process.exit(1);
+    const binDir = directories[1];
+    if (!fs.existsSync(binDir)) {
+      fs.mkdirSync(binDir, { recursive: true });
     }
+
+    for (const tagCandidate of wrapperTagCandidates) {
+      for (const candidate of asset.candidates) {
+        const url = `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tagCandidate}/${candidate}`;
+        const tempFilePath = path.join(binDir, `${candidate}-${tagCandidate}.tmp`);
+        const destinationPath = path.join(binDir, asset.bin);
+
+        try {
+          console.log(
+            chalk.blue(
+              `Downloading ${asset.id} wrapper candidate: tag=${tagCandidate}, asset=${candidate}`
+            )
+          );
+          const downloadResponse = await axios.get(url, { responseType: "stream" });
+          const writer = fs.createWriteStream(tempFilePath);
+          downloadResponse.data.pipe(writer);
+
+          await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+          });
+
+          if (fs.existsSync(destinationPath)) {
+            fs.unlinkSync(destinationPath);
+          }
+          fs.renameSync(tempFilePath, destinationPath);
+
+          if (process.platform !== "win32") {
+            fs.chmodSync(destinationPath, 0o755);
+          }
+
+          console.log(
+            chalk.blue(
+              `✅ Downloaded ${asset.id} wrapper to ${destinationPath} (tag: ${tagCandidate}, source: ${candidate})`
+            )
+          );
+          return;
+        } catch (error) {
+          if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
+          }
+
+          const status = error.response?.status;
+          if (status === 404) {
+            console.log(
+              chalk.yellow(
+                `⚠️  Wrapper candidate ${candidate} not found for tag ${tagCandidate} (HTTP 404). Trying next option...`
+              )
+            );
+            continue;
+          }
+
+          console.error(
+            chalk.red(
+              `Error downloading ${asset.id} wrapper from ${candidate} (tag ${tagCandidate}):`
+            ),
+            error.message
+          );
+          process.exit(1);
+        }
+      }
+    }
+
+    console.error(
+      chalk.red(`❌ Failed to download ${asset.id} wrapper from any known candidate name or tag.`)
+    );
+    console.error(
+      chalk.red(
+        `   Tags tried: ${wrapperTagCandidates.join(', ')} | Candidates: ${asset.candidates.join(', ')}`
+      )
+    );
+    process.exit(1);
   }
 
-  for (const asset of assets) {
+  for (const asset of wrapperAssets) {
     await downloadAsset(asset);
   }
 
   // Verify all binaries are downloaded before building
   console.log(chalk.yellow("🔍 Verifying all binaries are downloaded..."));
   const buildBinPath = path.join(baseDirectory, "build", "bin");
-  const requiredBinaries = [
-    "neuron-wrapper-darwin64",
-    "neuron-wrapper-darwin-arm64",
-    "neuron-wrapper-linux32",
-    "neuron-wrapper-linux64",
-    "neuron-wrapper-win32.exe",
-    "neuron-wrapper-win64.exe",
-  ];
+  const wrapperBinaryNames = wrapperAssets.map((asset) => asset.bin);
+  const requiredBinaries = [...wrapperBinaryNames];
 
   let allBinariesExist = true;
   for (const binary of requiredBinaries) {
