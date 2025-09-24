@@ -81,36 +81,57 @@ async function build() {
     {
       id: "macos-x64",
       bin: "neuron-wrapper-darwin64",
-      candidates: ["neuron-wrapper-darwin64"],
+      candidates: [
+        { name: "neuron-wrapper-darwin64" },
+        { name: "neuron-wrapper-darwin64.zip", archive: "zip", expected: "neuron-wrapper-darwin64" },
+        { name: "neuron-wrapper-macos-x64" },
+        { name: "neuron-wrapper-macos-x64.zip", archive: "zip", expected: "neuron-wrapper-darwin64" },
+      ],
     },
     {
       id: "macos-arm64",
       bin: "neuron-wrapper-darwin-arm64",
       candidates: [
-        "neuron-wrapper-darwin-arm64",
-        "neuron-wrapper-macos-arm64",
-        "neuron-wrapper-arm64",
+        { name: "neuron-wrapper-darwin-arm64" },
+        { name: "neuron-wrapper-darwin-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
+        { name: "neuron-wrapper-macos-arm64" },
+        { name: "neuron-wrapper-macos-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
+        { name: "neuron-wrapper-arm64" },
+        { name: "neuron-wrapper-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
+        { name: "neuron-wrapper-darwin-arm64.tar.gz", archive: "tar", expected: "neuron-wrapper-darwin-arm64" },
       ],
     },
     {
       id: "linux-x86",
       bin: "neuron-wrapper-linux32",
-      candidates: ["neuron-wrapper-linux32"],
+      candidates: [
+        { name: "neuron-wrapper-linux32" },
+        { name: "neuron-wrapper-linux32.zip", archive: "zip", expected: "neuron-wrapper-linux32" },
+      ],
     },
     {
       id: "linux-x64",
       bin: "neuron-wrapper-linux64",
-      candidates: ["neuron-wrapper-linux64"],
+      candidates: [
+        { name: "neuron-wrapper-linux64" },
+        { name: "neuron-wrapper-linux64.zip", archive: "zip", expected: "neuron-wrapper-linux64" },
+      ],
     },
     {
       id: "win-x86",
       bin: "neuron-wrapper-win32.exe",
-      candidates: ["neuron-wrapper-win32.exe"],
+      candidates: [
+        { name: "neuron-wrapper-win32.exe" },
+        { name: "neuron-wrapper-win32.zip", archive: "zip", expected: "neuron-wrapper-win32.exe" },
+      ],
     },
     {
       id: "win-x64",
       bin: "neuron-wrapper-win64.exe",
-      candidates: ["neuron-wrapper-win64.exe"],
+      candidates: [
+        { name: "neuron-wrapper-win64.exe" },
+        { name: "neuron-wrapper-win64.zip", archive: "zip", expected: "neuron-wrapper-win64.exe" },
+      ],
     },
   ];
 
@@ -122,22 +143,100 @@ async function build() {
     chalk.blue(`Wrapper tag resolution order: ${wrapperTagCandidates.join(' -> ')}`)
   );
 
+  function findFirstFileRecursive(dir, targetName) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!targetName && entry.name.startsWith('.')) {
+          continue;
+        }
+        const match = findFirstFileRecursive(fullPath, targetName);
+        if (match) {
+          return match;
+        }
+      } else if (!targetName || entry.name === targetName) {
+        if (!targetName && entry.name.startsWith('.')) {
+          continue;
+        }
+        return fullPath;
+      }
+    }
+    return null;
+  }
+
+  function materializeAsset(tempFilePath, destinationPath, candidate, contextLabel) {
+    const archiveType = candidate.archive;
+    if (!archiveType) {
+      if (fs.existsSync(destinationPath)) {
+        fs.unlinkSync(destinationPath);
+      }
+      fs.renameSync(tempFilePath, destinationPath);
+      return;
+    }
+
+    const extractDir = path.join(
+      path.dirname(tempFilePath),
+      `.extract-${contextLabel}-${Date.now()}`
+    );
+    fs.mkdirSync(extractDir, { recursive: true });
+
+    try {
+      if (archiveType === "zip") {
+        execSync(`unzip -qq "${tempFilePath}" -d "${extractDir}"`);
+      } else if (archiveType === "tar") {
+        execSync(`tar -xzf "${tempFilePath}" -C "${extractDir}"`);
+      } else {
+        throw new Error(`Unsupported archive type: ${archiveType}`);
+      }
+
+      const targetName =
+        candidate.inner || candidate.expected || path.basename(destinationPath);
+      const extractedPath = findFirstFileRecursive(
+        extractDir,
+        targetName === path.basename(destinationPath) ? undefined : targetName
+      );
+
+      if (!extractedPath) {
+        throw new Error(
+          `Archive did not contain expected file (${targetName || 'auto-detected'})`
+        );
+      }
+
+      if (fs.existsSync(destinationPath)) {
+        fs.unlinkSync(destinationPath);
+      }
+      fs.copyFileSync(extractedPath, destinationPath);
+    } finally {
+      fs.rmSync(extractDir, { recursive: true, force: true });
+      fs.unlinkSync(tempFilePath);
+    }
+  }
+
   async function downloadAsset(asset) {
     const binDir = directories[1];
     if (!fs.existsSync(binDir)) {
       fs.mkdirSync(binDir, { recursive: true });
     }
 
+    const normalizedCandidates = asset.candidates.map((candidate) =>
+      typeof candidate === "string" ? { name: candidate } : candidate
+    );
+
     for (const tagCandidate of wrapperTagCandidates) {
-      for (const candidate of asset.candidates) {
-        const url = `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tagCandidate}/${candidate}`;
-        const tempFilePath = path.join(binDir, `${candidate}-${tagCandidate}.tmp`);
+      for (const candidate of normalizedCandidates) {
+        const url = `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tagCandidate}/${candidate.name}`;
+        const safeName = candidate.name.replace(/\//g, '-');
+        const tempFilePath = path.join(
+          binDir,
+          `${safeName}-${tagCandidate}.tmp`
+        );
         const destinationPath = path.join(binDir, asset.bin);
 
         try {
           console.log(
             chalk.blue(
-              `Downloading ${asset.id} wrapper candidate: tag=${tagCandidate}, asset=${candidate}`
+              `Downloading ${asset.id} wrapper candidate: tag=${tagCandidate}, asset=${candidate.name}`
             )
           );
           const downloadResponse = await axios.get(url, { responseType: "stream" });
@@ -149,10 +248,12 @@ async function build() {
             writer.on("error", reject);
           });
 
-          if (fs.existsSync(destinationPath)) {
-            fs.unlinkSync(destinationPath);
-          }
-          fs.renameSync(tempFilePath, destinationPath);
+          materializeAsset(
+            tempFilePath,
+            destinationPath,
+            candidate,
+            `${asset.id}-${tagCandidate}`
+          );
 
           if (process.platform !== "win32") {
             fs.chmodSync(destinationPath, 0o755);
@@ -160,7 +261,7 @@ async function build() {
 
           console.log(
             chalk.blue(
-              `✅ Downloaded ${asset.id} wrapper to ${destinationPath} (tag: ${tagCandidate}, source: ${candidate})`
+              `✅ Downloaded ${asset.id} wrapper to ${destinationPath} (tag: ${tagCandidate}, source: ${candidate.name})`
             )
           );
           return;
@@ -173,7 +274,7 @@ async function build() {
           if (status === 404) {
             console.log(
               chalk.yellow(
-                `⚠️  Wrapper candidate ${candidate} not found for tag ${tagCandidate} (HTTP 404). Trying next option...`
+                `⚠️  Wrapper candidate ${candidate.name} not found for tag ${tagCandidate} (HTTP 404). Trying next option...`
               )
             );
             continue;
@@ -181,7 +282,7 @@ async function build() {
 
           console.error(
             chalk.red(
-              `Error downloading ${asset.id} wrapper from ${candidate} (tag ${tagCandidate}):`
+              `Error downloading ${asset.id} wrapper from ${candidate.name} (tag ${tagCandidate}):`
             ),
             error.message
           );
@@ -195,7 +296,9 @@ async function build() {
     );
     console.error(
       chalk.red(
-        `   Tags tried: ${wrapperTagCandidates.join(', ')} | Candidates: ${asset.candidates.join(', ')}`
+        `   Tags tried: ${wrapperTagCandidates.join(', ')} | Candidates: ${normalizedCandidates
+          .map((c) => c.name)
+          .join(', ')}`
       )
     );
     process.exit(1);
