@@ -312,11 +312,41 @@ module.exports = function (RED) {
 
         (async () => {
             let loadedDeviceInfo = null;
+            let isDeviceReinstatement = false;
 
-            const contextDevice = context.get('deviceInfo');
-            if (contextDevice) {
-                loadedDeviceInfo = contextDevice;
-                console.log(`Node ${node.id}: Device loaded from context.`);
+            // Check if a device was loaded from the dropdown (device reinstatement)
+            if (config.loadedDeviceFilename && config.loadedDeviceFilename.trim() !== '') {
+                try {
+                    const deviceManager = require('../lib/deviceManager');
+                    loadedDeviceInfo = deviceManager.loadDeviceFile(config.loadedDeviceFilename);
+                    isDeviceReinstatement = true;
+                    console.log(`Node ${node.id}: Device reinstatement - loaded device from: ${config.loadedDeviceFilename}`);
+                    
+                    // Rename the device file to match the new node ID if needed
+                    if (config.loadedDeviceFilename !== `${node.id}.json`) {
+                        console.log(`Node ${node.id}: Renaming device file from ${config.loadedDeviceFilename} to ${node.id}.json`);
+                        deviceManager.renameDeviceFile(config.loadedDeviceFilename, node.id);
+                    }
+                    
+                    // Clear the loadedDeviceFilename to forget about the old file
+                    // From now on, this node will use its own file (node.id.json)
+                    config.loadedDeviceFilename = '';
+                    console.log(`Node ${node.id}: Device reinstatement complete - now using standard deployment flow`);
+                } catch (err) {
+                    // This is expected behavior - the device file may have been renamed in a previous deployment
+                    console.log(`Node ${node.id}: Device file ${config.loadedDeviceFilename}.json not found (likely renamed in previous deployment). Proceeding with new device creation.`);
+                    // Clear the failed filename and proceed with new device creation
+                    config.loadedDeviceFilename = '';
+                }
+            }
+
+            // Fallback to existing logic for context and disk loading
+            if (!loadedDeviceInfo) {
+                const contextDevice = context.get('deviceInfo');
+                if (contextDevice) {
+                    loadedDeviceInfo = contextDevice;
+                    console.log(`Node ${node.id}: Device loaded from context.`);
+                }
             }
 
             if (!loadedDeviceInfo && fs.existsSync(deviceFile)) {
@@ -330,6 +360,7 @@ module.exports = function (RED) {
             }
 
             if (loadedDeviceInfo) {
+                // Update configuration fields while preserving existing Hedera account data
                 loadedDeviceInfo.buyerEvmAddress = config.buyerEvmAddress;
                 loadedDeviceInfo.description = config.description;
                 loadedDeviceInfo.deviceName = config.deviceName;
@@ -337,10 +368,29 @@ module.exports = function (RED) {
                 loadedDeviceInfo.serialNumber = config.serialNumber;
                 loadedDeviceInfo.deviceType = config.deviceType;
                 loadedDeviceInfo.price = config.price;
+                
+                // Set smart contract from configuration
+                const contracts = {
+                    "jetvision": process.env.JETVISION_CONTRACT_EVM,
+                    "chat": process.env.CHAT_CONTRACT_EVM,
+                    "challenges": process.env.CHALLENGES_CONTRACT_EVM,
+                };
+                loadedDeviceInfo.smartContract = contracts[config.smartContract.toLowerCase()];
+                
                 node.deviceInfo = loadedDeviceInfo;
+                node.deviceInfo.nodeType = "seller";
+                node.deviceInfo.nodeId = node.id;
+                
+                // Save the updated device info
                 fs.writeFileSync(deviceFile, JSON.stringify(node.deviceInfo, null, 2), 'utf-8');
                 context.set('deviceInfo', node.deviceInfo);
-                node.status({ fill: "green", shape: "dot", text: "Device loaded." });
+                
+                if (isDeviceReinstatement) {
+                    node.status({ fill: "green", shape: "dot", text: "Device reinstated." });
+                    console.log(`Node ${node.id}: Device reinstatement completed - using existing Hedera account and topics`);
+                } else {
+                    node.status({ fill: "green", shape: "dot", text: "Device loaded." });
+                }
             }
 
             if (!node.deviceInfo) {
@@ -769,7 +819,7 @@ module.exports = function (RED) {
     RED.httpAdmin.get('/seller/last-seen/:topicId', async function (req, res) {
         const topicId = req.params.topicId;
         
-        console.log(`[DEBUG] Seller last seen requested for topic: ${topicId}`);
+       // console.log(`[DEBUG] Seller last seen requested for topic: ${topicId}`);
         
         try {
             if (!hederaService) {
@@ -1129,4 +1179,145 @@ module.exports = function (RED) {
             });
         }
     });
+
+    // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
+    
+    // Import deviceManager for new endpoints
+    const deviceManager = require('../lib/deviceManager');
+
+    // Endpoint for Seller Device List - Get eligible seller devices for reinstatement
+    RED.httpAdmin.get('/seller/devices/eligible', function (req, res) {
+        try {
+            // Get currently active node IDs to exclude from the list
+            const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            
+            // Get eligible seller devices
+            const eligibleDevices = deviceManager.listEligibleDevices('seller', activeNodeIds);
+            
+            console.log(`[SELLER DEVICES] Found ${eligibleDevices.length} eligible seller devices (excluding ${activeNodeIds.length} active nodes)`);
+            
+            res.json({
+                success: true,
+                devices: eligibleDevices,
+                activeNodeIds: activeNodeIds,
+                count: eligibleDevices.length
+            });
+            
+        } catch (error) {
+            console.error('[SELLER DEVICES] Error fetching eligible seller devices:', error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch eligible seller devices: ${error.message}`
+            });
+        }
+    });
+
+    // Endpoint to get balance by account ID (efficient direct access)
+    RED.httpAdmin.get('/device/balance/by-account/:accountId', async function (req, res) {
+        const accountId = req.params.accountId;
+        
+        try {
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    success: false, 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+            
+            console.log(`[DEVICE BALANCE] Fetching balance for account ID: ${accountId}`);
+            
+            // Get balance in tinybars directly using account ID
+            const balanceTinybars = await hederaService.getAccountBalanceTinybars(accountId);
+            
+            // Convert to HBAR (1 HBAR = 100,000,000 tinybars)
+            const balanceHbar = (balanceTinybars / 100000000).toFixed(8);
+            
+            console.log(`[DEVICE BALANCE] Balance for ${accountId}: ${balanceHbar} HBAR`);
+            
+            res.json({
+                success: true,
+                balance: balanceHbar,
+                balanceTinybars: balanceTinybars.toString(),
+                accountId: accountId,
+                unit: 'HBAR'
+            });
+            
+        } catch (error) {
+            console.error(`[DEVICE BALANCE] Error fetching balance for ${accountId}:`, error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch balance: ${error.message}`
+            });
+        }
+    });
+
+    // Endpoint to get balance by EVM address (fallback method)
+    RED.httpAdmin.get('/device/balance/:evmAddress', async function (req, res) {
+        const evmAddress = req.params.evmAddress;
+        
+        try {
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    success: false, 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+            
+            console.log(`[DEVICE BALANCE] Fetching balance for EVM address: ${evmAddress}`);
+            
+            // Find the device file that contains this EVM address
+            const deviceManager = require('../lib/deviceManager');
+            const allFiles = deviceManager.listAllDeviceFiles();
+            let accountId = null;
+            let deviceData = null;
+            
+            // Search through device files to find the one with matching EVM address
+            for (const filename of allFiles) {
+                try {
+                    const data = deviceManager.loadDeviceFile(filename);
+                    if (data.evmAddress && data.evmAddress.toLowerCase() === evmAddress.toLowerCase()) {
+                        accountId = data.accountId;
+                        deviceData = data;
+                        break;
+                    }
+                } catch (error) {
+                    console.error(`[DEVICE BALANCE] Error loading device file ${filename}:`, error);
+                    continue;
+                }
+            }
+            
+            if (!accountId) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Device not found for EVM address'
+                });
+            }
+            
+            // Get balance in tinybars
+            const balanceTinybars = await hederaService.getAccountBalanceTinybars(accountId);
+            
+            // Convert to HBAR (1 HBAR = 100,000,000 tinybars)
+            const balanceHbar = (balanceTinybars / 100000000).toFixed(8);
+            
+            console.log(`[DEVICE BALANCE] Balance for ${evmAddress} (${accountId}): ${balanceHbar} HBAR`);
+            
+            res.json({
+                success: true,
+                balance: balanceHbar,
+                balanceTinybars: balanceTinybars.toString(),
+                accountId: accountId,
+                evmAddress: evmAddress,
+                unit: 'HBAR'
+            });
+            
+        } catch (error) {
+            console.error(`[DEVICE BALANCE] Error fetching balance for ${evmAddress}:`, error);
+            res.status(500).json({
+                success: false,
+                error: `Failed to fetch balance: ${error.message}`
+            });
+        }
+    });
+
+    // Note: The /device/:filename endpoint is already added in buyer.js and will work for both buyer and seller
 };
