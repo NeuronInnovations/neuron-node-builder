@@ -71,42 +71,72 @@ const launcherScript = [
   'exec ./neuron-node-builder "$@"',
 ].join("\n");
 
+function writeSimpleLauncher(targetDir) {
+  const launcherPath = path.join(targetDir, "Launcher");
+  fs.writeFileSync(launcherPath, launcherScript);
+  fs.chmodSync(launcherPath, 0o755);
+  return launcherPath;
+}
+
 console.log("Building menu bar app...");
+const menubarBinarySource = path.join(
+  baseDirectory,
+  "menubar",
+  "build",
+  "NeuronNodeBuilderMenuBar.app",
+  "Contents",
+  "MacOS",
+  "NeuronNodeBuilderMenuBar"
+);
+const menubarExecutablePath = path.join(macosPath, "NeuronNodeBuilderMenuBar");
+
+let integratedMenuBar = false;
+
 try {
-  execSync("./menubar/build-menubar.sh", { stdio: "inherit" });
+  execSync(`./menubar/build-menubar.sh --arch=${arch}`, {
+    stdio: "inherit",
+    env: { ...process.env, ARCH: arch },
+  });
 
-  const menubarAppPath = path.join(
-    baseDirectory,
-    "menubar",
-    "build",
-    "NeuronNodeBuilderMenuBar.app",
-    "Contents",
-    "MacOS",
-    "NeuronNodeBuilderMenuBar"
-  );
-  const menubarExecutablePath = path.join(
-    macosPath,
-    "NeuronNodeBuilderMenuBar"
-  );
+  if (fs.existsSync(menubarBinarySource)) {
+    const expectedArchitecture = arch === "arm64" ? "arm64" : "x86_64";
+    let architectureMatches = true;
 
-  if (fs.existsSync(menubarAppPath)) {
-    fs.copyFileSync(menubarAppPath, menubarExecutablePath);
-    fs.chmodSync(menubarExecutablePath, 0o755);
-    console.log("✅ Menu bar app integrated successfully");
+    try {
+      const fileOutput = execSync(`file "${menubarBinarySource}"`).toString();
+      if (!fileOutput.includes(expectedArchitecture)) {
+        console.log(
+          `⚠️  Menu bar app architecture mismatch. Expected ${expectedArchitecture}, got: ${fileOutput.trim()}`
+        );
+        architectureMatches = false;
+      }
+    } catch (verificationError) {
+      console.log(
+        "⚠️  Unable to verify menu bar binary architecture:",
+        verificationError.message
+      );
+    }
+
+    if (architectureMatches) {
+      fs.copyFileSync(menubarBinarySource, menubarExecutablePath);
+      fs.chmodSync(menubarExecutablePath, 0o755);
+      integratedMenuBar = true;
+      console.log("✅ Menu bar app integrated successfully");
+    } else {
+      console.log("⚠️  Falling back to simple launcher due to architecture mismatch");
+    }
   } else {
     console.log("⚠️  Menu bar app not found, falling back to simple launcher");
-    const launcherPath = path.join(macosPath, "Launcher");
-    fs.writeFileSync(launcherPath, launcherScript);
-    fs.chmodSync(launcherPath, 0o755);
   }
 } catch (error) {
   console.log(
     "⚠️  Failed to build menu bar app, using simple launcher:",
     error.message
   );
-  const launcherPath = path.join(macosPath, "Launcher");
-  fs.writeFileSync(launcherPath, launcherScript);
-  fs.chmodSync(launcherPath, 0o755);
+}
+
+if (!integratedMenuBar) {
+  writeSimpleLauncher(macosPath);
 }
 
 const infoPlist = `<?xml version="1.0" encoding="UTF-8"?>

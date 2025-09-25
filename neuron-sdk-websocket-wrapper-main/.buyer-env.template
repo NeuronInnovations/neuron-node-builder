@@ -1,0 +1,8 @@
+eth_rpc_url=https://testnet.hashio.io/api
+hedera_evm_id=54d9e1e2664.... #Make sure there is no 0x
+hedera_id=0.0.1234
+list_of_sellers=02c73....  #public key of the seller(s), not evm address . Make sure there is no 0x
+location={"lat":-2.1574851,"lon":101.7108034,"alt":0.000000}
+mirror_api_url=https://testnet.mirrornode.hedera.com/api/v1
+private_key=23be04ef0acc046....  #Make sure there is no 0x, needs to be ECDSA private key
+smart_contract_address=0x87e2fc64dc1eae07300c2fc50d6700549e1632ca

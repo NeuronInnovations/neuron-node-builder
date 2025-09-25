@@ -1,0 +1,10 @@
+__debug*
+.DS_Store
+.env
+*.env
+.buyer-env
+.seller-env
+.cursor**
+dist/
+.gocache/
+.gomodcache/
