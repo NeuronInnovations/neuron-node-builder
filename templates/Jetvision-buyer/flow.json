@@ -1,0 +1,153 @@
+[
+    {
+        "id": "410574e908a5610c",
+        "type": "tab",
+        "label": "Buy Jetvision data",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "05d0a4ced2217ffc",
+        "type": "neuron-p2p",
+        "z": "410574e908a5610c",
+        "name": "",
+        "selectedNode": "",
+        "description": "",
+        "x": 180,
+        "y": 220,
+        "wires": [
+            [
+                "46343bae1d3f1da3"
+            ]
+        ]
+    },
+    {
+        "id": "46343bae1d3f1da3",
+        "type": "function",
+        "z": "410574e908a5610c",
+        "name": "Translate to worldmap data format",
+        "func": "if (typeof msg.payload === \"string\") {\n    try {\n        msg.payload = JSON.parse(msg.payload);\n    } catch (e) {\n        node.error(\"Invalid JSON payload: \" + msg.payload, msg);\n        return null; // stop execution if parsing fails\n    }\n}\n\n\nvar bearing = msg.payload.hdgs;\nif (!bearing) {\n    bearing = msg.payload.trk;\n}\nmsg.payload = {\n    name: msg.payload.hex,\n    lat: msg.payload.lat,\n    lon: msg.payload.lon,\n    icon: \"plane\",\n    iconSize: 32,\n    label: msg.payload.fli,\n    bearing: bearing,\n    speed: msg.payload.spd,\n    alt: msg.payload.alt,\n}\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 560,
+        "y": 220,
+        "wires": [
+            [
+                "ddd0bd7fe01ce1ed"
+            ]
+        ]
+    },
+    {
+        "id": "ddd0bd7fe01ce1ed",
+        "type": "ui_worldmap",
+        "z": "410574e908a5610c",
+        "group": "3699fb92c1625137",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "lat": "",
+        "lon": "",
+        "zoom": "",
+        "layer": "OSMG",
+        "cluster": "",
+        "maxage": "",
+        "usermenu": "hide",
+        "layers": "hide",
+        "panit": "true",
+        "panlock": "false",
+        "zoomlock": "false",
+        "hiderightclick": "true",
+        "coords": "none",
+        "showgrid": "false",
+        "showruler": "false",
+        "allowFileDrop": "false",
+        "path": "/worldmap",
+        "overlist": "DR,CO,RA,DN,HM",
+        "maplist": "OSMG,OSMC,EsriC,EsriS,EsriT,EsriDG,UKOS",
+        "mapname": "",
+        "mapurl": "",
+        "mapopt": "",
+        "mapwms": false,
+        "x": 920,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "f00d7ce9c693c291",
+        "type": "comment",
+        "z": "410574e908a5610c",
+        "name": "[ACTION] Double click and select \"Jetvision Buyer Config\"",
+        "info": "",
+        "x": 310,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "cd422c8f76e992fe",
+        "type": "buyer config",
+        "z": "410574e908a5610c",
+        "name": "Jetvision Buyer Config",
+        "sellerEvmAddress": "[]",
+        "sellerDevices": [],
+        "smartContract": "jetvision",
+        "deviceType": "",
+        "description": "",
+        "evmAddress": "New node - EVM address will be generated after deployment",
+        "balance": "New node - balance will be available after deployment",
+        "publicKey": "New node - Public key will be generated after deployment",
+        "stdInTopic": "New node - StdIn topic will be generated after deployment",
+        "stdOutTopic": "New node - StdOut topic will be generated after deployment",
+        "stdErrTopic": "New node - StdErr topic will be generated after deployment",
+        "loadedDeviceFilename": "",
+        "x": 200,
+        "y": 120,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9169dee9ecb10b9a",
+        "type": "comment",
+        "z": "410574e908a5610c",
+        "name": "[ACTION] Double click and add SELLER EVM",
+        "info": "",
+        "x": 270,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "1a4e5265c77d3802",
+        "type": "comment",
+        "z": "410574e908a5610c",
+        "name": "View map -  http://localhost:1880/worldmap/",
+        "info": "",
+        "x": 930,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "3699fb92c1625137",
+        "type": "ui_group",
+        "name": "Default",
+        "tab": "b49b76ab4930b9bc",
+        "order": 2,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "b49b76ab4930b9bc",
+        "type": "ui_tab",
+        "name": "Home",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    }
+]
