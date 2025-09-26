@@ -29,15 +29,33 @@ require('dotenv').config({
   path: envPath,
 });
 
-// Construct binary map
+// Construct binary map by platform/arch
+const platform = os.platform();
+const arch = os.arch();
+
 const binaries = {
-  'win32': 'neuron-wrapper-win64.exe',
-  'darwin': 'neuron-wrapper-darwin64',
-  'linux': 'neuron-wrapper-linux64'
+  darwin: {
+    arm64: 'neuron-wrapper-darwin-arm64',
+    x64: 'neuron-wrapper-darwin64',
+  },
+  win32: {
+    x64: 'neuron-wrapper-win64.exe',
+  },
+  linux: {
+    x64: 'neuron-wrapper-linux64',
+  },
 };
 
+const platformBinaries = binaries[platform] || {};
+const binaryName = platformBinaries[arch];
+
+if (!binaryName) {
+  console.error(`Unsupported platform/arch combination: ${platform} ${arch}`);
+  process.exit(1);
+}
+
 // Resolve path to the neuron-wrapper binary
-const binPath = path.resolve(__dirname, 'build', 'bin', binaries[os.platform()]);
+const binPath = path.resolve(__dirname, 'build', 'bin', binaryName);
 
 // Check if the binary exists
 if (!fs.existsSync(binPath)) {
