@@ -43,6 +43,34 @@ class ProcessManager {
         // Cleanup stale entries on startup
         this.registry.cleanupStaleEntries();
         this.portManager.cleanupExpiredReservations();
+        
+        // Detect and resolve port conflicts on startup
+        this.portManager.detectAndResolveConflicts().catch(error => {
+            console.error('Error detecting port conflicts on startup:', error.message);
+        });
+    }
+
+    /**
+     * Get flow ID from a Node-RED node
+     */
+    getFlowId(node) {
+        try {
+            // In Node-RED, nodes have a 'z' property that contains the flow ID
+            if (node.z) {
+                return node.z;
+            }
+            
+            // Alternative: try to get flow ID from the node's parent flow
+            if (node._flow && node._flow.id) {
+                return node._flow.id;
+            }
+            
+            // If we can't determine the flow ID, return null
+            return null;
+        } catch (error) {
+            console.warn(`Could not determine flow ID for node ${node.id}:`, error.message);
+            return null;
+        }
     }
 
     /**
@@ -133,9 +161,26 @@ class ProcessManager {
     async spawnNewProcess(node, deviceInfo, nodeType = 'buyer') {
         console.log(`Spawning new Go process for node ${node.id}`);
         
-        // Reserve a port
-        const port = await this.portManager.reservePort(node.id);
-        console.log(`Reserved port ${port} for node ${node.id}`);
+        // Get flow information for better port isolation
+        const flowId = this.getFlowId(node);
+        console.log(`Node ${node.id} belongs to flow: ${flowId || 'unknown'}`);
+        
+        let port;
+        try {
+            // Reserve a port with flow isolation
+            port = await this.portManager.reservePort(node.id, null, flowId);
+            console.log(`Reserved port ${port} for node ${node.id}${flowId ? ` (flow: ${flowId})` : ''}`);
+        } catch (portError) {
+            console.error(`Port reservation failed for node ${node.id}:`, portError.message);
+            
+            // Try to resolve conflicts and retry
+            console.log('Attempting to resolve port conflicts...');
+            await this.portManager.detectAndResolveConflicts();
+            
+            // Retry port reservation
+            port = await this.portManager.reservePort(node.id, null, flowId);
+            console.log(`Reserved port ${port} for node ${node.id} after conflict resolution${flowId ? ` (flow: ${flowId})` : ''}`);
+        }
         
         // Update device info with port
         deviceInfo.uniquePort = port;
@@ -266,7 +311,8 @@ class ProcessManager {
             // Remove from registry
             this.registry.removeProcess(nodeId);
             
-            // Release the port reservation
+            // Release the port reservation (we need to get flow ID from the node)
+            // For cleanup, we'll try to find the reservation by nodeId only
             this.portManager.releasePort(nodeId);
             
             console.log(`Cleanup completed for node ${nodeId}`);
