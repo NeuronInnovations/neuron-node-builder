@@ -102,22 +102,6 @@ async function build() {
       ],
     },
     {
-      id: "linux-x86",
-      bin: "neuron-wrapper-linux32",
-      candidates: [
-        { name: "neuron-wrapper-linux32" },
-        { name: "neuron-wrapper-linux32.zip", archive: "zip", expected: "neuron-wrapper-linux32" },
-      ],
-    },
-    {
-      id: "linux-x64",
-      bin: "neuron-wrapper-linux64",
-      candidates: [
-        { name: "neuron-wrapper-linux64" },
-        { name: "neuron-wrapper-linux64.zip", archive: "zip", expected: "neuron-wrapper-linux64" },
-      ],
-    },
-    {
       id: "win-x86",
       bin: "neuron-wrapper-win32.exe",
       candidates: [
@@ -511,10 +495,6 @@ async function build() {
     "node18-macos-arm64": {
       bin: "neuron-wrapper-darwin-arm64",
       output: "latest-macos-arm64",
-    },
-    "node18-linux-x64": {
-      bin: "neuron-wrapper-linux64",
-      output: "latest-linux-x64",
     },
   };
 

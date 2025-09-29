@@ -191,11 +191,6 @@ if [ -f "package.json" ] && command_exists npm; then
             print_result 1 "Windows executable not found"
         fi
 
-        if [ -f "build/releases/latest-linux-x64" ]; then
-            print_result 0 "Linux executable created"
-        else
-            print_result 1 "Linux executable not found"
-        fi
     else
         print_result 1 "Package command failed or timed out"
     fi

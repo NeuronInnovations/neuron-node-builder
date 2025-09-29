@@ -41,16 +41,17 @@ const binaries = {
   win32: {
     x64: 'neuron-wrapper-win64.exe',
   },
-  linux: {
-    x64: 'neuron-wrapper-linux64',
-  },
 };
 
 const platformBinaries = binaries[platform] || {};
 const binaryName = platformBinaries[arch];
 
 if (!binaryName) {
-  console.error(`Unsupported platform/arch combination: ${platform} ${arch}`);
+  if (platform === 'linux') {
+    console.error('Linux support has been discontinued. Please use the macOS or Windows builds of Neuron Node Builder.');
+  } else {
+    console.error(`Unsupported platform/arch combination: ${platform} ${arch}`);
+  }
   process.exit(1);
 }
 

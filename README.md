@@ -24,8 +24,9 @@ Both must be compiled for your specific platform and placed in the same director
 ### Supported Platforms
 
 - **macOS** (Intel x64 and Apple Silicon ARM64)
-- **Linux** (x64 and ARM64)
 - **Windows** (x64)
+
+> **Note:** Linux distributions are no longer supported. Use macOS or Windows to run Neuron Node Builder.
 
 ## Installation & Setup
 
@@ -114,7 +115,6 @@ Start Neuron Node Builder with the custom settings:
 npm run start
 ```
 
-
 ## Building Dependencies from Source
 
 Follow these steps to compile the required Go dependencies from source:
@@ -135,27 +135,14 @@ brew install go
 # Visit https://golang.org/dl/ and download the macOS installer
 ```
 
-#### On Linux:
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install golang-go
-
-# CentOS/RHEL/Fedora
-sudo yum install golang
-# or
-sudo dnf install golang
-```
-
 #### On Windows:
-Download the installer from [golang.org/dl/](https://golang.org/dl/)
+Download the installer from [golang.org/dl](https://golang.org/dl/) and follow the standard Windows setup wizard.
 
 ### Step 2: Verify Go Installation
 
 ```bash
 go version
 ```
-
 
 ### Step 4: Clone and Build neuron-nodered-sdk-wrapper
 
@@ -167,18 +154,14 @@ cd neuron-nodered-sdk-wrapper
 # Build for your platform
 go build -o neuron-nodered-sdk-wrapper
 
-# For cross-platform builds:
+# For cross-platform builds (macOS/Windows only):
 # macOS ARM64 (Apple Silicon)
 GOOS=darwin GOARCH=arm64 go build -o neuron-nodered-sdk-wrapper-darwin-arm64
 
 # macOS Intel
 GOOS=darwin GOARCH=amd64 go build -o neuron-nodered-sdk-wrapper-darwin-amd64
 
-# Linux x64
-GOOS=linux GOARCH=amd64 go build -o neuron-nodered-sdk-wrapper-linux-amd64
-
-# Linux ARM64
-GOOS=linux GOARCH=arm64 go build -o neuron-nodered-sdk-wrapper-linux-arm64
+# Linux builds are no longer supported
 
 # Windows
 GOOS=windows GOARCH=amd64 go build -o neuron-nodered-sdk-wrapper.exe
@@ -207,7 +190,6 @@ Update your `.env` file to point to the compiled wrapper:
 # SDK Configuration
 NEURON_SDK_PATH=/path/to/your/project/bin/neuron-nodered-sdk-wrapper
 ```
-
 
 ## First-Time Setup
 

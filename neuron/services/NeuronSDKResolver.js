@@ -131,10 +131,6 @@ class NeuronSDKResolver {
                 'x64': 'win64',
                 'ia32': 'win32'
             },
-            'linux': {
-                'x64': 'linux64',
-                'ia32': 'linux32'
-            },
             'darwin': {
                 'x64': 'darwin64',
                 'arm64': 'darwin64' // Assuming ARM64 builds are named the same
@@ -143,6 +139,9 @@ class NeuronSDKResolver {
 
         const targetPlatform = platformMap[platform]?.[arch];
         if (!targetPlatform) {
+            if (platform === 'linux') {
+                throw new Error('Linux support has been discontinued. Please use a macOS or Windows release of Neuron Node Builder.');
+            }
             throw new Error(`Unsupported platform: ${platform} ${arch}`);
         }
 

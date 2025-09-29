@@ -127,8 +127,7 @@ jobs:
           declare -A EXECUTABLES=(
             ["build/releases/latest-macos-x64"]="macOS x64"
             ["build/releases/latest-macos-arm64"]="macOS arm64"
-            ["build/releases/latest-win-x64.exe"]="Windows"  
-            ["build/releases/latest-linux-x64"]="Linux"
+            ["build/releases/latest-win-x64.exe"]="Windows"
           )
 
           for executable in "${!EXECUTABLES[@]}"; do
@@ -528,21 +527,6 @@ jobs:
             ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
           fi
 
-          # Linux executable
-          echo "Preparing Linux package..."
-          LINUX_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-linux-x64"
-          if [ -f "$LINUX_EXE" ]; then
-            CURRENT_DIR=$(pwd)
-            cd "$BUILD_ARTIFACTS_DIR/build/releases"
-            zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-linux-x64-v$VERSION.zip" latest-linux-x64
-            cd "$CURRENT_DIR"
-            echo "SUCCESS: Linux package created"
-          else
-            echo "WARNING: Linux executable not found at: $LINUX_EXE"
-            echo "Available files in build artifacts:"
-            ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
-          fi
-
           # macOS signed applications
           for ARCH in x64 arm64; do
             echo "Preparing macOS package for ${ARCH}..."
@@ -587,9 +571,6 @@ jobs:
           - **Download**: [\`neuron-node-builder-win-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-win-x64-v$VERSION.zip)
           - **Requirements**: Windows 10+ (64-bit)
 
-          ### Linux
-          - **Download**: [\`neuron-node-builder-linux-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-linux-x64-v$VERSION.zip)
-          - **Requirements**: Linux x64 with glibc 2.17+
 
           ## Security Information
 
@@ -610,11 +591,6 @@ jobs:
           2. Extract to desired location
           3. Run \`latest-win-x64.exe\`
 
-          ### Linux
-          1. Download the Linux ZIP file
-          2. Extract: \`unzip neuron-node-builder-linux-x64-v$VERSION.zip\`
-          3. Make executable: \`chmod +x latest-linux-x64\`
-          4. Run: \`./latest-linux-x64\`
           EOF
 
       - name: Create GitHub Release

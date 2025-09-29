@@ -53,7 +53,6 @@ git push origin v1.0.0-test
   - [ ] `neuron-node-builder-macos-x64-v1.0.0-test.zip`
   - [ ] `neuron-node-builder-macos-x64-v1.0.0-test.zip.sha256`
   - [ ] `neuron-node-builder-win-x64-v1.0.0-test.zip`
-  - [ ] `neuron-node-builder-linux-x64-v1.0.0-test.zip`
 
 ### 5. Test Downloaded App
 
