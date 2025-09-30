@@ -89,24 +89,9 @@ body .red-ui-header,
 
 /* Clean up - remove all conflicting methods and keep only the working one */
 
-.red-ui-header-toolbar::before {
-    content: var(--balance-text);
-    display: inline-flex !important;
-    align-items: center !important;
-    color: #888888 !important;
-    font-weight: bold !important;
-    padding: 4px 12px !important;
-    margin: 0 5px !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    border-radius: 3px !important;
+/* Balance link styling - now handled by JavaScript */
+#neuron-balance-link {
     order: -2 !important;
-    transition: content 0.3s ease !important;
-}
-
-/* Force visibility */
-body .red-ui-header-toolbar::before {
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 
 /* GLOBAL SOLUTION: Override Node-RED's hover variables to disable/modify hover effects */
@@ -571,6 +556,12 @@ body .red-ui-header-toolbar::before {
 }
 
 
+
+/* Health indicator dropdown - ensure it appears above all other elements */
+#neuron-health-indicator {
+    z-index: 100000 !important;
+    position: relative !important;
+}
 
 /* Responsive design */
 @media (max-width: 768px) {

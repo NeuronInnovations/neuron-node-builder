@@ -39,7 +39,7 @@
         dropdown.style.borderRadius = '6px';
         dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
         dropdown.style.minWidth = '220px';
-        dropdown.style.zIndex = '9999';
+        dropdown.style.zIndex = '100000';
         dropdown.style.fontSize = '14px';
         dropdown.style.padding = '10px 0';
         dropdown.innerHTML = '<div style="padding:10px;text-align:center;color:#aaa;">Loading...</div>';
