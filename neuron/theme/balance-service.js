@@ -26,8 +26,48 @@
             element.textContent = `Account: ${accountId} | Balance: ${balance} USDC`;
         });
 
-        // Update CSS custom property for pseudo-element content
-        document.documentElement.style.setProperty('--balance-text', `"Account: ${accountId} | Balance: ${balance} USDC"`);
+        // Create or update the balance link element
+        let balanceLink = document.getElementById('neuron-balance-link');
+        if (!balanceLink) {
+            // Create the balance link element
+            balanceLink = document.createElement('a');
+            balanceLink.id = 'neuron-balance-link';
+            balanceLink.href = 'https://portal.hedera.com/faucet';
+            balanceLink.target = '_blank';
+            balanceLink.rel = 'noopener noreferrer';
+            balanceLink.style.cssText = `
+                display: inline-flex !important;
+                align-items: center !important;
+                color: #888888 !important;
+                font-weight: bold !important;
+                padding: 4px 12px !important;
+                margin: 0 5px !important;
+                background: rgba(255, 255, 255, 0.1) !important;
+                border-radius: 3px !important;
+                text-decoration: none !important;
+                transition: all 0.3s ease !important;
+                cursor: pointer !important;
+            `;
+            
+            // Add hover effect
+            balanceLink.addEventListener('mouseenter', function() {
+                this.style.background = 'rgba(255, 255, 255, 0.2)';
+                this.style.color = '#ffffff';
+            });
+            balanceLink.addEventListener('mouseleave', function() {
+                this.style.background = 'rgba(255, 255, 255, 0.1)';
+                this.style.color = '#888888';
+            });
+            
+            // Insert into header toolbar
+            const headerToolbar = document.querySelector('.red-ui-header-toolbar');
+            if (headerToolbar) {
+                headerToolbar.insertBefore(balanceLink, headerToolbar.firstChild);
+            }
+        }
+        
+        // Update the link text
+        balanceLink.textContent = `Account: ${accountId} | Balance: ${balance} USDC`;
         
         currentBalance = balance;
         console.log(`✅ Balance updated: ${balance} USDC`);
@@ -35,7 +75,49 @@
 
     function showBalanceError(message) {
         console.error('❌ Balance Error:', message);
-        updateBalanceDisplay('Error');
+        
+        // Create or update the balance link element with error state
+        let balanceLink = document.getElementById('neuron-balance-link');
+        if (!balanceLink) {
+            // Create the balance link element
+            balanceLink = document.createElement('a');
+            balanceLink.id = 'neuron-balance-link';
+            balanceLink.href = 'https://portal.hedera.com/faucet';
+            balanceLink.target = '_blank';
+            balanceLink.rel = 'noopener noreferrer';
+            balanceLink.style.cssText = `
+                display: inline-flex !important;
+                align-items: center !important;
+                color: #888888 !important;
+                font-weight: bold !important;
+                padding: 4px 12px !important;
+                margin: 0 5px !important;
+                background: rgba(255, 255, 255, 0.1) !important;
+                border-radius: 3px !important;
+                text-decoration: none !important;
+                transition: all 0.3s ease !important;
+                cursor: pointer !important;
+            `;
+            
+            // Add hover effect
+            balanceLink.addEventListener('mouseenter', function() {
+                this.style.background = 'rgba(255, 255, 255, 0.2)';
+                this.style.color = '#ffffff';
+            });
+            balanceLink.addEventListener('mouseleave', function() {
+                this.style.background = 'rgba(255, 255, 255, 0.1)';
+                this.style.color = '#888888';
+            });
+            
+            // Insert into header toolbar
+            const headerToolbar = document.querySelector('.red-ui-header-toolbar');
+            if (headerToolbar) {
+                headerToolbar.insertBefore(balanceLink, headerToolbar.firstChild);
+            }
+        }
+        
+        // Update the link text with error message
+        balanceLink.textContent = `Balance: Error - Click to get HBAR`;
     }
 
     async function fetchBalance() {
