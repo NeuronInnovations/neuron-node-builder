@@ -384,8 +384,16 @@ class ProcessManager {
             if (!fs.existsSync(binDirectory)) {
                 fs.mkdirSync(binDirectory, { recursive: true });
             }
-            fs.copyFileSync(executablePath, path.join(binDirectory, path.basename(executablePath)));
-            const copiedExecutablePath = path.join(binDirectory, path.basename(executablePath));
+            const destinationPath = path.join(binDirectory, path.basename(executablePath));
+
+            if (process.platform === 'darwin') {
+                const { execSync } = require('child_process');
+                execSync(`cp -p "${executablePath}" "${destinationPath}"`);
+            } else {
+                fs.copyFileSync(executablePath, destinationPath);
+            }
+
+            const copiedExecutablePath = destinationPath;
 
             console.log(`🔍 Check #4 - Copying executable to: ${copiedExecutablePath}`);
 
