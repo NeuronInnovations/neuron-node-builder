@@ -38,6 +38,7 @@ jobs:
 
     outputs:
       version: ${{ steps.version.outputs.version }}
+      wrapper_tag: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
 
     steps:
       - name: Checkout code with token validation
@@ -197,6 +198,16 @@ jobs:
 
           npm ci --ignore-scripts
           echo "SUCCESS: Dependencies installed successfully"
+
+      - name: Rebuild macOS binary
+        env:
+          ARCH: ${{ matrix.arch }}
+          NEURON_WRAPPER_TAG: ${{ needs.security-and-build.outputs.wrapper_tag }}
+        run: |
+          echo "Rebuilding pkg binary for ${ARCH} on macOS runner..."
+          npm run build
+          rm -f build/releases/latest-macos-${ARCH}
+          npm run package -- --targets=node18-macos-${ARCH}
 
       - name: Prepare macOS executable
         env:
