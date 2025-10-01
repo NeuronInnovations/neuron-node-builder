@@ -497,7 +497,42 @@ async function build() {
     },
   };
 
-  for (const target of Object.keys(targets)) {
+  function parseTargetList(rawTargets) {
+    return rawTargets
+      .split(/[;,\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+  }
+
+  let requestedTargets = null;
+  const cliTargetArg = process.argv.find((arg) => arg.startsWith("--targets="));
+  if (cliTargetArg) {
+    requestedTargets = parseTargetList(cliTargetArg.split("=")[1] || "");
+  } else if (process.env.PKG_TARGETS) {
+    requestedTargets = parseTargetList(process.env.PKG_TARGETS);
+  }
+
+  const targetsToBuild = requestedTargets?.length
+    ? requestedTargets
+    : Object.keys(targets);
+
+  const unknownTargets = targetsToBuild.filter((target) => !targets[target]);
+  if (unknownTargets.length) {
+    console.error(
+      chalk.red(
+        `❌ Unknown pkg targets: ${unknownTargets.join(", ")}. Valid options: ${Object.keys(targets).join(", ")}`
+      )
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    chalk.blue(
+      `Targets selected for build: ${targetsToBuild.join(", ")}`
+    )
+  );
+
+  for (const target of targetsToBuild) {
     buildExecutable(target, targets[target].bin, targets[target].output);
   }
 }

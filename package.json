@@ -1,6 +1,6 @@
 {
     "name": "node-red",
-    "version": "1.0.0",
+    "version": "1.0.8",
     "description": "Low-code programming for event-driven applications",
     "homepage": "https://nodered.org",
     "license": "Apache-2.0",
@@ -22,7 +22,7 @@
         "package": "node --max-old-space-size=8192 build.js",
         "copy-binaries": "node copy-binaries.js",
         "create-app-bundle": "node create-app-bundle.js"
-     },
+    },
     "contributors": [
         {
             "name": "Nick O'Leary"
@@ -31,7 +31,6 @@
             "name": "Dave Conway-Jones"
         }
     ],
-    
     "dependencies": {
         "@hashgraph/sdk": "^2.49.2",
         "@inquirer/prompts": "^7.8.3",
