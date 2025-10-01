@@ -29,18 +29,73 @@ async function checkNetworkConnectivity() {
 }
 
 async function checkHederaNetwork() {
-    // Call /neuron/balance endpoint and check for valid balance
-    try {
-        const url = `http://localhost:${process.env.PORT || 1880}/neuron/balance`;
-        const response = await fetchJson(url, 2000);
-        if (response && response.success && response.balance) {
-            return { ok: true, details: `Balance: ${response.balance}` };
-        } else {
-            return { ok: false, error: response && response.error ? response.error : 'No valid balance' };
+    // Test connectivity to Hedera TESTNET consensus nodes (0.0.7 and 0.0.9)
+    const consensusNodes = [
+        { id: '0.0.7', host: '34.94.160.4', port: 50211 },      // Testnet node 0.0.7
+        { id: '0.0.9', host: '34.133.197.230', port: 50211 }    // Testnet node 0.0.9
+    ];
+    
+    const nodeResults = [];
+    
+    // Check each consensus node
+    for (const node of consensusNodes) {
+        try {
+            await checkNodeConnectivity(node.host, node.port, 3000);
+            nodeResults.push({ id: node.id, healthy: true });
+        } catch (error) {
+            nodeResults.push({ id: node.id, healthy: false, error: error.message });
         }
-    } catch (e) {
-        return { ok: false, error: e.message };
     }
+    
+    const healthyNodes = nodeResults.filter(n => n.healthy);
+    const unhealthyNodes = nodeResults.filter(n => !n.healthy);
+    
+    if (healthyNodes.length === 0) {
+        return { 
+            ok: false, 
+            error: `All consensus nodes are unhealthy (${unhealthyNodes.map(n => n.id).join(', ')})`,
+            nodes: nodeResults
+        };
+    } else if (unhealthyNodes.length > 0) {
+        return { 
+            ok: true, 
+            warning: `Some nodes unhealthy: ${unhealthyNodes.map(n => n.id).join(', ')}`,
+            details: `${healthyNodes.length}/${consensusNodes.length} nodes healthy`,
+            nodes: nodeResults
+        };
+    } else {
+        return { 
+            ok: true, 
+            details: `All consensus nodes healthy (${healthyNodes.map(n => n.id).join(', ')})`,
+            nodes: nodeResults
+        };
+    }
+}
+
+// Helper function to check node connectivity via TCP
+function checkNodeConnectivity(host, port, timeout) {
+    return new Promise((resolve, reject) => {
+        const net = require('net');
+        const socket = new net.Socket();
+        
+        const timer = setTimeout(() => {
+            socket.destroy();
+            reject(new Error('Connection timeout'));
+        }, timeout);
+        
+        socket.on('connect', () => {
+            clearTimeout(timer);
+            socket.destroy();
+            resolve();
+        });
+        
+        socket.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+        
+        socket.connect(port, host);
+    });
 }
 
 

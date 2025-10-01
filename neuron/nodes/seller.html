@@ -1,6 +1,27 @@
 <script type="text/html" data-template-name="seller config">
      <!-- Device Reinstatement Section -->
      
+<style>
+.device-available {
+    color: #4CAF50 !important;
+    font-weight: bold;
+}
+
+.device-in-use {
+    color: #f44336 !important;
+    font-style: italic;
+}
+
+#node-input-loadDevice option:disabled {
+    color: #999 !important;
+    background-color: #f5f5f5 !important;
+}
+
+#node-input-loadDevice option:disabled:hover {
+    background-color: #f5f5f5 !important;
+}
+</style>
+
 <div class="neuron-seller-config">
     <div class="form-row">
         <label for="node-input-name"> <span>Name</span></label>
@@ -16,7 +37,7 @@
         </select>
     </div>
 
-    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;">
+    <div class="form-row" id="device-reinstatement-section" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px; display: none;">
         <label for="node-input-loadDevice">Reinstantiate Device</span></label>
              <select id="node-input-loadDevice" style="flex: 1;">
                 <option value="">Create new device configuration</option>
@@ -28,6 +49,7 @@
         <div style="margin-top: 5px; font-size: 12px; color: #888;">
             <i>Select an existing device to reinstantiate its configuration</i>
         </div>
+        <input type="hidden" id="node-input-originalDeviceFilename" />
     </div>
 
     <div class="form-row">
@@ -249,6 +271,7 @@
             publicKey: { value: "" },
             // Device reinstatement field
             loadedDeviceFilename: { value: "" },
+            originalDeviceFilename: { value: "" },
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
             stdErrTopic: { value: "" }
@@ -274,6 +297,13 @@
             if (loadedFilename && loadedFilename.trim() !== '') {
                 node.loadedDeviceFilename = loadedFilename;
                 console.log(`[SELLER INIT] Restored loaded device filename: ${node.loadedDeviceFilename}`);
+            }
+            
+            // Initialize originalDeviceFilename from hidden field if it exists
+            const originalFilename = $('#node-input-originalDeviceFilename').val();
+            if (originalFilename && originalFilename.trim() !== '') {
+                node.originalDeviceFilename = originalFilename;
+                console.log(`[SELLER INIT] Restored original device filename: ${node.originalDeviceFilename}`);
             }
 
             // Function to make configuration fields readonly after deployment
@@ -319,7 +349,10 @@
                                 }
                             });
                             
-                            console.log(`[SELLER READONLY] Made configuration fields readonly for deployed node: ${node.id}`);
+                            // Hide device configuration dropdown for deployed nodes
+                            $('#device-reinstatement-section').hide();
+                            
+                            console.log(`[SELLER READONLY] Made configuration fields readonly and hid device dropdown for deployed node: ${node.id}`);
                         } else {
                             // Node not deployed, ensure fields are editable
                             const editableInputFields = [
@@ -356,6 +389,9 @@
                                 }
                             });
                             
+                            // Show device configuration dropdown for new nodes
+                            // Note: The dropdown will be shown/hidden based on available configurations in loadEligibleDevices()
+                            
                             console.log(`[SELLER READONLY] Made configuration fields editable for new node: ${node.id}`);
                         }
                     } catch (error) {
@@ -369,7 +405,7 @@
 
             // ===== DEVICE REINSTATEMENT FUNCTIONALITY =====
             
-            // Load eligible devices into dropdown
+            // Load all devices with status into dropdown
             async function loadEligibleDevices() {
                 try {
                     const response = await fetch('/seller/devices/eligible');
@@ -377,6 +413,7 @@
                     
                     const dropdown = $('#node-input-loadDevice');
                     const currentValue = dropdown.val();
+                    const deviceSection = $('#device-reinstatement-section');
                     
                     // Clear existing options except the first one
                     dropdown.find('option:not(:first)').remove();
@@ -385,21 +422,60 @@
                         data.devices.forEach(device => {
                             const formattedAddress = formatEvmAddress(device.evmAddress);
                             const truncatedAddress = formattedAddress.substring(0, 10) + '...';
-                            const option = $(`<option value="${device.filename}">${device.deviceName} (${truncatedAddress})</option>`);
+                            
+                            let optionText = `${device.deviceName} (${truncatedAddress})`;
+                            let optionClass = '';
+                            
+                            if (!device.available) {
+                                optionText += ` - In use by "${device.usedBy}"`;
+                                optionClass = 'device-in-use';
+                            } else {
+                                optionText += ' ✓ Available';
+                                optionClass = 'device-available';
+                            }
+                            
+                            const option = $(`<option value="${device.filename}" class="${optionClass}">${optionText}</option>`);
+                            
+                            // Disable unavailable options
+                            if (!device.available) {
+                                option.prop('disabled', true);
+                            }
+                            
                             dropdown.append(option);
                         });
-                        console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} eligible devices`);
+                        
+                        // Show the device section only if there are available configurations
+                        if (data.availableCount > 0) {
+                            deviceSection.show();
+                            console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} devices (${data.availableCount} available, ${data.devices.length - data.availableCount} in use) - showing dropdown`);
+                        } else {
+                            deviceSection.hide();
+                            console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} devices but none are available - hiding dropdown`);
+                        }
                     } else {
-                        console.log('[SELLER DEVICE LOAD] No eligible devices found');
+                        // Hide the device section if no devices
+                        deviceSection.hide();
+                        console.log('[SELLER DEVICE LOAD] No devices found');
                     }
                     
-                    // Restore previous selection if it still exists
-                    if (currentValue && dropdown.find(`option[value="${currentValue}"]`).length > 0) {
-                        dropdown.val(currentValue);
+                    // Restore previous selection if it still exists, or pre-select current configuration
+                    let selectionToRestore = currentValue;
+                    
+                    // If no current selection but we have an original device filename, use that
+                    if (!selectionToRestore && node.originalDeviceFilename && node.originalDeviceFilename.trim() !== '') {
+                        selectionToRestore = node.originalDeviceFilename;
+                        console.log(`[SELLER DEVICE LOAD] Pre-selecting original device configuration: ${selectionToRestore}`);
+                    }
+                    
+                    if (selectionToRestore && dropdown.find(`option[value="${selectionToRestore}"]`).length > 0) {
+                        dropdown.val(selectionToRestore);
+                        console.log(`[SELLER DEVICE LOAD] Restored device selection: ${selectionToRestore}`);
                     }
                     
                 } catch (error) {
-                    console.error('[SELLER DEVICE LOAD] Error loading eligible devices:', error);
+                    console.error('[SELLER DEVICE LOAD] Error loading devices:', error);
+                    // Hide section on error
+                    $('#device-reinstatement-section').hide();
                 }
             }
             
@@ -517,7 +593,9 @@
                         
                         // Store the loaded device filename for later use
                         node.loadedDeviceFilename = filename;
+                        node.originalDeviceFilename = filename;
                         $('#node-input-loadedDeviceFilename').val(filename);
+                        $('#node-input-originalDeviceFilename').val(filename);
                         
                         console.log('[SELLER DEVICE LOAD] Device configuration and runtime information loaded successfully');
                     } else {

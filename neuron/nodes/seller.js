@@ -537,6 +537,30 @@ module.exports = function (RED) {
                 await updateSelectedBuyers(node, initialBuyerEvmAddresses, true);
                 //console.log(`Node ${node.id}: Starting Go process via ProcessManager.`);
 
+                // Store connection status and balance status for combined display
+                let connectionStatus = { text: "Connecting...", fill: "yellow", shape: "ring" };
+                let balanceStatus = null;
+
+                // Helper function to update combined status
+                const updateCombinedStatus = () => {
+                    let statusText = connectionStatus.text;
+                    let statusFill = connectionStatus.fill;
+                    let statusShape = connectionStatus.shape;
+
+                    // Append balance info if available
+                    if (balanceStatus) {
+                        statusText += ` | ${balanceStatus.text}`;
+                        // Use the more critical status color (red > yellow > green)
+                        if (balanceStatus.fill === "red" || statusFill === "red") {
+                            statusFill = "red";
+                        } else if (balanceStatus.fill === "yellow" || statusFill === "yellow") {
+                            statusFill = "yellow";
+                        }
+                    }
+
+                    node.status({ fill: statusFill, shape: statusShape, text: statusText });
+                };
+
                 try {
                     node.status({ fill: "blue", shape: "dot", text: "Starting process..." });
                     node.goProcess = await processManager.ensureProcess(node, node.deviceInfo, 'seller');
@@ -551,13 +575,14 @@ module.exports = function (RED) {
                             if (status.isConnected) {
                                 const peerText = ` (${status.connectedPeers}/${status.totalPeers} peers)`;
                                 if (status.totalPeers > 0 && status.connectedPeers > 0) {
-                                    node.status({ fill: "green", shape: "dot", text: `Connected${peerText}` });
+                                    connectionStatus = { text: `Connected${peerText}`, fill: "green", shape: "dot" };
                                 } else {
-                                    node.status({ fill: "yellow", shape: "ring", text: "Connected - no peers" });
+                                    connectionStatus = { text: "Connected - no peers", fill: "yellow", shape: "ring" };
                                 }
                             } else {
-                                node.status({ fill: "yellow", shape: "ring", text: "Connecting..." });
+                                connectionStatus = { text: "Connecting...", fill: "yellow", shape: "ring" };
                             }
+                            updateCombinedStatus();
                         });
 
                         console.log(`Connection monitoring initialized for seller node ${node.id}`);
@@ -570,13 +595,22 @@ module.exports = function (RED) {
                     node.error(`Go process startup failed: ${error.message}`);
                     node.status({ fill: "red", shape: "ring", text: "Process failed" });
                 }
-                       cleanupBalanceCheck = startExponentialBalanceCheck({
+                cleanupBalanceCheck = startExponentialBalanceCheck({
                     node,
                     hederaService,
                     getAccountId: () => node.deviceInfo && node.deviceInfo.accountId,
-                    onLowBalance: (balanceHbars) => node.status({ fill: "yellow", shape: "ring", text: `Low balance: ${balanceHbars} HBAR` }),
-                    onZeroBalance: (balanceHbars) => node.status({ fill: "red", shape: "ring", text: `Balance: ${balanceHbars} HBAR` }),
-                    onError: () => node.status({ fill: "red", shape: "ring", text: "Balance check failed" }),
+                    onLowBalance: (balanceHbars) => {
+                        balanceStatus = { text: `Balance: ${balanceHbars} HBAR`, fill: "yellow" };
+                        updateCombinedStatus();
+                    },
+                    onZeroBalance: (balanceHbars) => {
+                        balanceStatus = { text: `Balance: ${balanceHbars} HBAR`, fill: "red" };
+                        updateCombinedStatus();
+                    },
+                    onError: () => {
+                        balanceStatus = { text: "Balance check failed", fill: "red" };
+                        updateCombinedStatus();
+                    },
                     initialDelayMs: 5000,
                     maxDelayMs: 5 * 60 * 1000
                 });
@@ -1185,29 +1219,39 @@ module.exports = function (RED) {
     // Import deviceManager for new endpoints
     const deviceManager = require('../lib/deviceManager');
 
-    // Endpoint for Seller Device List - Get eligible seller devices for reinstatement
+    // Endpoint for Seller Device List - Get all seller devices with status information
     RED.httpAdmin.get('/seller/devices/eligible', function (req, res) {
         try {
-            // Get currently active node IDs to exclude from the list
+            // Get currently active node IDs and their names
             const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            const activeNodeInfo = {};
             
-            // Get eligible seller devices
-            const eligibleDevices = deviceManager.listEligibleDevices('seller', activeNodeIds);
+            // Get node names for active nodes
+            RED.nodes.eachNode((node) => {
+                if (node.type === 'buyer config' || node.type === 'seller config' || 
+                    node.type === 'buyer' || node.type === 'seller') {
+                    activeNodeInfo[node.id] = node.name || node.type;
+                }
+            });
             
-            console.log(`[SELLER DEVICES] Found ${eligibleDevices.length} eligible seller devices (excluding ${activeNodeIds.length} active nodes)`);
+            // Get all seller devices (not just eligible ones)
+            const allSellerDevices = deviceManager.listAllDevicesWithStatus('seller', activeNodeIds, activeNodeInfo);
+            
+            console.log(`[SELLER DEVICES] Found ${allSellerDevices.length} seller devices (${allSellerDevices.filter(d => d.available).length} available, ${allSellerDevices.filter(d => !d.available).length} in use)`);
             
             res.json({
                 success: true,
-                devices: eligibleDevices,
+                devices: allSellerDevices,
                 activeNodeIds: activeNodeIds,
-                count: eligibleDevices.length
+                count: allSellerDevices.length,
+                availableCount: allSellerDevices.filter(d => d.available).length
             });
             
         } catch (error) {
-            console.error('[SELLER DEVICES] Error fetching eligible seller devices:', error);
+            console.error('[SELLER DEVICES] Error fetching seller devices:', error);
             res.status(500).json({
                 success: false,
-                error: `Failed to fetch eligible seller devices: ${error.message}`
+                error: `Failed to fetch seller devices: ${error.message}`
             });
         }
     });

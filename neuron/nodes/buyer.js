@@ -366,7 +366,10 @@ module.exports = function (RED) {
 
             if (loadedDeviceInfo) {
                 // Update configuration fields while preserving existing Hedera account data
-                loadedDeviceInfo.sellerEvmAddress = config.sellerEvmAddress;
+                // Only update sellerEvmAddress if config has a value, otherwise preserve loaded value
+                if (config.sellerEvmAddress && config.sellerEvmAddress !== '[]' && config.sellerEvmAddress !== '') {
+                    loadedDeviceInfo.sellerEvmAddress = config.sellerEvmAddress;
+                }
                 loadedDeviceInfo.description = config.description;
                 loadedDeviceInfo.deviceName = config.deviceName;
                 loadedDeviceInfo.deviceRole = config.deviceRole;
@@ -563,8 +566,8 @@ module.exports = function (RED) {
                 const initialSellerEvmAddresses = safeParseSellerAddresses(config.sellerEvmAddress);
                 
                 if (initialSellerEvmAddresses.length === 0) {
-                    node.warn("No seller addresses configured for initialization");
-                    node.status({ fill: "yellow", shape: "ring", text: "No sellers configured" });
+                    console.log(`Node ${node.id}: No seller addresses configured - this is normal for a new buyer node`);
+                    node.status({ fill: "blue", shape: "dot", text: "Ready - no sellers configured" });
                 } else {
                     await updateSelectedSellers(node, initialSellerEvmAddresses, true);
                     console.log(`Node ${node.id}: Initialized with ${initialSellerEvmAddresses.length} seller address(es)`);
@@ -1458,29 +1461,39 @@ module.exports = function (RED) {
     // Import deviceManager for new endpoints
     const deviceManager = require('../lib/deviceManager');
 
-    // Endpoint for Buyer Device List - Get eligible buyer devices for reinstatement
+    // Endpoint for Buyer Device List - Get all buyer devices with status information
     RED.httpAdmin.get('/buyer/devices/eligible', function (req, res) {
         try {
-            // Get currently active node IDs to exclude from the list
+            // Get currently active node IDs and their names
             const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            const activeNodeInfo = {};
             
-            // Get eligible buyer devices
-            const eligibleDevices = deviceManager.listEligibleDevices('buyer', activeNodeIds);
+            // Get node names for active nodes
+            RED.nodes.eachNode((node) => {
+                if (node.type === 'buyer config' || node.type === 'seller config' || 
+                    node.type === 'buyer' || node.type === 'seller') {
+                    activeNodeInfo[node.id] = node.name || node.type;
+                }
+            });
             
-            console.log(`[BUYER DEVICES] Found ${eligibleDevices.length} eligible buyer devices (excluding ${activeNodeIds.length} active nodes)`);
+            // Get all buyer devices (not just eligible ones)
+            const allBuyerDevices = deviceManager.listAllDevicesWithStatus('buyer', activeNodeIds, activeNodeInfo);
+            
+            console.log(`[BUYER DEVICES] Found ${allBuyerDevices.length} buyer devices (${allBuyerDevices.filter(d => d.available).length} available, ${allBuyerDevices.filter(d => !d.available).length} in use)`);
             
             res.json({
                 success: true,
-                devices: eligibleDevices,
+                devices: allBuyerDevices,
                 activeNodeIds: activeNodeIds,
-                count: eligibleDevices.length
+                count: allBuyerDevices.length,
+                availableCount: allBuyerDevices.filter(d => d.available).length
             });
             
         } catch (error) {
-            console.error('[BUYER DEVICES] Error fetching eligible buyer devices:', error);
+            console.error('[BUYER DEVICES] Error fetching buyer devices:', error);
             res.status(500).json({
                 success: false,
-                error: `Failed to fetch eligible buyer devices: ${error.message}`
+                error: `Failed to fetch buyer devices: ${error.message}`
             });
         }
     });
