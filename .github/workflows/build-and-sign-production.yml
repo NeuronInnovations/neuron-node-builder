@@ -38,7 +38,6 @@ jobs:
 
     outputs:
       version: ${{ steps.version.outputs.version }}
-      wrapper_tag: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
 
     steps:
       - name: Checkout code with token validation
@@ -120,47 +119,25 @@ jobs:
       - name: Build executables with validation
         env:
           NEURON_WRAPPER_TAG: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
-          PKG_TARGETS: node18-win-x64,node18-macos-x64
         run: |
           echo "Building executables..."
           npm run package
 
           # Comprehensive validation of all executables
-          declare -A TARGET_PATHS=(
-            ["node18-macos-x64"]="build/releases/latest-macos-x64"
-            ["node18-macos-arm64"]="build/releases/latest-macos-arm64"
-            ["node18-win-x64"]="build/releases/latest-win-x64.exe"
-          )
-          declare -A TARGET_LABELS=(
-            ["node18-macos-x64"]="macOS x64"
-            ["node18-macos-arm64"]="macOS arm64"
-            ["node18-win-x64"]="Windows"
+          declare -A EXECUTABLES=(
+            ["build/releases/latest-macos-x64"]="macOS x64"
+            ["build/releases/latest-macos-arm64"]="macOS arm64"
+            ["build/releases/latest-win-x64.exe"]="Windows"
           )
 
-          TARGET_LIST=${PKG_TARGETS:-node18-win-x64,node18-macos-x64}
-          IFS=',' read -ra REQUESTED_TARGETS <<< "$TARGET_LIST"
-          if [ ${#REQUESTED_TARGETS[@]} -eq 0 ]; then
-            echo "No pkg targets specified via PKG_TARGETS"
-            exit 1
-          fi
-
-          for raw_target in "${REQUESTED_TARGETS[@]}"; do
-            target=$(echo "$raw_target" | xargs)
-            path="${TARGET_PATHS[$target]}"
-            label="${TARGET_LABELS[$target]}"
-
-            if [ -z "$path" ]; then
-              echo "Unknown pkg target in PKG_TARGETS: $target"
+          for executable in "${!EXECUTABLES[@]}"; do
+            if [ ! -f "$executable" ]; then
+              echo "${EXECUTABLES[$executable]} executable missing: $executable"
               exit 1
             fi
-
-            if [ ! -f "$path" ]; then
-              echo "$label executable missing: $path"
-              exit 1
-            fi
-
-            size=$(du -h "$path" | cut -f1)
-            echo "$label executable: $path ($size)"
+            
+            size=$(du -h "$executable" | cut -f1)
+            echo "${EXECUTABLES[$executable]} executable: $executable ($size)"
           done
 
       - name: Upload build artifacts with metadata
@@ -220,16 +197,6 @@ jobs:
 
           npm ci --ignore-scripts
           echo "SUCCESS: Dependencies installed successfully"
-
-      - name: Rebuild macOS arm64 executable on macOS runner
-        if: matrix.arch == 'arm64'
-        env:
-          PKG_TARGETS: node18-macos-arm64
-          NEURON_WRAPPER_TAG: ${{ needs.security-and-build.outputs.wrapper_tag }}
-        run: |
-          echo "Rebuilding pkg executable for macOS arm64 on macOS runner..."
-          rm -f build/releases/latest-macos-arm64
-          npm run package
 
       - name: Prepare macOS executable
         env:
