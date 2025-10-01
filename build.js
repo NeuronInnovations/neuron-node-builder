@@ -59,8 +59,16 @@ async function build() {
     process.env.CI === "true" || process.argv.includes("--no-prompt");
 
   let tag;
+  const envWrapperTag = process.env.NEURON_WRAPPER_TAG?.trim();
 
-  if (isNoPromptMode) {
+  if (envWrapperTag) {
+    tag = envWrapperTag;
+    console.log(
+      chalk.blue(
+        `Using neuron-wrapper tag from NEURON_WRAPPER_TAG environment variable: ${tag}`
+      )
+    );
+  } else if (isNoPromptMode) {
     // In CI or no-prompt mode, automatically use the latest tag
     tag = await getLatestTag();
     console.log(chalk.blue(`CI/No-prompt mode: Using latest tag: ${tag}`));
