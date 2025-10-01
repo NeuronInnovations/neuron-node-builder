@@ -159,12 +159,16 @@ jobs:
   macos-sign-notarize:
     name: macOS Sign & Notarize (${{ matrix.arch }})
     needs: [security-and-build]
-    runs-on: macos-13
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        include:
+          - arch: x64
+            runner: macos-13
+          - arch: arm64
+            runner: macos-14
     env:
       MACOSX_DEPLOYMENT_TARGET: "10.12"
     if: |
