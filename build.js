@@ -42,17 +42,16 @@ async function build() {
   const defaultWrapperTag = "v0.0.1-alpha";
 
   async function getLatestTag() {
-    const overrideTag = process.env.NEURON_WRAPPER_TAG || process.env.WRAPPER_TAG;
-
-    if (overrideTag) {
-      console.log(chalk.blue(`🔖 Using wrapper tag override: ${overrideTag}`));
-      return overrideTag;
+    try {
+      const response = await axios.get("https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/latest");
+      const latestTag = response.data.tag_name;
+      console.log(chalk.blue(`Found latest wrapper tag: ${latestTag}`));
+      return latestTag;
+    } catch (error) {
+        console.error(chalk.red("Error fetching latest wrapper tag:"), error.message);
+        console.log(chalk.yellow("Falling back to default tag."));
+        return "v0.0.1-alpha";
     }
-
-    console.log(
-      chalk.blue("📥 Using direct download approach to avoid rate limits")
-    );
-    return defaultWrapperTag;
   }
 
   // Check for no-prompt mode (CI environment or explicit flag)
