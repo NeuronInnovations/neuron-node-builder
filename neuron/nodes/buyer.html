@@ -158,6 +158,22 @@
             <label for="node-input-stdErrTopic"><span>StdErr Topic</span></label>
             <input type="text" id="node-input-stdErrTopic" placeholder="StdErr topic will appear here after initialization" readonly>
         </div>
+
+        <div class="form-row">
+            <label for="node-input-heartbeat"><span>Heartbeat</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Last heartbeat will appear here after initialization" readonly>
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Heartbeat">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+
+        <div class="form-row">
+            <label for="node-input-reachability"><span>Reachability</span></label>
+            <input type="text" id="node-input-reachability" placeholder="Last received message will appear here after initialization" readonly>
+            <button type="button" id="refresh-reachability-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Connection Status Section - moved to bottom -->
@@ -251,6 +267,10 @@
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
             stdErrTopic: { value: "" },
+            // Heartbeat field
+            heartbeat: { value: "" },
+            // Reachability field
+            reachability: { value: "" },
             // Device reinstatement field
             loadedDeviceFilename: { value: "" },
             originalDeviceFilename: { value: "" }
@@ -569,6 +589,31 @@
                             }
                         }
 
+                        // Fetch and populate heartbeat
+                        if (node.id) {
+                            try {
+                                const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                                const heartbeatData = await heartbeatResponse.json();
+
+                                if (heartbeatData.success && heartbeatData.heartbeat) {
+                                    const heartbeat = heartbeatData.heartbeat;
+                                    if (heartbeat.lastSeenFormatted) {
+                                        $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                                        console.log('[BUYER DEVICE LOAD] Fetched heartbeat:', heartbeat.lastSeenFormatted);
+                                    } else {
+                                        $('#node-input-heartbeat').val('Never');
+                                        console.log('[BUYER DEVICE LOAD] No heartbeat data available');
+                                    }
+                                } else {
+                                    $('#node-input-heartbeat').val('Heartbeat not available');
+                                    console.log('[BUYER DEVICE LOAD] Heartbeat fetch failed:', heartbeatData.error);
+                                }
+                            } catch (error) {
+                                console.error('[BUYER DEVICE LOAD] Error fetching heartbeat:', error);
+                                $('#node-input-heartbeat').val('Heartbeat fetch error');
+                            }
+                        }
+
                         // Update seller devices list if present
                         if (deviceData.sellerEvmAddress) {
                             try {
@@ -615,6 +660,92 @@
             $('#refresh-devices-btn').on('click', function () {
                 console.log('[BUYER DEVICE LOAD] Refreshing device list...');
                 loadEligibleDevices();
+            });
+
+            // Event handler for heartbeat refresh
+            $('#refresh-heartbeat-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[BUYER HEARTBEAT] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                            console.log('[BUYER HEARTBEAT] Refreshed heartbeat:', heartbeat.lastSeenFormatted);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[BUYER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[BUYER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER HEARTBEAT] Error refreshing heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
+            });
+
+            // Event handler for reachability refresh
+            $('#refresh-reachability-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[BUYER REACHABILITY] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const reachabilityResponse = await fetch(`/buyer/reachability/${node.id}`);
+                    const reachabilityData = await reachabilityResponse.json();
+
+                    if (reachabilityData.success && reachabilityData.reachability) {
+                        const reachability = reachabilityData.reachability;
+                        if (reachability.lastSeenFormatted && reachability.messageType) {
+                            const displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            $('#node-input-reachability').val(displayText);
+                            console.log('[BUYER REACHABILITY] Refreshed reachability:', displayText);
+                        } else if (reachability.lastSeenFormatted) {
+                            $('#node-input-reachability').val(reachability.lastSeenFormatted);
+                            console.log('[BUYER REACHABILITY] Refreshed reachability:', reachability.lastSeenFormatted);
+                        } else {
+                            $('#node-input-reachability').val('Never');
+                            console.log('[BUYER REACHABILITY] No reachability data available');
+                        }
+                    } else {
+                        $('#node-input-reachability').val('Reachability not available');
+                        console.log('[BUYER REACHABILITY] Reachability fetch failed:', reachabilityData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER REACHABILITY] Error refreshing reachability:', error);
+                    $('#node-input-reachability').val('Reachability fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
             });
 
             $('#node-input-loadDevice').on('change', function () {
@@ -1129,6 +1260,7 @@
                                         $('#node-input-stdInTopic').val('StdIn topic not intialised');
                                         $('#node-input-stdOutTopic').val('StdOut topic not intialised');
                                         $('#node-input-stdErrTopic').val('StdErr topic not intialised');
+                                        $('#node-input-heartbeat').val('Heartbeat not available');
                                     });
                             } else {
                                 // Device file doesn't exist, show new node messages
@@ -1137,6 +1269,7 @@
                                 $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                                 $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                                 $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                                $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                             }
                         })
                         .fail(function () {
@@ -1146,6 +1279,7 @@
                             $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                             $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                             $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                            $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                         });
                 } else {
                     $('#node-input-evmAddress').val('New node - EVM address will be generated after deployment');
@@ -1153,6 +1287,72 @@
                     $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                     $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                     $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                    $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
+                    $('#node-input-reachability').val('New node - Reachability will be available after deployment');
+                }
+            }
+
+            // Load heartbeat data
+            async function loadHeartbeat() {
+                if (!node.id) {
+                    $('#node-input-heartbeat').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                            console.log('[BUYER HEARTBEAT] Loaded heartbeat:', heartbeat.lastSeenFormatted);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[BUYER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[BUYER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER HEARTBEAT] Error loading heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                }
+            }
+
+            // Load reachability data
+            async function loadReachability() {
+                if (!node.id) {
+                    $('#node-input-reachability').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const reachabilityResponse = await fetch(`/buyer/reachability/${node.id}`);
+                    const reachabilityData = await reachabilityResponse.json();
+
+                    if (reachabilityData.success && reachabilityData.reachability) {
+                        const reachability = reachabilityData.reachability;
+                        if (reachability.lastSeenFormatted && reachability.messageType) {
+                            const displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            $('#node-input-reachability').val(displayText);
+                            console.log('[BUYER REACHABILITY] Loaded reachability:', displayText);
+                        } else if (reachability.lastSeenFormatted) {
+                            $('#node-input-reachability').val(reachability.lastSeenFormatted);
+                            console.log('[BUYER REACHABILITY] Loaded reachability:', reachability.lastSeenFormatted);
+                        } else {
+                            $('#node-input-reachability').val('Never');
+                            console.log('[BUYER REACHABILITY] No reachability data available');
+                        }
+                    } else {
+                        $('#node-input-reachability').val('Reachability not available');
+                        console.log('[BUYER REACHABILITY] Reachability fetch failed:', reachabilityData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER REACHABILITY] Error loading reachability:', error);
+                    $('#node-input-reachability').val('Reachability fetch error');
                 }
             }
 
@@ -1255,6 +1455,11 @@
             } else {
                 console.log(`[BUYER INIT] Skipping balance update - device already loaded: ${node.loadedDeviceFilename}`);
             }
+
+            // Load heartbeat ONCE on dialog open (always load, regardless of device loading status)
+            loadHeartbeat();
+            // Load reachability ONCE on dialog open (always load, regardless of device loading status)
+            loadReachability();
         },
 
 
@@ -1283,6 +1488,10 @@
             this.stdInTopic = $('#node-input-stdInTopic').val();
             this.stdOutTopic = $('#node-input-stdOutTopic').val();
             this.stdErrTopic = $('#node-input-stdErrTopic').val();
+            // Save the heartbeat field
+            this.heartbeat = $('#node-input-heartbeat').val();
+            // Save the reachability field
+            this.reachability = $('#node-input-reachability').val();
         }
     });
 

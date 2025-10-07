@@ -154,6 +154,14 @@
             <input type="text" id="node-input-stdErrTopic" placeholder="StdErr topic will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
         </div>
 
+        <div class="form-row">
+            <label for="node-input-heartbeat"><span>Heartbeat</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Last heartbeat will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Heartbeat">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+
         <div class="form-row" style="display: none;">
             <label style="display: none;"><span>Connection Status</span></label>
             <div id="connection-status-indicator" style="display: none; margin-left: 10px;">
@@ -274,7 +282,9 @@
             originalDeviceFilename: { value: "" },
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
-            stdErrTopic: { value: "" }
+            stdErrTopic: { value: "" },
+            // Heartbeat field
+            heartbeat: { value: "" }
         },
         inputs: 0,
         outputs: 1,
@@ -590,6 +600,31 @@
                                 $('#node-input-balance').val('Balance fetch error');
                             }
                         }
+
+                        // Fetch and populate heartbeat
+                        if (node.id) {
+                            try {
+                                const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                                const heartbeatData = await heartbeatResponse.json();
+
+                                if (heartbeatData.success && heartbeatData.heartbeat) {
+                                    const heartbeat = heartbeatData.heartbeat;
+                                    if (heartbeat.lastSeenFormatted) {
+                                        $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                                        console.log('[SELLER DEVICE LOAD] Fetched heartbeat:', heartbeat.lastSeenFormatted);
+                                    } else {
+                                        $('#node-input-heartbeat').val('Never');
+                                        console.log('[SELLER DEVICE LOAD] No heartbeat data available');
+                                    }
+                                } else {
+                                    $('#node-input-heartbeat').val('Heartbeat not available');
+                                    console.log('[SELLER DEVICE LOAD] Heartbeat fetch failed:', heartbeatData.error);
+                                }
+                            } catch (error) {
+                                console.error('[SELLER DEVICE LOAD] Error fetching heartbeat:', error);
+                                $('#node-input-heartbeat').val('Heartbeat fetch error');
+                            }
+                        }
                         
                         // Store the loaded device filename for later use
                         node.loadedDeviceFilename = filename;
@@ -712,6 +747,47 @@
                     document.body.removeChild(textArea);
                 }
             }
+
+            // Event handler for heartbeat refresh
+            $('#refresh-heartbeat-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[SELLER HEARTBEAT] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                            console.log('[SELLER HEARTBEAT] Refreshed heartbeat:', heartbeat.lastSeenFormatted);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[SELLER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[SELLER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[SELLER HEARTBEAT] Error refreshing heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
+            });
 
             $('<style>')
                 .text(`
@@ -836,6 +912,7 @@
                                         $('#node-input-stdInTopic').val('StdIn topic not initialized yet');
                                         $('#node-input-stdOutTopic').val('StdOut topic not initialized yet');
                                         $('#node-input-stdErrTopic').val('StdErr topic not initialized yet');
+                                        $('#node-input-heartbeat').val('Heartbeat not available');
                                     });
                             } else {
                                 // Device file doesn't exist - this is a new node
@@ -845,6 +922,7 @@
                                 $('#node-input-stdInTopic').val('New node');
                                 $('#node-input-stdOutTopic').val('New node');
                                 $('#node-input-stdErrTopic').val('New node');
+                                $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                             }
                         })
                         .fail(function () {
@@ -854,6 +932,7 @@
                             $('#node-input-stdInTopic').val('New node');
                             $('#node-input-stdOutTopic').val('New node');
                             $('#node-input-stdErrTopic').val('New node');
+                            $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                         });
                 } else {
                     $('#node-input-evmAddress').val('New node - EVM address will be generated after deployment');
@@ -861,6 +940,37 @@
                     $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                     $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                     $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                    $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
+                }
+            }
+
+            // Load heartbeat data
+            async function loadHeartbeat() {
+                if (!node.id) {
+                    $('#node-input-heartbeat').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                            console.log('[SELLER HEARTBEAT] Loaded heartbeat:', heartbeat.lastSeenFormatted);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[SELLER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[SELLER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[SELLER HEARTBEAT] Error loading heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
                 }
             }
 
@@ -1009,6 +1119,9 @@
             } else {
                 console.log(`[SELLER INIT] Skipping public key update - device already loaded: ${node.loadedDeviceFilename}`);
             }
+
+            // Load heartbeat ONCE on dialog open (always load, regardless of device loading status)
+            loadHeartbeat();
 
             // Set up refresh intervals
             if (node.id) {
@@ -1320,6 +1433,12 @@
             this.evmAddress = $('#node-input-evmAddress').val();
             this.balance = $('#node-input-balance').val();
             this.publicKey = $('#node-input-publicKey').val();
+            // Save the topic fields
+            this.stdInTopic = $('#node-input-stdInTopic').val();
+            this.stdOutTopic = $('#node-input-stdOutTopic').val();
+            this.stdErrTopic = $('#node-input-stdErrTopic').val();
+            // Save the heartbeat field
+            this.heartbeat = $('#node-input-heartbeat').val();
 
             //  console.log('Saved buyer EVM addresses:', this.buyerEvmAddress);
         }

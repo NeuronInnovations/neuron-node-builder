@@ -1214,6 +1214,110 @@ module.exports = function (RED) {
         }
     });
 
+    // Heartbeat endpoint - Get last recorded heartbeat from stdout topic
+    RED.httpAdmin.get('/seller/heartbeat/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let sellerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!sellerNode) {
+                const instanceId = sellerTemplateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    sellerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!sellerNode || sellerNode.type !== 'seller config') {
+                return res.status(404).json({ 
+                    error: 'Seller node not found'
+                });
+            }
+
+            if (!sellerNode.deviceInfo || !sellerNode.deviceInfo.topics || !sellerNode.deviceInfo.topics[1]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdout topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdout topic (deviceInfo.topics[1])
+            const stdoutTopic = sellerNode.deviceInfo.topics[1];
+            
+            // Fetch the latest message from stdout topic
+            const messages = await hederaService.getTopicMessages(stdoutTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastHeartbeatTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last heartbeat
+                const now = Date.now();
+                const millisecondsAgo = now - lastHeartbeatTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString()
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastHeartbeatTime: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting heartbeat for seller node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get heartbeat: ' + error.message 
+            });
+        }
+    });
+
+    // Helper function to format last seen time
+    function formatLastSeen(seconds) {
+        if (seconds === null || seconds === undefined) return 'Never';
+        
+        // Handle negative values (future timestamps - shouldn't happen but just in case)
+        if (seconds < 0) return 'Just now';
+        
+        if (seconds < 60) {
+            return `${seconds}s ago`;
+        } else if (seconds < 3600) {
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}m ago`;
+        } else if (seconds < 86400) {
+            const hours = Math.floor(seconds / 3600);
+            return `${hours}h ago`;
+        } else {
+            const days = Math.floor(seconds / 86400);
+            return `${days}d ago`;
+        }
+    }
+
     // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
     
     // Import deviceManager for new endpoints

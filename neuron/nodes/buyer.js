@@ -1456,6 +1456,226 @@ module.exports = function (RED) {
         }
     });
 
+    // Heartbeat endpoint - Get last recorded heartbeat from stdout topic
+    RED.httpAdmin.get('/buyer/heartbeat/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.topics || !buyerNode.deviceInfo.topics[1]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdout topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdout topic (deviceInfo.topics[1])
+            const stdoutTopic = buyerNode.deviceInfo.topics[1];
+            
+            // Fetch the latest message from stdout topic
+            const messages = await hederaService.getTopicMessages(stdoutTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastHeartbeatTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last heartbeat
+                const now = Date.now();
+                const millisecondsAgo = now - lastHeartbeatTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString()
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastHeartbeatTime: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting heartbeat for buyer node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get heartbeat: ' + error.message 
+            });
+        }
+    });
+
+    // Reachability endpoint - Get last received message from stdin topic
+    RED.httpAdmin.get('/buyer/reachability/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.topics || !buyerNode.deviceInfo.topics[0]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdin topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdin topic (deviceInfo.topics[0])
+            const stdinTopic = buyerNode.deviceInfo.topics[0];
+            
+            // Fetch the latest message from stdin topic
+            const messages = await hederaService.getTopicMessages(stdinTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Debug logging to understand message structure
+                console.log('[BUYER REACHABILITY] Raw message structure:', {
+                    sequenceNumber: lastMessage.sequenceNumber,
+                    timestamp: lastMessage.timestamp,
+                    messageLength: lastMessage.message ? lastMessage.message.length : 0,
+                    messagePreview: lastMessage.message ? lastMessage.message.substring(0, 100) : 'No message'
+                });
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastMessageTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last message
+                const now = Date.now();
+                const millisecondsAgo = now - lastMessageTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                // Extract messageType from the message (if available)
+                let messageType = 'Unknown';
+                try {
+                    // The message content is base64 encoded, decode it first
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        // Try to parse the message content as JSON
+                        const parsedMessage = JSON.parse(messageContent);
+                        
+                        // Debug logging for parsed message
+                        console.log('[BUYER REACHABILITY] Parsed message:', {
+                            keys: Object.keys(parsedMessage),
+                            messageType: parsedMessage.messageType,
+                            type: parsedMessage.type,
+                            topic: parsedMessage.topic,
+                            payload: parsedMessage.payload
+                        });
+                        
+                        // Look for messageType in various possible locations
+                        if (parsedMessage.messageType) {
+                            messageType = parsedMessage.messageType;
+                        } else if (parsedMessage.type) {
+                            messageType = parsedMessage.type;
+                        } else if (parsedMessage.payload && typeof parsedMessage.payload === 'object') {
+                            // Check if payload contains messageType
+                            if (parsedMessage.payload.messageType) {
+                                messageType = parsedMessage.payload.messageType;
+                            } else if (parsedMessage.payload.type) {
+                                messageType = parsedMessage.payload.type;
+                            }
+                        } else if (parsedMessage.topic) {
+                            // If it's a topic-based message, use the topic as messageType
+                            messageType = parsedMessage.topic;
+                        } else if (typeof parsedMessage.payload === 'string') {
+                            // If payload is a string, it might be the message type
+                            messageType = parsedMessage.payload;
+                        }
+                    }
+                } catch (parseError) {
+                    // If JSON parsing fails, try to extract from raw message
+                    console.log('[BUYER REACHABILITY] Could not parse message as JSON:', parseError.message);
+                    messageType = 'Raw Message';
+                }
+                
+                res.json({
+                    success: true,
+                    reachability: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastMessageTime: new Date(lastMessageTime).toISOString(),
+                        messageType: messageType
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    reachability: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastMessageTime: null,
+                        messageType: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting reachability for buyer node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get reachability: ' + error.message 
+            });
+        }
+    });
+
     // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
     
     // Import deviceManager for new endpoints
