@@ -1510,13 +1510,29 @@ module.exports = function (RED) {
                 const millisecondsAgo = now - lastHeartbeatTime;
                 const secondsAgo = Math.floor(millisecondsAgo / 1000);
                 
+                // Extract natReachability from heartbeat message
+                let natReachability = null;
+                try {
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        const parsedMessage = JSON.parse(messageContent);
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[BUYER HEARTBEAT] Found natReachability:', natReachability);
+                        }
+                    }
+                } catch (parseError) {
+                    console.log('[BUYER HEARTBEAT] Could not parse message:', parseError.message);
+                }
+                
                 res.json({
                     success: true,
                     heartbeat: {
                         lastSeen: secondsAgo,
                         lastSeenFormatted: formatLastSeen(secondsAgo),
                         timestamp: timestampString,
-                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString()
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString(),
+                        natReachability: natReachability
                     }
                 });
             } else {
@@ -1526,7 +1542,8 @@ module.exports = function (RED) {
                         lastSeen: null,
                         lastSeenFormatted: 'Never',
                         timestamp: null,
-                        lastHeartbeatTime: null
+                        lastHeartbeatTime: null,
+                        natReachability: null
                     }
                 });
             }
@@ -1601,8 +1618,9 @@ module.exports = function (RED) {
                 const millisecondsAgo = now - lastMessageTime;
                 const secondsAgo = Math.floor(millisecondsAgo / 1000);
                 
-                // Extract messageType from the message (if available)
+                // Extract messageType and natReachability from the message
                 let messageType = 'Unknown';
+                let natReachability = null;
                 try {
                     // The message content is base64 encoded, decode it first
                     const messageContent = lastMessage.message;
@@ -1616,8 +1634,26 @@ module.exports = function (RED) {
                             messageType: parsedMessage.messageType,
                             type: parsedMessage.type,
                             topic: parsedMessage.topic,
-                            payload: parsedMessage.payload
+                            natReachability: parsedMessage.natReachability,
+                            payload: parsedMessage.payload,
+                            fullMessage: parsedMessage
                         });
+                        
+                        // Extract natReachability from various possible locations
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability at root level:', natReachability);
+                        } else if (parsedMessage.payload && parsedMessage.payload.natReachability !== undefined && parsedMessage.payload.natReachability !== null) {
+                            // Check if natReachability is in payload
+                            natReachability = parsedMessage.payload.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability in payload:', natReachability);
+                        } else if (parsedMessage.data && parsedMessage.data.natReachability !== undefined && parsedMessage.data.natReachability !== null) {
+                            // Check if natReachability is in data
+                            natReachability = parsedMessage.data.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability in data:', natReachability);
+                        } else {
+                            console.log('[BUYER REACHABILITY] natReachability not found in message');
+                        }
                         
                         // Look for messageType in various possible locations
                         if (parsedMessage.messageType) {
@@ -1652,7 +1688,8 @@ module.exports = function (RED) {
                         lastSeenFormatted: formatLastSeen(secondsAgo),
                         timestamp: timestampString,
                         lastMessageTime: new Date(lastMessageTime).toISOString(),
-                        messageType: messageType
+                        messageType: messageType,
+                        natReachability: natReachability
                     }
                 });
             } else {

@@ -160,17 +160,17 @@
         </div>
 
         <div class="form-row">
-            <label for="node-input-heartbeat"><span>Heartbeat</span></label>
-            <input type="text" id="node-input-heartbeat" placeholder="Last heartbeat will appear here after initialization" readonly>
-            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Heartbeat">
+            <label for="node-input-heartbeat"><span>Reachability</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Reachability will appear here after initialization" readonly>
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
                 <i class="fa fa-refresh"></i>
             </button>
         </div>
 
         <div class="form-row">
-            <label for="node-input-reachability"><span>Reachability</span></label>
+            <label for="node-input-reachability"><span>STDIN</span></label>
             <input type="text" id="node-input-reachability" placeholder="Last received message will appear here after initialization" readonly>
-            <button type="button" id="refresh-reachability-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
+            <button type="button" id="refresh-reachability-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh STDIN">
                 <i class="fa fa-refresh"></i>
             </button>
         </div>
@@ -683,8 +683,15 @@
                     if (heartbeatData.success && heartbeatData.heartbeat) {
                         const heartbeat = heartbeatData.heartbeat;
                         if (heartbeat.lastSeenFormatted) {
-                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
-                            console.log('[BUYER HEARTBEAT] Refreshed heartbeat:', heartbeat.lastSeenFormatted);
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[BUYER HEARTBEAT] Refreshed heartbeat:', displayText);
                         } else {
                             $('#node-input-heartbeat').val('Never');
                             console.log('[BUYER HEARTBEAT] No heartbeat data available');
@@ -724,7 +731,13 @@
                     if (reachabilityData.success && reachabilityData.reachability) {
                         const reachability = reachabilityData.reachability;
                         if (reachability.lastSeenFormatted && reachability.messageType) {
-                            const displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            // Format: "natReachability - timestamp (messageType)"
+                            let displayText = '';
+                            if (reachability.natReachability !== null && reachability.natReachability !== undefined) {
+                                displayText = `${reachability.natReachability} - ${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            } else {
+                                displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            }
                             $('#node-input-reachability').val(displayText);
                             console.log('[BUYER REACHABILITY] Refreshed reachability:', displayText);
                         } else if (reachability.lastSeenFormatted) {
@@ -1306,8 +1319,15 @@
                     if (heartbeatData.success && heartbeatData.heartbeat) {
                         const heartbeat = heartbeatData.heartbeat;
                         if (heartbeat.lastSeenFormatted) {
-                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
-                            console.log('[BUYER HEARTBEAT] Loaded heartbeat:', heartbeat.lastSeenFormatted);
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[BUYER HEARTBEAT] Loaded heartbeat:', displayText);
                         } else {
                             $('#node-input-heartbeat').val('Never');
                             console.log('[BUYER HEARTBEAT] No heartbeat data available');
@@ -1336,7 +1356,13 @@
                     if (reachabilityData.success && reachabilityData.reachability) {
                         const reachability = reachabilityData.reachability;
                         if (reachability.lastSeenFormatted && reachability.messageType) {
-                            const displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            // Format: "natReachability - timestamp (messageType)"
+                            let displayText = '';
+                            if (reachability.natReachability !== null && reachability.natReachability !== undefined) {
+                                displayText = `${reachability.natReachability} - ${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            } else {
+                                displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            }
                             $('#node-input-reachability').val(displayText);
                             console.log('[BUYER REACHABILITY] Loaded reachability:', displayText);
                         } else if (reachability.lastSeenFormatted) {

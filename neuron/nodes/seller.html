@@ -155,9 +155,9 @@
         </div>
 
         <div class="form-row">
-            <label for="node-input-heartbeat"><span>Heartbeat</span></label>
-            <input type="text" id="node-input-heartbeat" placeholder="Last heartbeat will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
-            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Heartbeat">
+            <label for="node-input-heartbeat"><span>Reachability</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Reachability will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
                 <i class="fa fa-refresh"></i>
             </button>
         </div>
@@ -769,8 +769,15 @@
                     if (heartbeatData.success && heartbeatData.heartbeat) {
                         const heartbeat = heartbeatData.heartbeat;
                         if (heartbeat.lastSeenFormatted) {
-                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
-                            console.log('[SELLER HEARTBEAT] Refreshed heartbeat:', heartbeat.lastSeenFormatted);
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[SELLER HEARTBEAT] Refreshed heartbeat:', displayText);
                         } else {
                             $('#node-input-heartbeat').val('Never');
                             console.log('[SELLER HEARTBEAT] No heartbeat data available');
@@ -941,6 +948,7 @@
                     $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                     $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
                     $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
+                    $('#node-input-reachability').val('New node - Reachability will be available after deployment');
                 }
             }
 
@@ -958,8 +966,15 @@
                     if (heartbeatData.success && heartbeatData.heartbeat) {
                         const heartbeat = heartbeatData.heartbeat;
                         if (heartbeat.lastSeenFormatted) {
-                            $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
-                            console.log('[SELLER HEARTBEAT] Loaded heartbeat:', heartbeat.lastSeenFormatted);
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[SELLER HEARTBEAT] Loaded heartbeat:', displayText);
                         } else {
                             $('#node-input-heartbeat').val('Never');
                             console.log('[SELLER HEARTBEAT] No heartbeat data available');

@@ -1268,13 +1268,29 @@ module.exports = function (RED) {
                 const millisecondsAgo = now - lastHeartbeatTime;
                 const secondsAgo = Math.floor(millisecondsAgo / 1000);
                 
+                // Extract natReachability from heartbeat message
+                let natReachability = null;
+                try {
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        const parsedMessage = JSON.parse(messageContent);
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[SELLER HEARTBEAT] Found natReachability:', natReachability);
+                        }
+                    }
+                } catch (parseError) {
+                    console.log('[SELLER HEARTBEAT] Could not parse message:', parseError.message);
+                }
+                
                 res.json({
                     success: true,
                     heartbeat: {
                         lastSeen: secondsAgo,
                         lastSeenFormatted: formatLastSeen(secondsAgo),
                         timestamp: timestampString,
-                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString()
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString(),
+                        natReachability: natReachability
                     }
                 });
             } else {
@@ -1284,7 +1300,8 @@ module.exports = function (RED) {
                         lastSeen: null,
                         lastSeenFormatted: 'Never',
                         timestamp: null,
-                        lastHeartbeatTime: null
+                        lastHeartbeatTime: null,
+                        natReachability: null
                     }
                 });
             }
