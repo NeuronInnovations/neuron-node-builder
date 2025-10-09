@@ -200,7 +200,14 @@ jobs:
 
       - name: Install dependencies
         shell: bash
-        run: npm ci
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "No package-lock.json found, creating one..."
+            npm install --package-lock-only
+          fi
+
+          npm ci
+          echo "SUCCESS: Dependencies installed successfully"
 
       - name: Install Playwright browsers
         shell: bash
