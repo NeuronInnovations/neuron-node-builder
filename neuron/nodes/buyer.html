@@ -79,6 +79,7 @@
                     <thead>
                         <tr style="background-color: #2d2d2d; color: white;">
                             <th style="padding: 8px; border: 1px solid #555; text-align: left;">EVM Address</th>
+                            <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 120px;">Shared Account</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 100px;">Status</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 100px;">Last Seen</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 60px;">Actions</th>
@@ -894,11 +895,13 @@
 
                 node.devicesList.forEach((device, index) => {
                     const row = $(`
-                        <tr>
+                        <tr data-seller-evm="${device.evmAddress}">
                             <td style="padding: 8px; border: 1px solid #555; font-family: monospace; font-size: 11px; word-break: break-all;">
                                 ${device.evmAddress}
                             </td>
-                           
+                            <td id="shared-account-cell-${index}" class="buyer-shared-account-cell" style="padding: 8px; border: 1px solid #555; text-align: center; font-size: 11px;">
+                                -
+                            </td>
                             <td id="status-cell-${index}" style="padding: 8px; border: 1px solid #555; text-align: center; font-size: 11px;">
                                 <i class="fa fa-spinner fa-spin" style="color: #888;"></i>
                             </td>
@@ -951,6 +954,49 @@
                         autoUpdateInterval = null;
                     }
                 }, 30000); // 5 second
+            }
+
+            // Function to fetch shared account for a specific seller
+            async function fetchSharedAccountForSeller(sellerEvmAddress, index) {
+                const sharedAccountCell = $(`#shared-account-cell-${index}`);
+                
+                console.log(`[BUYER SHARED ACCOUNT] Cell selector: #shared-account-cell-${index}, found: ${sharedAccountCell.length}, current text: "${sharedAccountCell.text()}"`);
+                
+                // Check if already loaded (has a value other than '-')
+                const currentValue = sharedAccountCell.text().trim();
+                if (currentValue !== '-' && currentValue !== '' && currentValue.startsWith('0.0.')) {
+                    console.log(`[BUYER SHARED ACCOUNT] Skipping fetch for seller ${sellerEvmAddress} - already loaded: ${currentValue}`);
+                    return;
+                }
+
+                if (!node.id) {
+                    console.warn('[BUYER SHARED ACCOUNT] No node ID available');
+                    return;
+                }
+
+                try {
+                    console.log(`[BUYER SHARED ACCOUNT] Fetching shared account for seller ${sellerEvmAddress}, index ${index}`);
+                    const response = await fetch(`/buyer/shared-account/${node.id}/${sellerEvmAddress}`);
+                    const data = await response.json();
+                    
+                    console.log(`[BUYER SHARED ACCOUNT] API response for seller ${sellerEvmAddress}:`, data);
+
+                    if (data.success && data.sharedAccount) {
+                        // Format as Hedera account: 0.0.{accountNumber}
+                        const formattedAccount = `0.0.${data.sharedAccount}`;
+                        sharedAccountCell.text(formattedAccount);
+                        sharedAccountCell.attr('title', `Shared account: ${formattedAccount}`);
+                        console.log(`[BUYER SHARED ACCOUNT] Set shared account for seller ${sellerEvmAddress}: ${formattedAccount}`);
+                    } else {
+                        sharedAccountCell.text('-');
+                        sharedAccountCell.attr('title', data.message || 'No shared account found');
+                        console.log(`[BUYER SHARED ACCOUNT] No shared account for seller ${sellerEvmAddress}`);
+                    }
+                } catch (error) {
+                    console.error(`[BUYER SHARED ACCOUNT] Error fetching shared account for seller ${sellerEvmAddress}:`, error);
+                    sharedAccountCell.text('-');
+                    sharedAccountCell.attr('title', 'Error fetching shared account');
+                }
             }
 
             // Auto-check function - INSIDE oneditprepare
@@ -1042,6 +1088,8 @@
                     let color = '#dc3545'; // red for disconnected
                     if (status === 'connected') {
                         color = '#28a745'; // green
+                        // Fetch shared account only for connected sellers
+                        fetchSharedAccountForSeller(device.evmAddress, index);
                     } else if (status === 'connecting') {
                         color = '#ffc107'; // yellow
                     }

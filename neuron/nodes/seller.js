@@ -1314,6 +1314,92 @@ module.exports = function (RED) {
         }
     });
 
+    // Shared accounts endpoint - Get shared accounts from stdin topic messages
+    RED.httpAdmin.get('/seller/shared-accounts/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let sellerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!sellerNode) {
+                const instanceId = sellerTemplateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    sellerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!sellerNode || sellerNode.type !== 'seller config') {
+                return res.status(404).json({ 
+                    error: 'Seller node not found'
+                });
+            }
+
+            if (!sellerNode.deviceInfo || !sellerNode.deviceInfo.topics || !sellerNode.deviceInfo.topics[0]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdin topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdin topic (deviceInfo.topics[0])
+            const stdinTopic = sellerNode.deviceInfo.topics[0];
+            
+            // Fetch recent messages from stdin topic (get more to find all peers)
+            const messages = await hederaService.getTopicMessages(stdinTopic, 1, 100, "desc");
+            
+            // Build a map of buyer EVM address -> shared account
+            const sharedAccounts = {};
+            
+            if (messages && messages.length > 0) {
+                for (const message of messages) {
+                    try {
+                        const messageContent = message.message;
+                        if (messageContent) {
+                            const parsedMessage = JSON.parse(messageContent);
+                            
+                            // Check if this is a serviceRequest message with 'e' and 'a' fields
+                            if (parsedMessage.messageType === 'serviceRequest' && 
+                                parsedMessage.e && 
+                                parsedMessage.a) {
+                                // Normalize EVM address to lowercase without 0x prefix for case-insensitive comparison
+                                const buyerEvmAddress = parsedMessage.e.toLowerCase().replace(/^0x/, '');
+                                const sharedAccount = parsedMessage.a;
+                                
+                                // Store the mapping (use the most recent one for each buyer)
+                                if (!sharedAccounts[buyerEvmAddress]) {
+                                    sharedAccounts[buyerEvmAddress] = sharedAccount;
+                                    console.log(`[SELLER SHARED ACCOUNTS] Found shared account for buyer ${buyerEvmAddress}: ${sharedAccount}`);
+                                }
+                            }
+                        }
+                    } catch (parseError) {
+                        // Skip messages that can't be parsed
+                        continue;
+                    }
+                }
+            }
+            
+            res.json({
+                success: true,
+                sharedAccounts: sharedAccounts
+            });
+            
+        } catch (error) {
+            console.error(`Error getting shared accounts for seller node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get shared accounts: ' + error.message 
+            });
+        }
+    });
+
     // Helper function to format last seen time
     function formatLastSeen(seconds) {
         if (seconds === null || seconds === undefined) return 'Never';

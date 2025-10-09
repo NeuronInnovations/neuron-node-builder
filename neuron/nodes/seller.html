@@ -196,6 +196,7 @@
                            <thead>
                                <tr>
                                    <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">EVM Address</th>
+                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Shared Account</th>
                                    <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Status</th>
                                    <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Last Seen</th>
                                </tr>
@@ -1621,6 +1622,13 @@
                     // Store the original public key in data attribute for fetchLastSeen
                     row.setAttribute('data-public-key', peer.publicKey || '');
 
+                    // Create shared account cell
+                    const sharedAccountCell = document.createElement('td');
+                    sharedAccountCell.className = 'peers-table-cell peer-shared-account';
+                    sharedAccountCell.style.textAlign = 'center';
+                    sharedAccountCell.textContent = '-';
+                    sharedAccountCell.title = 'Shared account will appear after EVM conversion';
+
                     // Convert public key to EVM address
                     if (peer.publicKey) {
                         fetch(`/seller/publickey-to-evm/${peer.publicKey}`)
@@ -1630,6 +1638,8 @@
                                     const formattedAddress = formatEvmAddress(data.evmAddress);
                                     evmCell.textContent = formattedAddress;
                                     evmCell.title = formattedAddress;
+                                    // Store the full EVM address for shared account lookup
+                                    row.setAttribute('data-evm-address', data.evmAddress);
                                 } else {
                                     evmCell.textContent = 'Conversion failed';
                                     evmCell.title = 'Could not convert public key to EVM address';
@@ -1661,10 +1671,23 @@
                     fetchLastSeen(peer, lastUpdateCell, smartContract);
 
                     row.appendChild(evmCell);
+                    row.appendChild(sharedAccountCell);
                     row.appendChild(statusCell);
                     row.appendChild(lastUpdateCell);
                     peersTableBody.appendChild(row);
                 });
+
+                // Fetch shared accounts only if we haven't fetched them yet
+                // Check if any row has a pending shared account (shows '-')
+                const hasPendingAccounts = Array.from(document.querySelectorAll('.peer-shared-account'))
+                    .some(cell => cell.textContent === '-');
+                
+                if (hasPendingAccounts) {
+                    console.log('[SELLER SHARED ACCOUNTS] Fetching shared accounts for new/pending peers');
+                    fetchSharedAccountsForPeers(nodeId);
+                } else {
+                    console.log('[SELLER SHARED ACCOUNTS] Skipping fetch - all shared accounts already loaded');
+                }
             }
 
             // Update last update time
@@ -1894,14 +1917,14 @@
                     }
                 }, 5000);
 
-                // Start 1-second auto-refresh for peer connection data
+                // Start auto-refresh for peer connection data
                 if (peerRefreshInterval) {
                     clearInterval(peerRefreshInterval);
                 }
-               //console.log(`[DEBUG] Starting 1-second peer refresh interval...`);
+               //console.log(`[DEBUG] Starting peer refresh interval...`);
                 peerRefreshInterval = setInterval(() => {
                     refreshPeersData();
-                }, 5000);
+                }, 10000);
             }).catch(() => {
                 // If initial load fails, still try to start the intervals
                 console.warn('Initial connection status load failed, but starting auto-refresh intervals anyway');
@@ -1910,10 +1933,10 @@
                 if (peerRefreshInterval) {
                     clearInterval(peerRefreshInterval);
                 }
-                // console.log(`[DEBUG] Starting 1-second peer refresh interval (fallback)...`);
+                // console.log(`[DEBUG] Starting peer refresh interval (fallback)...`);
                 peerRefreshInterval = setInterval(() => {
                     refreshPeersData();
-                }, 1000);
+                }, 10000);
             });
         }, 500); // 500ms delay to allow connection monitor to initialize
 
@@ -1943,6 +1966,71 @@
         if (/^0\.0\d+$/.test(topic)) return topic.replace(/^0\.0(\d+)$/, '0.0.$1');
         if (/^\d+$/.test(topic)) return `0.0.${topic}`;
         return topic;
+    }
+
+    // Function to fetch shared accounts for all peers
+    async function fetchSharedAccountsForPeers(nodeId) {
+        if (!nodeId) {
+            console.warn('[SELLER SHARED ACCOUNTS] No node ID available');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/seller/shared-accounts/${nodeId}`);
+            const data = await response.json();
+
+            if (data.success && data.sharedAccounts) {
+                console.log('[SELLER SHARED ACCOUNTS] Fetched shared accounts:', data.sharedAccounts);
+                
+                // Normalize shared accounts map to lowercase without 0x prefix for case-insensitive lookup
+                const normalizedSharedAccounts = {};
+                Object.keys(data.sharedAccounts).forEach(key => {
+                    const normalizedKey = key.toLowerCase().replace(/^0x/, '');
+                    normalizedSharedAccounts[normalizedKey] = data.sharedAccounts[key];
+                });
+                console.log('[SELLER SHARED ACCOUNTS] Normalized shared accounts:', normalizedSharedAccounts);
+                
+                // Wait a bit for EVM addresses to be converted and stored in data attributes
+                setTimeout(() => {
+                    // Update each row with its shared account
+                    const rows = document.querySelectorAll('#peers-table-body tr');
+                    console.log(`[SELLER SHARED ACCOUNTS] Found ${rows.length} rows to update`);
+                    
+                    rows.forEach((row, index) => {
+                        const evmAddress = row.getAttribute('data-evm-address');
+                        console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: data-evm-address="${evmAddress}"`);
+                        
+                        const sharedAccountCell = row.querySelector('.peer-shared-account');
+                        console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: sharedAccountCell found=${!!sharedAccountCell}`);
+                        
+                        if (evmAddress && sharedAccountCell) {
+                            // Normalize the EVM address for lookup (lowercase, no 0x prefix)
+                            const normalizedEvmAddress = evmAddress.toLowerCase().replace(/^0x/, '');
+                            const sharedAccount = normalizedSharedAccounts[normalizedEvmAddress];
+                            console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: Looking for account for ${evmAddress} (normalized: ${normalizedEvmAddress}), found: ${sharedAccount}`);
+                            
+                            if (sharedAccount) {
+                                // Format as Hedera account: 0.0.{accountNumber}
+                                const formattedAccount = `0.0.${sharedAccount}`;
+                                sharedAccountCell.textContent = formattedAccount;
+                                sharedAccountCell.title = `Shared account: ${formattedAccount}`;
+                                console.log(`[SELLER SHARED ACCOUNTS] Set shared account for ${evmAddress}: ${formattedAccount}`);
+                            } else {
+                                sharedAccountCell.textContent = '-';
+                                sharedAccountCell.title = 'No shared account found';
+                                console.log(`[SELLER SHARED ACCOUNTS] No shared account found for ${evmAddress}`);
+                            }
+                        } else if (!evmAddress) {
+                            console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: No EVM address set yet, will retry`);
+                        }
+                    });
+                }, 2000); // Wait 2 seconds for EVM conversions to complete
+            } else {
+                console.warn('[SELLER SHARED ACCOUNTS] Failed to fetch shared accounts:', data.error);
+            }
+        } catch (error) {
+            console.error('[SELLER SHARED ACCOUNTS] Error fetching shared accounts:', error);
+        }
     }
 
     async function fetchLastSeen(peer, lastSeenCell, smartContract) {

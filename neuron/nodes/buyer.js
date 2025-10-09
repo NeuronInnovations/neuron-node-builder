@@ -1368,6 +1368,163 @@ module.exports = function (RED) {
         }
     });
 
+    // Shared account endpoint - Get shared account for a specific seller
+    RED.httpAdmin.get('/buyer/shared-account/:nodeId/:sellerEvmAddress', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        const sellerEvmAddress = req.params.sellerEvmAddress;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.evmAddress) {
+                return res.status(400).json({ 
+                    error: 'Buyer node not initialized - no EVM address available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            const buyerEvmAddress = buyerNode.deviceInfo.evmAddress;
+            console.log(`[BUYER SHARED ACCOUNT] Looking for shared account with seller ${sellerEvmAddress}, buyer EVM: ${buyerEvmAddress}`);
+
+            // Get smart contract EVM directly from device info
+            const contractEVM = buyerNode.deviceInfo.smartContract;
+            if (!contractEVM) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Smart contract EVM not found in device info'
+                });
+            }
+            
+            console.log(`[BUYER SHARED ACCOUNT] Using contract EVM: ${contractEVM}`);
+
+            // Import and create contract service instance
+            const { HederaContractService } = require('neuron-js-registration-sdk');
+            const contractService = new HederaContractService({
+                network: process.env.HEDERA_NETWORK || 'testnet',
+                operatorId: process.env.HEDERA_OPERATOR_ID,
+                operatorKey: process.env.HEDERA_OPERATOR_KEY,
+                contractEVM
+            });
+
+            // Get seller's device info from smart contract
+            const sellerDevices = await contractService.getDevicesByOwner(contractEVM, sellerEvmAddress);
+            
+            console.log(`[BUYER SHARED ACCOUNT] getDevicesByOwner result:`, {
+                sellerEvmAddress,
+                contractEVM,
+                devicesFound: sellerDevices ? sellerDevices.length : 0,
+                devices: sellerDevices
+            });
+            
+            if (!sellerDevices || sellerDevices.length === 0) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Seller device not found in smart contract'
+                });
+            }
+
+            // Get the first (should be only) seller device
+            const sellerDevice = sellerDevices[0];
+            
+            console.log(`[BUYER SHARED ACCOUNT] Seller device structure:`, {
+                hasTopics: !!sellerDevice.topics,
+                topicsLength: sellerDevice.topics ? sellerDevice.topics.length : 0,
+                topics: sellerDevice.topics,
+                stdInTopic: sellerDevice.stdInTopic,
+                fullDevice: sellerDevice
+            });
+            
+            // Use stdInTopic directly from the device structure
+            const sellerStdinTopic = sellerDevice.stdInTopic;
+            
+            if (!sellerStdinTopic) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Seller device has no stdin topic'
+                });
+            }
+
+            console.log(`[BUYER SHARED ACCOUNT] Seller stdin topic: ${sellerStdinTopic}`);
+
+            // Fetch recent messages from seller's stdin topic
+            const messages = await hederaService.getTopicMessages(sellerStdinTopic, 1, 50, "desc");
+            
+            if (messages && messages.length > 0) {
+                // Look for serviceRequest messages where 'e' matches buyer's EVM address
+                const normalizedBuyerEvm = buyerEvmAddress.toLowerCase().replace(/^0x/, '');
+                
+                for (const message of messages) {
+                    try {
+                        const messageContent = message.message;
+                        if (messageContent) {
+                            const parsedMessage = JSON.parse(messageContent);
+                            
+                            // Check if this is a serviceRequest message
+                            if (parsedMessage.messageType === 'serviceRequest' && 
+                                parsedMessage.e && 
+                                parsedMessage.a) {
+                                // Normalize the 'e' field for comparison
+                                const normalizedMessageEvm = parsedMessage.e.toLowerCase().replace(/^0x/, '');
+                                
+                                // Check if this message is for this buyer
+                                if (normalizedMessageEvm === normalizedBuyerEvm) {
+                                    const sharedAccount = parsedMessage.a;
+                                    console.log(`[BUYER SHARED ACCOUNT] Found shared account: ${sharedAccount} for seller ${sellerEvmAddress}`);
+                                    
+                                    return res.json({
+                                        success: true,
+                                        sharedAccount: sharedAccount
+                                    });
+                                }
+                            }
+                        }
+                    } catch (parseError) {
+                        // Skip messages that can't be parsed
+                        continue;
+                    }
+                }
+            }
+
+            // No matching message found
+            console.log(`[BUYER SHARED ACCOUNT] No serviceRequest found for buyer ${buyerEvmAddress} in seller ${sellerEvmAddress}'s stdin`);
+            res.json({
+                success: true,
+                sharedAccount: null,
+                message: 'No matching serviceRequest message found'
+            });
+            
+        } catch (error) {
+            console.error(`Error getting shared account for seller ${sellerEvmAddress}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get shared account: ' + error.message 
+            });
+        }
+    });
+
     // Helper function to format last seen time
     function formatLastSeen(seconds) {
         if (seconds === null || seconds === undefined) return 'Never';
