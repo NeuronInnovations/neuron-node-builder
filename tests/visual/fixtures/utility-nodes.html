@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Utility Nodes Fixture</title>
+    <link rel="stylesheet" href="../harness/styles/node-editor.css" />
+  </head>
+  <body>
+    <section class="panel" id="utility-nodes">
+      <div class="panel-header">
+        <h2>Utility Nodes</h2>
+        <span class="context">StdIn ▸ StdOut ▸ StdErr ▸ Neuron P2P ▸ NeuronGPT</span>
+      </div>
+      <div class="grid-2">
+        <div class="sub-panel">
+          <h3>StdIn (Read)</h3>
+          <div class="form-row">
+            <label for="stdin-name"><span>Name</span></label>
+            <input id="stdin-name" placeholder="stdin" value="Telemetry Input" />
+          </div>
+          <div class="form-row">
+            <label for="stdin-numMessages"><span>Number of messages</span></label>
+            <input id="stdin-numMessages" placeholder="# messages" value="25" />
+          </div>
+          <div class="form-row">
+            <label for="stdin-nodeType"><span>Node Type</span></label>
+            <select id="stdin-nodeType">
+              <option value="buyer config">Buyer</option>
+              <option value="seller config">Seller</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="stdin-selectedNode"><span>Selected Node</span></label>
+            <input id="stdin-selectedNode" placeholder="Select a node" value="Ops Control Center" readonly />
+            <button class="red-ui-button">Select node</button>
+            <button class="red-ui-button" style="background: none; color: var(--text-muted);">Clear</button>
+          </div>
+        </div>
+
+        <div class="sub-panel">
+          <h3>StdOut (Write)</h3>
+          <div class="form-row">
+            <label for="stdout-name"><span>Name</span></label>
+            <input id="stdout-name" placeholder="Stdout" value="Seller Stream" />
+          </div>
+          <div class="form-row">
+            <label for="stdout-nodeType"><span>Node Type</span></label>
+            <select id="stdout-nodeType">
+              <option value="seller config">Seller</option>
+              <option value="buyer config">Buyer</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="stdout-selectedNode"><span>Selected Node</span></label>
+            <input id="stdout-selectedNode" placeholder="Select a node" value="Jetvision Seller" readonly />
+            <button class="red-ui-button">Select node</button>
+            <button class="red-ui-button" style="background: none; color: var(--text-muted);">Clear</button>
+          </div>
+        </div>
+
+        <div class="sub-panel">
+          <h3>StdErr (Monitor)</h3>
+          <div class="form-row">
+            <label for="stderr-name"><span>Name</span></label>
+            <input id="stderr-name" placeholder="stderr" value="Diagnostics" />
+          </div>
+          <div class="form-row">
+            <label for="stderr-nodeType"><span>Node Type</span></label>
+            <select id="stderr-nodeType">
+              <option value="buyer config">Buyer</option>
+              <option value="seller config">Seller</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="stderr-selectedNode"><span>Selected Node</span></label>
+            <input id="stderr-selectedNode" placeholder="Select a node" value="Ops Control Center" readonly />
+            <button class="red-ui-button">Select node</button>
+            <button class="red-ui-button" style="background: none; color: var(--text-muted);">Clear</button>
+          </div>
+        </div>
+
+        <div class="sub-panel">
+          <h3>Neuron P2P</h3>
+          <div class="form-row">
+            <label for="p2p-name"><span>Name</span></label>
+            <input id="p2p-name" placeholder="Neuron P2P" value="Jetvision Stream" />
+          </div>
+          <div class="form-row">
+            <label for="p2p-selectedNode"><span>Selected Node</span></label>
+            <input id="p2p-selectedNode" placeholder="No node selected" value="Jetvision Seller" readonly />
+            <button class="red-ui-button">Select node</button>
+            <button class="red-ui-button" style="background: none; color: var(--text-muted);">Clear</button>
+          </div>
+          <div class="form-row">
+            <label for="p2p-description"><span>Description</span></label>
+            <input id="p2p-description" placeholder="Optional description" value="Route seller telemetry to buyers" />
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <div class="sub-panel">
+        <h3>Neuron GPT Assistant</h3>
+        <div class="form-row">
+          <label for="gpt-name"><span>Name</span></label>
+          <input id="gpt-name" placeholder="Name" value="Builder Copilot" />
+        </div>
+        <div class="form-row">
+          <label for="gpt-apiKey"><span>OpenAI API Key</span></label>
+          <input id="gpt-apiKey" type="password" placeholder="sk-..." value="sk-live-••••••••" />
+        </div>
+        <div class="form-row">
+          <label for="gpt-webSearch"><span>Enable Web Search</span></label>
+          <input id="gpt-webSearch" type="checkbox" checked style="flex: none; width: auto;" />
+        </div>
+        <div class="form-row">
+          <label for="gpt-model"><span>AI Model</span></label>
+          <select id="gpt-model">
+            <option value="gpt-4" selected>GPT-4 (Recommended)</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Faster)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

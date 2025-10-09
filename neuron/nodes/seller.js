@@ -394,6 +394,46 @@ module.exports = function (RED) {
             }
 
             if (!node.deviceInfo) {
+                // VISUAL TEST MODE: Skip SDK creation and use mock deviceInfo from config
+                if (process.env.VISUAL_TEST_MODE === '1') {
+                    console.log(`[visual-test] Seller node ${node.id}: Creating mock deviceInfo from config (skipping SDK)`);
+
+                    const contracts = {
+                        "jetvision": process.env.JETVISION_CONTRACT_EVM,
+                        "chat": process.env.CHAT_CONTRACT_EVM,
+                        "challenges": process.env.CHALLENGES_CONTRACT_EVM,
+                    };
+
+                    // Create minimal deviceInfo from config for visual tests
+                    node.deviceInfo = {
+                        nodeType: "seller",
+                        nodeId: node.id,
+                        deviceName: config.deviceName || "Test Seller Device",
+                        deviceRole: config.deviceRole || "Publisher",
+                        serialNumber: config.serialNumber || "TEST-00000",
+                        deviceType: config.deviceType || "Edge",
+                        price: config.price || 0,
+                        description: config.description || "",
+                        accountId: config.evmAddress?.split('@')[0] || "0.0.999999",
+                        evmAddress: config.evmAddress || "0.0.999999@hedera",
+                        publicKey: config.publicKey || "302e020100300506032b6570042204200000000000000000000000000000000000000000000000000000000000000001",
+                        extractedPrivateKey: "0000000000000000000000000000000000000000000000000000000000000001",
+                        stdInTopic: config.stdInTopic || "0.0.888888-stdin",
+                        stdOutTopic: config.stdOutTopic || "0.0.888888-stdout",
+                        stdErrTopic: config.stdErrTopic || "0.0.888888-stderr",
+                        smartContract: contracts[config.smartContract?.toLowerCase()] || contracts["jetvision"],
+                        balance: config.balance || "0 ℏ"
+                    };
+
+                    // Save to file and context
+                    fs.writeFileSync(deviceFile, JSON.stringify(node.deviceInfo, null, 2), 'utf-8');
+                    context.set('deviceInfo', node.deviceInfo);
+
+                    node.status({ fill: "yellow", shape: "dot", text: "visual test mode" });
+                    console.log(`[visual-test] Seller node ${node.id}: Mock deviceInfo created successfully`);
+                    return; // Skip SDK creation entirely
+                }
+
                 try {
                     node.status({ fill: "blue", shape: "dot", text: "Creating new device..." });
 

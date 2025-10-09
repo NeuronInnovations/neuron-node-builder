@@ -54,12 +54,29 @@ module.exports = function(RED) {
                 }
                 
                 logDebug('Found target node:', { id: targetNode.id, type: targetNode.type, name: targetNode.name });
-                
+
                 if (!targetNode.deviceInfo) {
-                    throw new Error(`Target node missing deviceInfo (ID: ${node.selectedNodeId}). The selected node may not be fully initialized yet.`);
+                    // VISUAL TEST MODE: Create minimal mock deviceInfo if missing
+                    if (process.env.VISUAL_TEST_MODE === '1') {
+                        logDebug('[visual-test] Target node missing deviceInfo - creating mock for P2P connection');
+                        targetNode.deviceInfo = {
+                            wsPort: 9999, // Mock port
+                            publicKey: "302e020100300506032b6570042204200000000000000000000000000000000000000000000000000000000000000001",
+                            accountId: "0.0.999999",
+                            evmAddress: "0.0.999999@hedera"
+                        };
+                    } else {
+                        throw new Error(`Target node missing deviceInfo (ID: ${node.selectedNodeId}). The selected node may not be fully initialized yet.`);
+                    }
                 }
                 if (!targetNode.deviceInfo.wsPort) {
-                    throw new Error(`Target node missing wsPort in deviceInfo (ID: ${node.selectedNodeId}). The selected node may not be running.`);
+                    // VISUAL TEST MODE: Add mock wsPort if missing
+                    if (process.env.VISUAL_TEST_MODE === '1') {
+                        logDebug('[visual-test] Target node missing wsPort - adding mock value');
+                        targetNode.deviceInfo.wsPort = 9999;
+                    } else {
+                        throw new Error(`Target node missing wsPort in deviceInfo (ID: ${node.selectedNodeId}). The selected node may not be running.`);
+                    }
                 }
                 
                 const info = {
@@ -78,6 +95,13 @@ module.exports = function(RED) {
         }
 
         function connect() {
+            // VISUAL TEST MODE: Skip WebSocket connection entirely
+            if (process.env.VISUAL_TEST_MODE === '1') {
+                logDebug('[visual-test] Skipping P2P WebSocket connection in visual test mode');
+                node.status({ fill: "yellow", shape: "dot", text: "visual test mode (no connection)" });
+                return;
+            }
+
             if (ws) {
                 logDebug('Cleaning up previous connection');
                 ws.removeAllListeners();

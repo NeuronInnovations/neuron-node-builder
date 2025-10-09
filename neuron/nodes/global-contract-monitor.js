@@ -118,17 +118,24 @@ function saveContractDataToCache(contract) {
 // Fetch data for a specific contract
 async function fetchContractData(contract) {
     try {
+        // VISUAL TEST MODE: Skip live contract fetching
+        if (process.env.VISUAL_TEST_MODE === '1') {
+            console.log(`[visual-test] Skipping ${contract} contract data fetch (using cached data)`);
+            contractLoadingStates[contract] = false;
+            return;
+        }
+
         console.log(`Fetching fresh ${contract} contract data...`);
         contractLoadingStates[contract] = true;
-        
+
         const contractService = contractServices[contract];
         if (!contractService) {
             console.error(`Cannot fetch data - no service for ${contract}`);
             return;
-        }   
+        }
         const contractId = contractConfigs[contract].contractId;
         const contractEvm = contractConfigs[contract].contractEvm;
-        
+
         const freshPeerCount = await contractService.getPeerArraySize(contractEvm);
         console.log(`Fresh ${contract} peer count: ${freshPeerCount}`);
         

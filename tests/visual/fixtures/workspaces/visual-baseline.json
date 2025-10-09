@@ -1,0 +1,119 @@
+[
+  {
+    "id": "f1b2c3d4a5b6c7d8",
+    "type": "tab",
+    "label": "Visual Baseline",
+    "disabled": false,
+    "info": "Workspace used by Playwright visual regression to exercise Neuron Node Builder UI"
+  },
+  {
+    "id": "sellerNode1",
+    "type": "seller config",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Jetvision Seller",
+    "deviceRole": "Publisher",
+    "deviceName": "Orbital Sensor",
+    "smartContract": "jetvision",
+    "serialNumber": "JET-23944",
+    "deviceType": "Edge",
+    "price": 39,
+    "description": "Live aircraft tracking feed",
+    "evmAddress": "0.0.482193@hedera",
+    "balance": "132.442 ℏ",
+    "publicKey": "302e020100300506032b657004220420b1938e6",
+    "stdInTopic": "0.0.123456-stdin",
+    "stdOutTopic": "0.0.123456-stdout",
+    "stdErrTopic": "0.0.123456-stderr",
+    "loadedDeviceFilename": "sellerNode1",
+    "x": 260,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "buyerNode1",
+    "type": "buyer config",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Ops Control Center",
+    "deviceType": "Control Center",
+    "smartContract": "jetvision",
+    "description": "Ops center subscriber",
+    "evmAddress": "0.0.239991@hedera",
+    "balance": "88.100 ℏ",
+    "publicKey": "302a300506032b65700321008f9d4b",
+    "sellerEvmAddress": [
+      "0x19AF…f9c2",
+      "0xb18C…92aa"
+    ],
+    "stdInTopic": "0.0.998877-stdin",
+    "stdOutTopic": "0.0.998877-stdout",
+    "stdErrTopic": "0.0.998877-stderr",
+    "loadedDeviceFilename": "buyerNode1",
+    "x": 640,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "stdinRead1",
+    "type": "stdin r",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Telemetry Input",
+    "numMessages": 25,
+    "selectedNode": "buyerNode1",
+    "nodeType": "buyer config",
+    "x": 200,
+    "y": 340,
+    "wires": [
+      [
+        "stdoutWrite1"
+      ]
+    ]
+  },
+  {
+    "id": "stdinWrite1",
+    "type": "stdin w",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Device Reinstatement",
+    "selectedNode": "sellerNode1",
+    "nodeType": "seller config",
+    "x": 200,
+    "y": 440,
+    "wires": [
+      [
+        "stdoutWrite1"
+      ]
+    ]
+  },
+  {
+    "id": "stdoutWrite1",
+    "type": "stdout w",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Seller Stream",
+    "selectedNode": "sellerNode1",
+    "nodeType": "seller config",
+    "x": 460,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "stderrRead1",
+    "type": "stderr r",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Diagnostics",
+    "selectedNode": "buyerNode1",
+    "nodeType": "buyer config",
+    "x": 460,
+    "y": 440,
+    "wires": []
+  },
+  {
+    "id": "neuronP2p1",
+    "type": "neuron-p2p",
+    "z": "f1b2c3d4a5b6c7d8",
+    "name": "Jetvision Stream",
+    "selectedNode": "sellerNode1",
+    "description": "Route seller telemetry to buyers",
+    "x": 720,
+    "y": 340,
+    "wires": []
+  }
+]

@@ -486,4 +486,256 @@ git push origin :refs/tags/v1.0.0
 
 ---
 
+## Visual Regression Testing with Argos CI
+
+The visual testing suite uses **Argos CI**, an open-source visual regression testing platform, to automatically detect UI changes. The GitHub Actions workflow launches a real Node-RED runtime, loads the deterministic workspace under `tests/visual/fixtures/workspaces/visual-baseline.json`, and captures screenshots through Playwright. These tests run on macOS and Windows and can block signing/publishing jobs when regressions appear.
+
+### Why Argos CI?
+
+- **Free tier**: 5,000 screenshots/month (vs LambdaTest's 2,000)
+- **Cost-effective**: $30/month Pro tier (vs LambdaTest's $359/month)
+- **Open-source**: Can self-host if needed
+- **AI-powered**: Smart visual comparison with 1% tolerance
+- **Native Playwright integration**: Seamless screenshot capture and upload
+- **GitHub integration**: Automatic PR comments with visual comparison results
+
+### Local Execution
+
+#### 1. Install Dependencies
+
+```bash
+npm ci
+npx playwright install chromium
+```
+
+#### 2. Setup Argos CI (One-time)
+
+a. **Create Argos account** (if not already done):
+   - Visit: https://argos-ci.com
+   - Sign up with GitHub (recommended for seamless integration)
+   - Free tier: 5,000 screenshots/month
+
+b. **Create project**:
+   - Project name: `neuron-node-builder`
+   - Connect to GitHub repository
+
+c. **Get project token**:
+   - Go to Project Settings → API → Project Token
+   - Copy the token (format: `argos_xxxxxx...`)
+
+d. **Add token to `.env` file** (in repository root):
+
+```bash
+# .env file in repository root
+ARGOS_TOKEN=argos_your_project_token_here
+```
+
+#### 3. Run Visual Tests
+
+**Local testing (without uploading to Argos):**
+
+```bash
+npm run test:visual                  # Run all tests (captures snapshots locally)
+npm run test:visual:ui               # Run with Playwright UI mode
+npm run test:visual:headed           # Run with visible browser
+npm run test:visual:debug            # Run with Playwright debugger
+```
+
+Screenshots are captured locally but not uploaded to Argos cloud.
+
+**Testing with Argos upload:**
+
+```bash
+# Upload to Argos for visual comparison
+ARGOS_UPLOAD=true npm run test:visual
+
+# Run specific test file
+ARGOS_UPLOAD=true npx playwright test tests/visual/startup.spec.ts --project=chromium-mac
+
+# Run specific project (macOS or Windows)
+ARGOS_UPLOAD=true npx playwright test tests/visual --project=chromium-mac
+```
+
+This will:
+- Capture screenshots during test execution
+- Automatically upload to Argos cloud (via Playwright reporter)
+- Create a build in Argos dashboard
+- Compare against existing baselines (if any)
+
+#### 4. View Results
+
+After running tests with `ARGOS_UPLOAD=true`:
+
+1. Check console output for Argos build URL:
+   ```
+   Argos: 3 screenshots uploaded
+   Build URL: https://app.argos-ci.com/your-org/neuron-node-builder/builds/xxx
+   ```
+
+2. Click the build URL to view visual comparison in Argos dashboard
+
+3. **First run**: Approve baselines for each screenshot
+   - All screenshots appear as "new" (not yet baselined)
+   - Click "Approve" to set as baseline for future comparisons
+
+4. **Subsequent runs**: Review changes
+   - ✅ **No changes**: All screenshots match baselines
+   - ⚠️  **Changes detected**: Visual differences highlighted
+   - Click screenshots to see side-by-side comparison
+   - Approve or reject changes
+
+The global setup routine automatically:
+
+- points `NEURON_ENV_PATH` to `tests/visual/fixtures/env/.env.visual`
+- seeds the canonical workspace and device fixtures
+- spins up Node-RED in the background and writes logs to `tests/visual/.output/node-red.log`
+
+### Baseline Management
+
+**How Argos Works:**
+
+- `tests/visual/support/argos.ts` wraps Playwright's fixtures so every call to `captureViewportSnapshot` becomes an Argos screenshot
+- Playwright reporter (`@argos-ci/playwright/reporter`) automatically uploads screenshots to Argos cloud
+- Argos compares new screenshots against approved baselines using AI-powered visual diff
+- macOS and Windows builds upload in parallel and contribute to the same build
+
+**Managing Baselines:**
+
+1. **Initial Setup** (First Run):
+   - Run tests with `ARGOS_UPLOAD=true`
+   - All screenshots appear as "new" in Argos dashboard
+   - Review and approve each screenshot to set as baseline
+   - Future runs will compare against these baselines
+
+2. **Updating Baselines** (After UI Changes):
+   - Make intended UI changes to your code
+   - Run visual tests: `ARGOS_UPLOAD=true npm run test:visual`
+   - Argos detects differences and marks them as "changed"
+   - Review changes in Argos dashboard:
+     - If changes are intentional: Click "Approve" to update baseline
+     - If changes are bugs: Click "Reject" and fix the code
+
+3. **Best Practices**:
+   - Approve baselines per platform (macOS vs Windows) separately
+   - Use descriptive test names for easy identification
+   - Update baselines after design system changes
+   - Keep fixtures stable (refresh fixture data when defaults change)
+   - Configure `threshold: 0.01` in `argos.config.js` for 1% tolerance
+
+### Troubleshooting Tips
+
+#### General Debugging
+
+- **Node-RED fails to load:** Inspect `tests/visual/.output/node-red.log` for errors. The global setup tears down the process and surfaces critical errors.
+- **Route stubs missing:** Stubs live in `tests/visual/support/node-red.ts`. Extend them when new admin endpoints are added; otherwise dialogs may hang.
+- **Stale temp directories:** Remove `neuron-visual-*` folders under your OS temp directory if a previous run crashed before teardown.
+
+#### Argos CI Issues
+
+**Error: "ARGOS_TOKEN environment variable is not set"**
+
+The Argos project token is missing:
+
+1. Create or update `.env` in repository root:
+
+   ```bash
+   ARGOS_TOKEN=argos_your_project_token_here
+   ```
+
+2. Get token from Argos dashboard:
+   - Go to https://app.argos-ci.com
+   - Navigate to your project → Settings → API
+   - Copy "Project Token"
+
+3. Verify token is loaded:
+   ```bash
+   cat .env | grep ARGOS_TOKEN
+   ```
+
+**Tests pass but screenshots not uploaded**
+
+Argos upload is disabled by default in local development:
+
+1. **Enable upload explicitly:**
+   ```bash
+   ARGOS_UPLOAD=true npm run test:visual
+   ```
+
+2. **Or run CI command:**
+   ```bash
+   npm run test:visual:ci  # Enables upload automatically
+   ```
+
+3. **Check Playwright reporter is configured:**
+   - Verify `playwright.config.ts` includes `@argos-ci/playwright/reporter`
+   - Ensure `uploadToArgos: CI || process.env.ARGOS_UPLOAD === "true"`
+
+**Parallel upload issues on CI**
+
+When running tests on multiple platforms (macOS + Windows):
+
+1. Ensure `ARGOS_PARALLEL_TOTAL` and `ARGOS_PARALLEL_INDEX` are set correctly in GitHub Actions workflow
+
+2. Verify `argos.config.js` has parallel upload configuration:
+   ```javascript
+   upload: {
+     parallel: process.env.CI === "true",
+     parallelTotal: 2,  // Number of parallel jobs
+     parallelIndex: process.env.ARGOS_PARALLEL_INDEX || 0,
+   }
+   ```
+
+3. Each job must have unique `parallel-index` (0, 1, ...)
+
+**Screenshots appear different on CI vs local**
+
+This is often due to OS-specific rendering differences:
+
+1. **Expected behavior**: macOS and Windows screenshots will differ
+   - Argos creates separate baselines for each platform
+   - Approve baselines per OS independently
+
+2. **Font rendering**: Ensure `waitForFonts()` is called before screenshots
+
+3. **Animations**: Verify `disableAnimations()` is applied
+
+4. **Dynamic content**: Use fixture data, not live APIs
+
+**Baseline approval not working**
+
+1. Check you're logged into Argos dashboard with correct account
+
+2. Verify you have access to the project
+
+3. For first run: All screenshots must be manually approved
+
+4. Look for Argos bot comments on GitHub PRs (may require GitHub App installation)
+
+**Environment File Confusion**
+
+- **`.env`** (repository root): Argos credentials (`ARGOS_TOKEN`)
+- **`tests/visual/fixtures/env/.env.visual`**: Hedera test data (`HEDERA_OPERATOR_KEY`, contract IDs, etc.)
+
+Both files are loaded automatically by `playwright.config.ts`.
+
+### GitHub Actions Integration
+
+The visual regression workflow (`.github/workflows/visual-ai-regression.yml`) automatically:
+
+1. **Runs on Pull Requests**: Captures screenshots for every PR to main/master branch
+2. **Daily Scheduled Runs**: Runs at 6 AM UTC to catch environmental drift
+3. **Parallel Execution**: Runs on both macOS and Windows simultaneously
+4. **Argos Integration**:
+   - Uploads screenshots from both platforms
+   - Combines into single build for comparison
+   - Argos bot comments on PR with visual changes
+   - Build URL provided for detailed review
+
+**Required GitHub Secret:**
+- `ARGOS_TOKEN` - Get from Argos dashboard → Settings → API
+
+With these steps, you can maintain the "robot eyes" gate, refresh baselines confidently, and run the suite locally before pushing to CI.
+
+---
+
 **Once all tests pass, you have a production-ready, enterprise-grade macOS signing and publishing workflow!**

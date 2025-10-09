@@ -154,11 +154,97 @@ jobs:
           if-no-files-found: error
 
   # ============================================================================
+  # JOB 1B: VISUAL REGRESSION WITH ARGOS CI
+  # ============================================================================
+  visual-regression:
+    name: Visual Regression (${{ matrix.label }})
+    needs: [security-and-build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            project: chromium-mac
+            label: macOS Chromium
+            parallel-index: 0
+          - runner: windows-2022
+            project: chromium-win
+            label: Windows Chromium
+            parallel-index: 1
+    env:
+      NODE_VERSION: "18"
+      # Argos CI Configuration
+      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+      ARGOS_UPLOAD: "true"
+      ARGOS_PARALLEL_TOTAL: "2"
+      ARGOS_PARALLEL_INDEX: ${{ matrix.parallel-index }}
+      ARGOS_BUILD_NAME: neuron-v${{ needs.security-and-build.outputs.version }}-build-${{ github.run_id }}
+      # Test Environment
+      VISUAL_TEST_MODE: "1"
+      NODE_RED_BASE_URL: "http://127.0.0.1:1880"
+      CI: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full git history required for Argos comparison
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          npm ci
+
+      - name: Install Playwright browsers
+        shell: bash
+        run: |
+          npx playwright install chromium
+
+      - name: Run visual regression tests with Argos CI
+        shell: bash
+        env:
+          PLAYWRIGHT_HTML_REPORT: tests/visual/.playwright-report
+        run: |
+          npx playwright test tests/visual --project=${{ matrix.project }}
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-${{ matrix.project }}-v${{ needs.security-and-build.outputs.version }}
+          path: |
+            tests/visual/.playwright-report
+            tests/visual/.output
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report Argos build status
+        if: matrix.parallel-index == 0
+        shell: bash
+        run: |
+          echo "## 🎨 Visual Regression Testing" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build**: $ARGOS_BUILD_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: ${{ matrix.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: [View Argos Results](https://app.argos-ci.com)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Argos CI is comparing screenshots across both macOS and Windows platforms." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
   # JOB 2: MACOS SIGNING & NOTARIZATION
   # ============================================================================
   macos-sign-notarize:
     name: macOS Sign & Notarize (${{ matrix.arch }})
-    needs: [security-and-build]
+    needs: [security-and-build, visual-regression]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -468,7 +554,7 @@ jobs:
   # ============================================================================
   create-release:
     name: Create Multi-Platform Release
-    needs: [security-and-build, macos-sign-notarize]
+    needs: [security-and-build, visual-regression, macos-sign-notarize]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

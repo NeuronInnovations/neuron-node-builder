@@ -74,12 +74,23 @@ class NeuronUpdateService {
     async checkForUpdates(searchParams) {
         console.log(`🔍 Checking for updates`);
 
-        // Get the update flags, current version, and latest update
+        // Get the update flags and current version first so we can quickly bail in test contexts
         const updateFlags = await this.#getUpdateFlags();
         const currentVersion = await this.#getVersion();
-        const releases = await this.#getLatestUpdate();
 
         console.log(` - 📦 Current version: ${currentVersion}`);
+
+        if (process.env.VISUAL_TEST_MODE === '1' || process.env.NEURON_SKIP_UPDATE_CHECK === '1') {
+            console.log(' - 🧪 Visual test mode enabled, skipping update checks');
+            return { type: 'continue' };
+        }
+
+        const releases = await this.#getLatestUpdate();
+
+        if (!Array.isArray(releases) || releases.length === 0) {
+            console.log(' - ⚠️ No releases fetched, continuing without update prompts');
+            return { type: 'continue' };
+        }
 
         let mandatoryUpdate = null;
         let optionalUpdate = null;

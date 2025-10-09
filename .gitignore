@@ -80,3 +80,7 @@ build/releases/
 
 credentials
 .cursor/rules/directive.mdc
+tests/visual/.output/
+tests/visual/.playwright-report/
+tests/visual/.tsbuild/
+tests/visual/.sdk-logs/

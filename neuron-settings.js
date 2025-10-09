@@ -407,7 +407,12 @@ module.exports = {
      */
     httpStatic: [
         {path: path.resolve(__dirname, "neuron/theme/"), root: "/neuron/theme/"},
-        {path: path.resolve(__dirname, "neuron/pages/"), root: "/neuron/pages/"}
+        {path: path.resolve(__dirname, "neuron/pages/"), root: "/neuron/pages/"},
+        // Serve visual test fixtures when in test mode
+        ...(process.env.VISUAL_TEST_MODE === '1' ? [
+            {path: path.resolve(__dirname, "tests/visual/fixtures/"), root: "/visual-fixtures/"},
+            {path: path.resolve(__dirname, "public/"), root: "/public/"}
+        ] : [])
     ],
 
     /**
