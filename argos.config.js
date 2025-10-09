@@ -29,13 +29,15 @@ module.exports = {
     // Must match the number of matrix jobs in GitHub Actions
     parallelTotal: process.env.ARGOS_PARALLEL_TOTAL
       ? parseInt(process.env.ARGOS_PARALLEL_TOTAL, 10)
-      : (process.env.CI ? 2 : 1), // 2 platforms (macOS, Windows) on CI
+      : process.env.CI
+      ? 2
+      : 1, // 2 platforms (macOS, Windows) on CI
 
-    // Index of current job (0-based)
-    // Each platform gets a unique index: macOS=0, Windows=1
+    // Index of current job (1-based, as required by Argos)
+    // Each platform gets a unique index: macOS=1, Windows=2
     parallelIndex: process.env.ARGOS_PARALLEL_INDEX
       ? parseInt(process.env.ARGOS_PARALLEL_INDEX, 10)
-      : 0,
+      : 1,
   },
 
   /**
@@ -54,16 +56,16 @@ module.exports = {
    * Build identification
    * Helps track builds in the Argos dashboard
    */
-  buildName: process.env.ARGOS_BUILD_NAME ||
-             `neuron-build-${process.env.GITHUB_RUN_ID || Date.now()}`,
+  buildName:
+    process.env.ARGOS_BUILD_NAME ||
+    `neuron-build-${process.env.GITHUB_RUN_ID || Date.now()}`,
 
   /**
    * Git branch information
    * Auto-detected from GitHub Actions environment or git
    */
-  branch: process.env.GITHUB_HEAD_REF ||
-          process.env.GITHUB_REF_NAME ||
-          undefined, // Let Argos auto-detect from git
+  branch:
+    process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || undefined, // Let Argos auto-detect from git
 
   /**
    * CI detection

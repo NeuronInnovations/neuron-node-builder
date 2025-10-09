@@ -27,7 +27,8 @@
         "test:visual:report": "playwright show-report tests/visual/.playwright-report",
         "test:visual:headed": "playwright test --config=playwright.config.ts --headed",
         "test:visual:debug": "playwright test --config=playwright.config.ts --debug",
-        "test:visual:ci": "export $(grep -v '^#' .env | xargs) && ARGOS_UPLOAD=true playwright test --config=playwright.config.ts"
+        "test:visual:argos": "ARGOS_UPLOAD=true playwright test --config=playwright.config.ts",
+        "test:visual:ci": "ARGOS_UPLOAD=true playwright test --config=playwright.config.ts"
     },
     "contributors": [
         {

@@ -20,7 +20,8 @@ const CI = process.env.CI === "true";
 export default defineConfig({
   testDir: path.resolve(__dirname, "tests/visual"),
   outputDir: path.resolve(__dirname, "tests/visual/.output"),
-  timeout: 90_000,
+  // Increase timeout for CI environments where startup is slower
+  timeout: CI ? 120_000 : 90_000,
   expect: {
     timeout: 5_000,
   },

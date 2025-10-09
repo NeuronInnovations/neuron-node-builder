@@ -324,18 +324,55 @@ export async function registerApiStubs(
   // Navigate to Node-RED editor
   // Use 'domcontentloaded' instead of 'networkidle' because Node-RED has continuous
   // WebSocket/polling activity that prevents networkidle from ever being reached
-  // Increase timeout to 45s to account for slow startup and SmartUI overhead
+  // Increase timeout to 45s to account for slow startup and CI overhead
   await page.goto(NODE_RED_BASE_URL, {
     waitUntil: "domcontentloaded",
     timeout: 45_000,
   });
 
-  // Wait for critical UI elements to ensure editor is interactive
-  // The palette (node library sidebar) indicates the editor has fully initialized
-  await page.waitForSelector("#red-ui-palette", {
-    state: "visible",
-    timeout: 15_000,
-  });
+  // Wait for Node-RED editor to fully initialize
+  // Strategy: Wait for palette spinner to hide AND palette content to show
+  // This indicates all nodes have been loaded into the palette
+  try {
+    // First wait for the palette container to exist (should be immediate)
+    await page.waitForSelector("#red-ui-palette", {
+      state: "attached",
+      timeout: 5_000,
+    });
+
+    // Then wait for the spinner to disappear (indicates nodes are loading)
+    // In CI environments this can take longer, so use generous timeout
+    await page.waitForSelector("#red-ui-palette > .red-ui-palette-spinner", {
+      state: "hidden",
+      timeout: 30_000,
+    });
+
+    // Finally ensure the palette content is visible (nodes loaded)
+    await page.waitForSelector(".red-ui-palette-scroll:not(.hide)", {
+      state: "visible",
+      timeout: 10_000,
+    });
+
+    console.log("[node-red] Editor palette fully initialized");
+  } catch (error) {
+    // Log current state for debugging
+    const paletteExists = await page.locator("#red-ui-palette").count();
+    const spinnerHidden = await page
+      .locator("#red-ui-palette > .red-ui-palette-spinner")
+      .isHidden()
+      .catch(() => false);
+    const scrollVisible = await page
+      .locator(".red-ui-palette-scroll")
+      .isVisible()
+      .catch(() => false);
+
+    console.error("[node-red] Palette initialization failed:");
+    console.error(`  - Palette exists: ${paletteExists > 0}`);
+    console.error(`  - Spinner hidden: ${spinnerHidden}`);
+    console.error(`  - Scroll visible: ${scrollVisible}`);
+
+    throw error;
+  }
 }
 
 /**

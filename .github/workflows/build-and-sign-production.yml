@@ -168,11 +168,11 @@ jobs:
           - runner: macos-13
             project: chromium-mac
             label: macOS Chromium
-            parallel-index: 0
+            parallel-index: 1
           - runner: windows-2022
             project: chromium-win
             label: Windows Chromium
-            parallel-index: 1
+            parallel-index: 2
     env:
       NODE_VERSION: "18"
       # Argos CI Configuration
@@ -235,7 +235,7 @@ jobs:
           retention-days: 7
 
       - name: Report Argos build status
-        if: matrix.parallel-index == 0
+        if: matrix.parallel-index == 1
         shell: bash
         run: |
           echo "## 🎨 Visual Regression Testing" >> $GITHUB_STEP_SUMMARY

@@ -349,8 +349,25 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   try {
     await waitForHealth(`${HEALTHCHECK_URL}/`, HEALTHCHECK_TIMEOUT_MS);
 
-    // NEW: Check for initialization errors after health check passes
+    // Check for initialization errors after health check passes
     await checkForInitializationErrors(logPath);
+
+    // Verify Node API is responding (palette will need this to load nodes)
+    console.log("[visual-setup] Verifying Node API readiness...");
+    const paletteCheck = await fetch(`${HEALTHCHECK_URL}/red/nodes`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    }).catch(() => null);
+
+    if (paletteCheck && paletteCheck.ok) {
+      console.log(
+        "[visual-setup] ✅ Node API responding (palette will load)\n"
+      );
+    } else {
+      console.warn(
+        "[visual-setup] ⚠️ Node API not responding - palette may be slow to load\n"
+      );
+    }
   } catch (error) {
     if (!exited) {
       nodeRedProcess.kill();
