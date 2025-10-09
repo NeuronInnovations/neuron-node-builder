@@ -14,9 +14,9 @@ async function build() {
     `${baseDirectory}/build/config`,
   ];
 
-  console.log(chalk.grey(`Release directory: ${directories[0]}`));
-  console.log(chalk.grey(`Downloaded binary directory: ${directories[1]}`));
-  console.log(chalk.grey(`Config directory: ${directories[2]}`));
+  console.log(chalk.gray(`Release directory: ${directories[0]}`));
+  console.log(chalk.gray(`Downloaded binary directory: ${directories[1]}`));
+  console.log(chalk.gray(`Config directory: ${directories[2]}`));
 
   if (!fs.existsSync(directories[0])) {
     fs.mkdirSync(directories[0], { recursive: true });
@@ -43,14 +43,19 @@ async function build() {
 
   async function getLatestTag() {
     try {
-      const response = await axios.get("https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/latest");
+      const response = await axios.get(
+        "https://api.github.com/repos/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/latest"
+      );
       const latestTag = response.data.tag_name;
       console.log(chalk.blue(`Found latest wrapper tag: ${latestTag}`));
       return latestTag;
     } catch (error) {
-        console.error(chalk.red("Error fetching latest wrapper tag:"), error.message);
-        console.log(chalk.yellow("Falling back to default tag."));
-        return "v0.0.1-alpha";
+      console.error(
+        chalk.red("Error fetching latest wrapper tag:"),
+        error.message
+      );
+      console.log(chalk.yellow("Falling back to default tag."));
+      return "v0.0.1-alpha";
     }
   }
 
@@ -90,9 +95,17 @@ async function build() {
       bin: "neuron-wrapper-darwin64",
       candidates: [
         { name: "neuron-wrapper-darwin64" },
-        { name: "neuron-wrapper-darwin64.zip", archive: "zip", expected: "neuron-wrapper-darwin64" },
+        {
+          name: "neuron-wrapper-darwin64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-darwin64",
+        },
         { name: "neuron-wrapper-macos-x64" },
-        { name: "neuron-wrapper-macos-x64.zip", archive: "zip", expected: "neuron-wrapper-darwin64" },
+        {
+          name: "neuron-wrapper-macos-x64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-darwin64",
+        },
       ],
     },
     {
@@ -100,12 +113,28 @@ async function build() {
       bin: "neuron-wrapper-darwin-arm64",
       candidates: [
         { name: "neuron-wrapper-darwin-arm64" },
-        { name: "neuron-wrapper-darwin-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
+        {
+          name: "neuron-wrapper-darwin-arm64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-darwin-arm64",
+        },
         { name: "neuron-wrapper-macos-arm64" },
-        { name: "neuron-wrapper-macos-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
+        {
+          name: "neuron-wrapper-macos-arm64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-darwin-arm64",
+        },
         { name: "neuron-wrapper-arm64" },
-        { name: "neuron-wrapper-arm64.zip", archive: "zip", expected: "neuron-wrapper-darwin-arm64" },
-        { name: "neuron-wrapper-darwin-arm64.tar.gz", archive: "tar", expected: "neuron-wrapper-darwin-arm64" },
+        {
+          name: "neuron-wrapper-arm64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-darwin-arm64",
+        },
+        {
+          name: "neuron-wrapper-darwin-arm64.tar.gz",
+          archive: "tar",
+          expected: "neuron-wrapper-darwin-arm64",
+        },
       ],
     },
     {
@@ -113,7 +142,11 @@ async function build() {
       bin: "neuron-wrapper-win32.exe",
       candidates: [
         { name: "neuron-wrapper-win32.exe" },
-        { name: "neuron-wrapper-win32.zip", archive: "zip", expected: "neuron-wrapper-win32.exe" },
+        {
+          name: "neuron-wrapper-win32.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-win32.exe",
+        },
       ],
     },
     {
@@ -121,17 +154,27 @@ async function build() {
       bin: "neuron-wrapper-win64.exe",
       candidates: [
         { name: "neuron-wrapper-win64.exe" },
-        { name: "neuron-wrapper-win64.zip", archive: "zip", expected: "neuron-wrapper-win64.exe" },
+        {
+          name: "neuron-wrapper-win64.zip",
+          archive: "zip",
+          expected: "neuron-wrapper-win64.exe",
+        },
       ],
     },
   ];
 
-  console.log(chalk.blue(`📋 Preparing to download ${wrapperAssets.length} wrapper assets`));
+  console.log(
+    chalk.blue(
+      `📋 Preparing to download ${wrapperAssets.length} wrapper assets`
+    )
+  );
   console.log(chalk.green.underline("Downloading Assets"));
 
   const wrapperTagCandidates = Array.from(new Set([tag, defaultWrapperTag]));
   console.log(
-    chalk.blue(`Wrapper tag resolution order: ${wrapperTagCandidates.join(' -> ')}`)
+    chalk.blue(
+      `Wrapper tag resolution order: ${wrapperTagCandidates.join(" -> ")}`
+    )
   );
 
   function findFirstFileRecursive(dir, targetName) {
@@ -139,7 +182,7 @@ async function build() {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!targetName && entry.name.startsWith('.')) {
+        if (!targetName && entry.name.startsWith(".")) {
           continue;
         }
         const match = findFirstFileRecursive(fullPath, targetName);
@@ -147,7 +190,7 @@ async function build() {
           return match;
         }
       } else if (!targetName || entry.name === targetName) {
-        if (!targetName && entry.name.startsWith('.')) {
+        if (!targetName && entry.name.startsWith(".")) {
           continue;
         }
         return fullPath;
@@ -156,7 +199,12 @@ async function build() {
     return null;
   }
 
-  function materializeAsset(tempFilePath, destinationPath, candidate, contextLabel) {
+  function materializeAsset(
+    tempFilePath,
+    destinationPath,
+    candidate,
+    contextLabel
+  ) {
     const archiveType = candidate.archive;
     if (!archiveType) {
       if (fs.existsSync(destinationPath)) {
@@ -190,7 +238,9 @@ async function build() {
 
       if (!extractedPath) {
         throw new Error(
-          `Archive did not contain expected file (${targetName || 'auto-detected'})`
+          `Archive did not contain expected file (${
+            targetName || "auto-detected"
+          })`
         );
       }
 
@@ -217,7 +267,7 @@ async function build() {
     for (const tagCandidate of wrapperTagCandidates) {
       for (const candidate of normalizedCandidates) {
         const url = `https://github.com/NeuronInnovations/neuron-sdk-websocket-wrapper/releases/download/${tagCandidate}/${candidate.name}`;
-        const safeName = candidate.name.replace(/\//g, '-');
+        const safeName = candidate.name.replace(/\//g, "-");
         const tempFilePath = path.join(
           binDir,
           `${safeName}-${tagCandidate}.tmp`
@@ -230,7 +280,9 @@ async function build() {
               `Downloading ${asset.id} wrapper candidate: tag=${tagCandidate}, asset=${candidate.name}`
             )
           );
-          const downloadResponse = await axios.get(url, { responseType: "stream" });
+          const downloadResponse = await axios.get(url, {
+            responseType: "stream",
+          });
           const writer = fs.createWriteStream(tempFilePath);
           downloadResponse.data.pipe(writer);
 
@@ -283,13 +335,15 @@ async function build() {
     }
 
     console.error(
-      chalk.red(`❌ Failed to download ${asset.id} wrapper from any known candidate name or tag.`)
+      chalk.red(
+        `❌ Failed to download ${asset.id} wrapper from any known candidate name or tag.`
+      )
     );
     console.error(
       chalk.red(
-        `   Tags tried: ${wrapperTagCandidates.join(', ')} | Candidates: ${normalizedCandidates
-          .map((c) => c.name)
-          .join(', ')}`
+        `   Tags tried: ${wrapperTagCandidates.join(
+          ", "
+        )} | Candidates: ${normalizedCandidates.map((c) => c.name).join(", ")}`
       )
     );
     process.exit(1);
@@ -528,16 +582,16 @@ async function build() {
   if (unknownTargets.length) {
     console.error(
       chalk.red(
-        `❌ Unknown pkg targets: ${unknownTargets.join(", ")}. Valid options: ${Object.keys(targets).join(", ")}`
+        `❌ Unknown pkg targets: ${unknownTargets.join(
+          ", "
+        )}. Valid options: ${Object.keys(targets).join(", ")}`
       )
     );
     process.exit(1);
   }
 
   console.log(
-    chalk.blue(
-      `Targets selected for build: ${targetsToBuild.join(", ")}`
-    )
+    chalk.blue(`Targets selected for build: ${targetsToBuild.join(", ")}`)
   );
 
   for (const target of targetsToBuild) {
