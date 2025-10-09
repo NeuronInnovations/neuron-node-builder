@@ -181,6 +181,8 @@ jobs:
       ARGOS_PARALLEL_TOTAL: "2"
       ARGOS_PARALLEL_INDEX: ${{ matrix.parallel-index }}
       ARGOS_BUILD_NAME: neuron-v${{ needs.security-and-build.outputs.version }}-build-${{ github.run_id }}
+      ARGOS_BRANCH: ${{ github.ref_name }}
+      ARGOS_COMMIT: ${{ github.sha }}
       # Test Environment
       VISUAL_TEST_MODE: "1"
       NODE_RED_BASE_URL: "http://127.0.0.1:1880"

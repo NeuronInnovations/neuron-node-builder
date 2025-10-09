@@ -152,11 +152,11 @@ export async function verifyVisualTestEnvironment(): Promise<ValidationResult> {
     }
   }
 
-  // Check 4: Verify required environment variables (only when SmartUI is enabled)
-  const smartUIEnabled = process.env.SKIP_SMARTUI !== "1";
+  // Check 4: Verify required environment variables for Argos CI (only when enabled)
+  const argosEnabled = process.env.ARGOS_UPLOAD === "true";
 
-  if (smartUIEnabled) {
-    const required = ["LT_USERNAME", "LT_ACCESS_KEY", "PROJECT_TOKEN"];
+  if (argosEnabled) {
+    const required = ["ARGOS_TOKEN"];
     const missing = required.filter(
       (key) => !process.env[key] || process.env[key] === ""
     );
@@ -164,8 +164,8 @@ export async function verifyVisualTestEnvironment(): Promise<ValidationResult> {
     if (missing.length > 0) {
       result.errors.push(
         `Missing required environment variables: ${missing.join(", ")}. ` +
-          "These are required for SmartUI visual regression. " +
-          "Add them to .env file or run with SKIP_SMARTUI=1 to skip visual regression."
+          "These are required for Argos CI visual regression. " +
+          "Add ARGOS_TOKEN to GitHub secrets or set ARGOS_UPLOAD=false to skip."
       );
       result.passed = false;
     }
