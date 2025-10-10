@@ -346,8 +346,22 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     }
   );
 
-  nodeRedProcess.stdout?.pipe(logStream);
-  nodeRedProcess.stderr?.pipe(logStream);
+  // Pipe to log file AND console for debugging
+  nodeRedProcess.stdout?.on("data", (data) => {
+    logStream.write(data);
+    const message = data.toString().trim();
+    if (message) {
+      console.log(`[node-red stdout] ${message}`);
+    }
+  });
+
+  nodeRedProcess.stderr?.on("data", (data) => {
+    logStream.write(data);
+    const message = data.toString().trim();
+    if (message) {
+      console.error(`[node-red stderr] ${message}`);
+    }
+  });
 
   let startupError: Error | undefined;
   let exited = false;
@@ -384,10 +398,41 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     if (!exited) {
       nodeRedProcess.kill();
     }
+
+    // Output Node-RED logs to help diagnose the issue
+    console.error(
+      "\n[visual-setup] ❌ Node-RED failed to start. Last 50 lines of log:"
+    );
+    console.error("=".repeat(80));
+    try {
+      const logContent = fs.readFileSync(logPath, "utf-8");
+      const logLines = logContent.split("\n");
+      const last50Lines = logLines.slice(-50).join("\n");
+      console.error(last50Lines);
+    } catch (logError) {
+      console.error(`Could not read log file: ${logError}`);
+    }
+    console.error("=".repeat(80));
+
     throw error instanceof Error ? error : new Error(String(error));
   }
 
   if (startupError) {
+    // Output Node-RED logs before throwing
+    console.error(
+      "\n[visual-setup] ❌ Node-RED exited prematurely. Last 50 lines of log:"
+    );
+    console.error("=".repeat(80));
+    try {
+      const logContent = fs.readFileSync(logPath, "utf-8");
+      const logLines = logContent.split("\n");
+      const last50Lines = logLines.slice(-50).join("\n");
+      console.error(last50Lines);
+    } catch (logError) {
+      console.error(`Could not read log file: ${logError}`);
+    }
+    console.error("=".repeat(80));
+
     throw startupError;
   }
 
