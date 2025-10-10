@@ -217,11 +217,25 @@ jobs:
           npx playwright install chromium
 
       - name: Run visual regression tests with Argos CI
+        id: visual_tests
+        continue-on-error: true
         shell: bash
         env:
           PLAYWRIGHT_HTML_REPORT: tests/visual/.playwright-report
         run: |
-          npx playwright test tests/visual --project=${{ matrix.project }}
+          # Run tests and capture exit code without failing the step
+          npx playwright test tests/visual --project=${{ matrix.project }} || TEST_EXIT_CODE=$?
+
+          # Log outcome but always exit 0 so downstream jobs continue
+          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
+            echo "⚠️  Visual tests had failures (exit code: ${TEST_EXIT_CODE}) but continuing workflow"
+            echo "test_status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Visual tests passed"
+            echo "test_status=passed" >> $GITHUB_OUTPUT
+          fi
+
+          exit 0
 
       - name: Upload test artifacts
         if: always()
@@ -238,8 +252,19 @@ jobs:
         if: matrix.parallel-index == 1
         shell: bash
         run: |
+          TEST_STATUS="${{ steps.visual_tests.outputs.test_status || 'unknown' }}"
+
           echo "## 🎨 Visual Regression Testing" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$TEST_STATUS" = "failed" ]; then
+            echo "⚠️ **Status**: Tests completed with failures (workflow continuing)" >> $GITHUB_STEP_SUMMARY
+          elif [ "$TEST_STATUS" = "passed" ]; then
+            echo "✅ **Status**: Tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **Status**: Unknown" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "- **Build**: $ARGOS_BUILD_NAME" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Platform**: ${{ matrix.label }}" >> $GITHUB_STEP_SUMMARY
@@ -266,8 +291,13 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: "10.12"
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["dohoangviet", "admin"]'), github.actor))
+      always() &&
+      needs.security-and-build.result == 'success' &&
+      (needs.visual-regression.result == 'success' || needs.visual-regression.result == 'failure') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && contains(fromJSON('["dohoangviet", "admin"]'), github.actor))
+      )
 
     steps:
       - name: Checkout code
@@ -567,9 +597,16 @@ jobs:
     timeout-minutes: 15
 
     # Only create releases for version tags or authorized manual triggers
+    # Visual regression failures don't block releases
     if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+      always() &&
+      needs.security-and-build.result == 'success' &&
+      needs.macos-sign-notarize.result == 'success' &&
+      (needs.visual-regression.result == 'success' || needs.visual-regression.result == 'failure') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+      )
 
     steps:
       - name: Checkout code

@@ -334,8 +334,7 @@ export async function registerApiStubs(
     }
     console.log("[node-red] Server health check passed");
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Node-RED server health check failed: ${message}. ` +
         `Ensure the server is running at ${NODE_RED_BASE_URL}`
@@ -359,31 +358,75 @@ export async function registerApiStubs(
   const pageTitle = await page.title();
   console.log(`[node-red] Page title: "${pageTitle}"`);
 
-  // Wait for Node-RED editor to fully initialize
-  // Strategy: Wait for palette spinner to hide AND palette content to show
-  // This indicates all nodes have been loaded into the palette
+  // CRITICAL: Detect if we're on setup page (means VISUAL_TEST_MODE didn't work)
+  if (
+    currentUrl.includes("/neuron/pages/setup.html") ||
+    (await page
+      .locator("text=/hedera.*operator/i")
+      .isVisible()
+      .catch(() => false))
+  ) {
+    console.error(
+      "[node-red] ❌ LANDED ON SETUP PAGE - VISUAL_TEST_MODE NOT WORKING"
+    );
+    console.error("[node-red] Environment check:");
+    console.error(`  - VISUAL_TEST_MODE: ${process.env.VISUAL_TEST_MODE}`);
+    console.error(`  - CI: ${process.env.CI}`);
+
+    // Capture screenshot for debugging
+    await page
+      .screenshot({
+        path: path.join(__dirname, "..", ".output", "setup-page-redirect.png"),
+        fullPage: true,
+      })
+      .catch(() => {
+        /* ignore screenshot errors */
+      });
+
+    throw new Error(
+      "Node-RED redirected to setup page instead of showing editor. " +
+        "This means VISUAL_TEST_MODE environment variable is not being respected. " +
+        "Check that the variable is set correctly in global-setup.ts and neuron-settings.js"
+    );
+  }
+
+  // Wait for Node-RED editor to fully initialize with progressive timeout strategy
+  const CI = process.env.CI === "true";
+  const PALETTE_TIMEOUT = CI ? 60_000 : 20_000; // Increase CI timeout to 60s
+  const SPINNER_TIMEOUT = CI ? 90_000 : 45_000; // Increase to 90s for CI
+  const SCROLL_TIMEOUT = CI ? 30_000 : 15_000; // Increase to 30s for CI
+
   try {
     // First wait for the palette container to exist (should be immediate)
     // Increased timeout for CI environments (especially macOS runners)
+    console.log(
+      `[node-red] Waiting for palette (timeout: ${PALETTE_TIMEOUT}ms)...`
+    );
     await page.waitForSelector("#red-ui-palette", {
       state: "attached",
-      timeout: 20_000, // Increased from 5s to 20s for CI reliability
+      timeout: PALETTE_TIMEOUT,
     });
 
     // Then wait for the spinner to disappear (indicates nodes are loading)
     // In CI environments this can take longer, so use generous timeout
+    console.log(
+      `[node-red] Waiting for spinner to hide (timeout: ${SPINNER_TIMEOUT}ms)...`
+    );
     await page.waitForSelector("#red-ui-palette > .red-ui-palette-spinner", {
       state: "hidden",
-      timeout: 45_000, // Increased from 30s to 45s for slower CI runners
+      timeout: SPINNER_TIMEOUT,
     });
 
     // Finally ensure the palette content is visible (nodes loaded)
+    console.log(
+      `[node-red] Waiting for palette content (timeout: ${SCROLL_TIMEOUT}ms)...`
+    );
     await page.waitForSelector(".red-ui-palette-scroll:not(.hide)", {
       state: "visible",
-      timeout: 15_000, // Increased from 10s to 15s for CI reliability
+      timeout: SCROLL_TIMEOUT,
     });
 
-    console.log("[node-red] Editor palette fully initialized");
+    console.log("[node-red] ✅ Editor palette fully initialized");
   } catch (error) {
     // Log current state for debugging
     const paletteExists = await page.locator("#red-ui-palette").count();
