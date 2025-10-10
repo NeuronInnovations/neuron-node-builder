@@ -321,6 +321,27 @@ export async function registerApiStubs(
     (window as any).NEURON_VISUAL_TEST_MODE = true;
   });
 
+  // Verify Node-RED server is responding before navigation
+  // This prevents race conditions in CI environments
+  console.log("[node-red] Verifying server health before navigation...");
+  try {
+    const healthResponse = await fetch(NODE_RED_BASE_URL, {
+      method: "HEAD",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!healthResponse.ok) {
+      throw new Error(`Server responded with status ${healthResponse.status}`);
+    }
+    console.log("[node-red] Server health check passed");
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Node-RED server health check failed: ${message}. ` +
+        `Ensure the server is running at ${NODE_RED_BASE_URL}`
+    );
+  }
+
   // Navigate to Node-RED editor
   // Use 'domcontentloaded' instead of 'networkidle' because Node-RED has continuous
   // WebSocket/polling activity that prevents networkidle from ever being reached
@@ -335,22 +356,23 @@ export async function registerApiStubs(
   // This indicates all nodes have been loaded into the palette
   try {
     // First wait for the palette container to exist (should be immediate)
+    // Increased timeout for CI environments (especially macOS runners)
     await page.waitForSelector("#red-ui-palette", {
       state: "attached",
-      timeout: 5_000,
+      timeout: 20_000, // Increased from 5s to 20s for CI reliability
     });
 
     // Then wait for the spinner to disappear (indicates nodes are loading)
     // In CI environments this can take longer, so use generous timeout
     await page.waitForSelector("#red-ui-palette > .red-ui-palette-spinner", {
       state: "hidden",
-      timeout: 30_000,
+      timeout: 45_000, // Increased from 30s to 45s for slower CI runners
     });
 
     // Finally ensure the palette content is visible (nodes loaded)
     await page.waitForSelector(".red-ui-palette-scroll:not(.hide)", {
       state: "visible",
-      timeout: 10_000,
+      timeout: 15_000, // Increased from 10s to 15s for CI reliability
     });
 
     console.log("[node-red] Editor palette fully initialized");

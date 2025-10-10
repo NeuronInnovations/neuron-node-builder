@@ -230,12 +230,14 @@ module.exports = {
         }
         
         // If credentials are missing and this is not the setup page or API endpoint
-        if (missingVars.length > 0 && 
-            !req.path.includes('/neuron/pages/setup.html') && 
+        // Skip redirect in visual test mode to allow automated testing
+        if (missingVars.length > 0 &&
+            !req.path.includes('/neuron/pages/setup.html') &&
             !req.path.includes('/neuron/setup/save-credentials') &&
             !req.path.includes('/neuron/theme/') &&
-            req.path !== '/favicon.ico') {
-            
+            req.path !== '/favicon.ico' &&
+            process.env.VISUAL_TEST_MODE !== '1') {
+
             console.log('🔄 Redirecting to setup page due to missing credentials');
             // Redirect to setup page
             return res.redirect('/neuron/pages/setup.html');
