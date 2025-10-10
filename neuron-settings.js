@@ -197,50 +197,24 @@ module.exports = {
             const TemplateService = require('./neuron/services/TemplateService');
             return TemplateService(req, res, next);
         }
-        
-        // Check if credentials are missing and redirect to setup if needed
-        // Read .env file directly to avoid process.env caching issues
-        const envPath = require('./neuron/services/NeuronEnvironment').getPath();
-        let envContent = '';
-        
-        if (require('fs').existsSync(envPath)) {
-            envContent = require('fs').readFileSync(envPath, 'utf-8');
-        }
-        
-        // Parse .env content to check for credentials
-        const lines = envContent.split('\n');
-        const credentials = {};
-        
-        lines.forEach(line => {
-            const [key, ...valueParts] = line.split('=');
-            if (key && valueParts.length > 0) {
-                credentials[key.trim()] = valueParts.join('=').trim();
-            }
-        });
-        
-        const requiredEnvVars = ['HEDERA_OPERATOR_KEY', 'HEDERA_OPERATOR_ID'];
-        const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
-        
-        // Debug logging for redirect decisions
-        if (req.path === '/') {
-            console.log('🔍 Checking credentials for root path (direct file read):');
-            console.log('  HEDERA_OPERATOR_ID:', credentials.HEDERA_OPERATOR_ID ? '✅ Set' : '❌ Missing');
-            console.log('  HEDERA_OPERATOR_KEY:', credentials.HEDERA_OPERATOR_KEY ? '✅ Set' : '❌ Missing');
-             console.log('  Missing vars:', missingVars.length > 0 ? missingVars : 'None');
-        }
-        
-        // If credentials are missing and this is not the setup page or API endpoint
-        // Skip redirect in visual test mode to allow automated testing
-        if (missingVars.length > 0 &&
-            !req.path.includes('/neuron/pages/setup.html') &&
-            !req.path.includes('/neuron/setup/save-credentials') &&
-            !req.path.includes('/neuron/theme/') &&
-            req.path !== '/favicon.ico' &&
-            process.env.VISUAL_TEST_MODE !== '1') {
 
-            console.log('🔄 Redirecting to setup page due to missing credentials');
-            // Redirect to setup page
-            return res.redirect('/neuron/pages/setup.html');
+        // Skip ALL credential checks in visual test mode to allow automated testing
+        const isVisualTestMode = process.env.VISUAL_TEST_MODE === '1';
+
+        if (!isVisualTestMode) {
+            // Check if credentials are missing and redirect to setup if needed
+            const requiredEnvVars = ['HEDERA_OPERATOR_KEY', 'HEDERA_OPERATOR_ID'];
+            const missingVars = requiredEnvVars.filter(varName => !process.env[varName] || process.env[varName].trim() === '');
+
+            if (missingVars.length > 0 &&
+                !req.path.includes('/neuron/pages/setup.html') &&
+                !req.path.includes('/neuron/setup/save-credentials') &&
+                !req.path.includes('/neuron/theme/') &&
+                req.path !== '/favicon.ico') {
+
+                console.log('🔄 Redirecting to setup page due to missing credentials:', missingVars);
+                return res.redirect('/neuron/pages/setup.html');
+            }
         }
         
         // Handle credential setup endpoint
@@ -341,16 +315,16 @@ module.exports = {
         
         if (req.path !== '/') {
             next();
-
             return;
         }
 
+        // Check for application updates (skipped in test mode)
         const updateService = new NeuronUpdateService();
-
         const requestUrl = new URL(req.url, `http://${req.headers.host}`);
- 
+
         updateService.checkForUpdates(requestUrl.searchParams).then((response) => {
             if (response.type === 'redirect') {
+                console.log(`[middleware] Update available, redirecting to: ${response.url}`);
                 return res.redirect(response.url);
             }
 

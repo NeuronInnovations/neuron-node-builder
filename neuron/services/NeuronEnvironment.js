@@ -33,6 +33,13 @@ module.exports.load = function load() {
     require('dotenv').config({
         path: envPath
     });
+
+    // Verify critical environment variables for visual tests
+    if (process.env.VISUAL_TEST_MODE === '1') {
+        console.log('🧪 Visual test mode - verifying credentials loaded:');
+        console.log(`  HEDERA_OPERATOR_ID: ${process.env.HEDERA_OPERATOR_ID ? '✅ Set' : '❌ Missing'}`);
+        console.log(`  HEDERA_OPERATOR_KEY: ${process.env.HEDERA_OPERATOR_KEY ? '✅ Set (length: ' + process.env.HEDERA_OPERATOR_KEY.length + ')' : '❌ Missing'}`);
+    }
 };
 
 module.exports.reload = function reload() {

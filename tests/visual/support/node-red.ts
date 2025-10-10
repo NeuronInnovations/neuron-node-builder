@@ -351,6 +351,14 @@ export async function registerApiStubs(
     timeout: 45_000,
   });
 
+  // Debug: Log the actual URL we landed on
+  const currentUrl = page.url();
+  console.log(`[node-red] Navigation completed. Current URL: ${currentUrl}`);
+
+  // Debug: Log page title to see what page we're on
+  const pageTitle = await page.title();
+  console.log(`[node-red] Page title: "${pageTitle}"`);
+
   // Wait for Node-RED editor to fully initialize
   // Strategy: Wait for palette spinner to hide AND palette content to show
   // This indicates all nodes have been loaded into the palette
@@ -392,6 +400,21 @@ export async function registerApiStubs(
     console.error(`  - Palette exists: ${paletteExists > 0}`);
     console.error(`  - Spinner hidden: ${spinnerHidden}`);
     console.error(`  - Scroll visible: ${scrollVisible}`);
+
+    // Debug: Capture what page elements exist to understand what page we're on
+    const bodyText = await page
+      .locator("body")
+      .textContent()
+      .catch(() => "Unable to read body text");
+    console.error(`[node-red] Page body text (first 500 chars):`);
+    console.error(`  ${bodyText?.substring(0, 500)}`);
+
+    // Check for common indicators
+    const hasSetupForm = await page.locator('form, input[type="text"]').count();
+    const hasRedUiElements = await page.locator('[class*="red-ui"]').count();
+    console.error(`[node-red] Page analysis:`);
+    console.error(`  - Form/input elements: ${hasSetupForm}`);
+    console.error(`  - red-ui-* elements: ${hasRedUiElements}`);
 
     throw error;
   }

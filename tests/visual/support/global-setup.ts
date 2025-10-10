@@ -321,7 +321,19 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     NODE_ENV: process.env.NODE_ENV ?? "test",
     PORT: process.env.PORT ?? "1880",
     PLAYWRIGHT_VISUAL_RUN_ID: randomUUID(),
+    // Explicitly set critical environment variables for Node-RED server
+    VISUAL_TEST_MODE: "1",
+    NEURON_ENV_PATH: visualEnvPath,
+    NEURON_USER_PATH: userHome,
   };
+
+  // Debug: Verify environment variables being passed to Node-RED
+  console.log("[visual-setup] Node-RED environment:");
+  console.log(`  VISUAL_TEST_MODE: ${childEnv.VISUAL_TEST_MODE}`);
+  console.log(`  NEURON_ENV_PATH: ${childEnv.NEURON_ENV_PATH}`);
+  console.log(`  NEURON_USER_PATH: ${childEnv.NEURON_USER_PATH}`);
+  console.log(`  NODE_ENV: ${childEnv.NODE_ENV}`);
+  console.log(`  PORT: ${childEnv.PORT}`);
 
   const nodeRedProcess = spawn(
     nodePath,
