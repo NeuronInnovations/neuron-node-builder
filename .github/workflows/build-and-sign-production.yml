@@ -187,6 +187,10 @@ jobs:
       VISUAL_TEST_MODE: "1"
       NODE_RED_BASE_URL: "http://127.0.0.1:1880"
       CI: "true"
+      # Visual Test Fallback Credentials (in case .env.visual is missing)
+      HEDERA_OPERATOR_ID: "0.0.123456"
+      HEDERA_OPERATOR_KEY: "302e020100300506032b657004220420000000000000000000000000000000000000000000000000000000000000000000"
+      HEDERA_RPC: "https://testnet.hashio.io/api"
 
     steps:
       - name: Checkout repository

@@ -30,6 +30,7 @@ sync.ffs_db
 package-lock.json
 .editorconfig
 .env
+!tests/visual/fixtures/env/.env.visual
 neuron/nodes/devices/*
 neuron/nodes/sdk_env_files/.buyer*
 neuron/nodes/sdk_env_files/.seller*

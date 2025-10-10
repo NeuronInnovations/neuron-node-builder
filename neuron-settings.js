@@ -12,6 +12,8 @@
  *
  **/
 
+console.log("🚀 [neuron-settings] Starting to load Neuron settings...");
+
 // Import required modules
 const fs = require("fs");
 const path = require("path");
@@ -20,14 +22,20 @@ const { spawn } = require("child_process");
 const NeuronUpdateService = require("./neuron/services/NeuronUpdateService");
 
 // Load environment variables with configurable path
+console.log("📝 [neuron-settings] Loading environment...");
 require("./neuron/services/NeuronEnvironment").load();
+console.log("✅ [neuron-settings] Environment loaded");
 
 // Resolve the SDK path
+console.log("📝 [neuron-settings] Resolving SDK path...");
 const NeuronSDKResolver = require("./neuron/services/NeuronSDKResolver");
 new NeuronSDKResolver().resolve();
+console.log("✅ [neuron-settings] SDK path resolved");
 
 // Load user home directory
+console.log("📝 [neuron-settings] Loading user home directory...");
 const userHomePath = require("./neuron/services/NeuronUserHome").load();
+console.log("✅ [neuron-settings] User home directory loaded:", userHomePath);
 
 // Validate required Hedera credentials
 const requiredEnvVars = ["HEDERA_OPERATOR_KEY", "HEDERA_OPERATOR_ID"];
@@ -854,3 +862,5 @@ module.exports = {
   //    */
   //},
 };
+
+console.log("✅ [neuron-settings] Neuron settings loaded successfully!");
