@@ -27,7 +27,7 @@ const determineEnvPath = () => {
         process.env.HEDERA_OPERATOR_ID || "0.0.123456";
       process.env.HEDERA_OPERATOR_KEY =
         process.env.HEDERA_OPERATOR_KEY ||
-        "302e020100300506032b657004220420000000000000000000000000000000000000000000000000000000000000000000";
+        "302e020100300506032b65700422042000000000000000000000000000000000000000000000000000000000000000ff";
       return null; // Signal to skip file loading
     }
     throw new Error(`Environment file not found at: ${envPath}`);

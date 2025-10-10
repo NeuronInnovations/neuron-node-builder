@@ -260,7 +260,8 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     "workspaces",
     "devices"
   );
-  const devicesTargetDir = path.join(userDir, "devices");
+  // DeviceManager looks in userHome/devices (not userDir/devices)
+  const devicesTargetDir = path.join(userHome, "devices");
   ensureDirectory(devicesTargetDir);
 
   if (fs.existsSync(devicesFixtureDir)) {
