@@ -70,7 +70,19 @@ const setLoadingState = async (
 
 test.describe("Startup loading experience", () => {
   test("Default boot state", async ({ page, argosSnapshot }) => {
-    await page.goto(loadingUrl);
+    // Block navigation before loading page
+    await page.route("**/*", async (route) => {
+      const url = route.request().url();
+      // Block redirects to Node-RED but allow loading.html and its assets
+      if (url.includes("localhost:1880") && !url.includes("loading")) {
+        console.log(`[TEST] Blocked redirect to: ${url}`);
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto(loadingUrl, { waitUntil: "domcontentloaded" });
     await disableAnimations(page);
     await waitForFonts(page);
     await setLoadingState(page, "default");
@@ -78,7 +90,18 @@ test.describe("Startup loading experience", () => {
   });
 
   test("Server ready state", async ({ page, argosSnapshot }) => {
-    await page.goto(loadingUrl);
+    // Block navigation before loading page
+    await page.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (url.includes("localhost:1880") && !url.includes("loading")) {
+        console.log(`[TEST] Blocked redirect to: ${url}`);
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto(loadingUrl, { waitUntil: "domcontentloaded" });
     await disableAnimations(page);
     await waitForFonts(page);
     await setLoadingState(page, "ready");
@@ -86,7 +109,18 @@ test.describe("Startup loading experience", () => {
   });
 
   test("Timeout + error guidance", async ({ page, argosSnapshot }) => {
-    await page.goto(loadingUrl);
+    // Block navigation before loading page
+    await page.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (url.includes("localhost:1880") && !url.includes("loading")) {
+        console.log(`[TEST] Blocked redirect to: ${url}`);
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto(loadingUrl, { waitUntil: "domcontentloaded" });
     await disableAnimations(page);
     await waitForFonts(page);
     await setLoadingState(page, "error");
