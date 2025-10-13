@@ -1,134 +1,234 @@
 # Task Completion Checklist
 
-## When a Development Task is Completed
+## After Making Code Changes
+
+When you complete a coding task, follow this checklist to ensure quality:
 
 ### 1. Code Quality Checks
-- [ ] Run JSHint linting
-  ```bash
-  grunt jshint
-  ```
-- [ ] Fix any linting errors or warnings
-- [ ] Ensure code follows style guidelines (4-space indentation, proper braces)
 
-### 2. Testing
-- [ ] Run unit tests
-  ```bash
-  npm test
-  # or
-  grunt simplemocha
-  ```
-- [ ] Add new tests for new features
-- [ ] Ensure all tests pass
-- [ ] Run visual regression tests (if UI changes)
-  ```bash
-  npm run test:visual
-  ```
-- [ ] Check test coverage
-  ```bash
-  grunt nyc:all
-  ```
+```bash
+# Lint the code you changed
+grunt jshint:editor    # If you changed editor code
+grunt jshint:nodes     # If you changed node code
+grunt jshint:tests     # If you changed tests
+```
 
-### 3. Build Verification
-- [ ] Run production build
-  ```bash
-  npm run build
-  # or
-  npx grunt build
-  ```
-- [ ] Verify build completes without errors
-- [ ] Check that `public/` directory is created with compiled assets
-- [ ] Test the application locally
-  ```bash
-  npm run start
-  ```
+**Fix all linting errors before proceeding.**
 
-### 4. Visual Testing (for UI changes)
-- [ ] Run visual regression suite
-  ```bash
-  npm run test:visual
-  ```
-- [ ] Review SmartUI dashboard for any regressions
-- [ ] Approve baseline changes if intentional
-- [ ] Ensure tests pass on both macOS and Windows
+### 2. Build the Project
 
-### 5. Documentation
-- [ ] Update README.md if user-facing changes
-- [ ] Update API.md for API changes
-- [ ] Add/update JSDoc comments
-- [ ] Update CHANGELOG.md with notable changes
+```bash
+# Rebuild editor assets if you changed frontend code
+npx grunt build
 
-### 6. Environment & Configuration
-- [ ] Update `.env.example` if new environment variables added
-- [ ] Document any new configuration requirements
-- [ ] Update neuron-settings.js if needed
+# Verify the build succeeded
+ls -la packages/node_modules/@node-red/editor-client/public/
+```
+
+**Ensure `public/red/` and `public/vendor/` directories exist and contain files.**
+
+### 3. Run Tests
+
+```bash
+# For backend changes: Run unit tests
+npm test
+
+# For UI changes: Run visual regression tests
+npm run test:visual
+
+# If you have Argos configured and want to compare:
+ARGOS_UPLOAD=true npm run test:visual
+```
+
+**All tests should pass. Fix failures before committing.**
+
+### 4. Test Manually
+
+```bash
+# Start the application
+npm run start
+
+# Visit http://localhost:1880
+# Test the feature you changed
+# Verify no console errors
+# Check the UI works as expected
+```
+
+**Manual verification is critical for Node-RED UI changes.**
+
+### 5. Check for Regressions
+
+If you modified:
+- **Buyer/Seller nodes**: Test node configuration dialogs
+- **Services**: Check logs for errors
+- **Environment handling**: Verify .env loading
+- **SDK integration**: Test with real SDK binary
+
+### 6. Documentation
+
+Update documentation if needed:
+- `README.md` - User-facing changes
+- Code comments - Complex logic
+- JSDoc - API changes
+- Memory files - Architecture changes
 
 ### 7. Git Workflow
-- [ ] Ensure all changes are committed
-  ```bash
-  git status
-  git add .
-  git commit -m "descriptive message"
-  ```
-- [ ] Push to feature branch
-  ```bash
-  git push origin feat/branch-name
-  ```
-- [ ] Create pull request to appropriate branch (master/dev)
 
-### 8. Pre-Release Checks (for releases)
-- [ ] Update version in package.json
-- [ ] Update CHANGELOG.md
-- [ ] Run full test suite
-  ```bash
-  npm test
-  npm run test:visual
-  ```
-- [ ] Build and package application
-  ```bash
-  npm run package
-  ```
-- [ ] Test packaged application
-- [ ] Create git tag
-  ```bash
-  git tag v1.0.0
-  git push origin v1.0.0
-  ```
+```bash
+# Stage your changes
+git add <files>
 
-### 9. Code Signing & Distribution (macOS releases)
-- [ ] Verify Apple Developer credentials
-- [ ] Run build workflow
-  ```bash
-  ./build-workflow.sh
-  ```
-- [ ] Sign and notarize app
-- [ ] Verify signature
-  ```bash
-  codesign --verify --verbose build/releases/*.app
-  spctl --assess --verbose build/releases/*.app
-  ```
-- [ ] Test on clean macOS environment
-- [ ] Upload to release
+# Commit with descriptive message
+git commit -m "feat: Add feature X"
+# or
+git commit -m "fix: Fix bug in Y"
 
-### 10. CI/CD Pipeline Checks
-- [ ] Ensure GitHub Actions workflows pass
-  - Security & Build job
-  - macOS Sign & Notarize job
-  - Visual AI Regression job
-- [ ] Review workflow logs for warnings
-- [ ] Verify release artifacts are created
+# Push to your branch
+git push origin <branch-name>
+```
 
-## Quick Pre-Commit Checklist
-For quick commits, at minimum ensure:
-- [ ] Code lints without errors (`grunt jshint`)
-- [ ] Existing tests pass (`npm test`)
-- [ ] Application builds (`npm run build`)
-- [ ] Application runs locally (`npm run start`)
+## Before Submitting a PR
 
-## Critical Reminders
-⚠️ **Always run `npx grunt build` before starting the application** - this is required for Node-RED 4.x UI to load
+### 1. Full Test Suite
+```bash
+# Run complete test suite
+npm test
 
-⚠️ **Visual tests are blocking** - failing visual tests will prevent deployment in CI/CD
+# Run visual tests with Argos
+npm run test:visual:ci
+```
 
-⚠️ **macOS signing requires valid credentials** - ensure certificates and API keys are configured
+### 2. Check CI Status
+- Wait for GitHub Actions to complete
+- Review visual regression results in Argos
+- Fix any CI failures
 
-⚠️ **Test on target platforms** - if possible, test on both macOS and Windows before release
+### 3. Code Review Preparation
+- Write clear PR description
+- Reference related issues
+- Document breaking changes
+- Add screenshots for UI changes
+
+## Release Process
+
+When preparing a release:
+
+### 1. Version Bump
+```bash
+# Update package.json version
+npm version patch  # or minor, or major
+```
+
+### 2. Update Changelog
+```bash
+# Edit CHANGELOG.md
+# Document new features, fixes, breaking changes
+```
+
+### 3. Full Build & Test
+```bash
+# Clean build
+rm -rf node_modules
+npm install
+npx grunt build
+npm test
+npm run test:visual:ci
+```
+
+### 4. Package & Test
+```bash
+# Create executables
+npm run package
+
+# Test the packaged app
+npm run create-app-bundle
+# Open and test the .app bundle
+```
+
+### 5. Tag & Push
+```bash
+# Create release tag
+git tag v1.0.0
+git push origin v1.0.0
+
+# This triggers the build-and-sign workflow
+```
+
+## Common Issues After Changes
+
+### Build Failures
+```bash
+# Clean and rebuild
+rm -rf packages/node_modules/@node-red/editor-client/public
+npx grunt build
+```
+
+### Test Failures
+```bash
+# Check test logs
+npm test 2>&1 | tee test.log
+
+# For visual tests, view report
+npm run test:visual:report
+```
+
+### Runtime Errors
+```bash
+# Check Node-RED logs
+# Look for errors in the console output
+
+# Check SDK logs (if SDK_LOG_FOLDER is set)
+cat $SDK_LOG_FOLDER/buyer-*-stderr.log
+cat $SDK_LOG_FOLDER/seller-*-stderr.log
+```
+
+### Environment Issues
+```bash
+# Verify .env is loaded
+cat .env
+
+# Check required variables
+echo $HEDERA_OPERATOR_ID
+echo $NEURON_SDK_PATH
+```
+
+## Quality Standards
+
+Before marking a task as complete:
+
+- [ ] Code passes linting (JSHint)
+- [ ] All tests pass locally
+- [ ] Manual testing completed
+- [ ] No console errors
+- [ ] No regressions in existing features
+- [ ] Documentation updated if needed
+- [ ] Git commit messages are clear
+- [ ] CI/CD checks pass
+- [ ] Visual tests approved (if UI changes)
+- [ ] Code follows project conventions
+- [ ] No sensitive data in code/logs
+- [ ] Error handling is appropriate
+- [ ] Cleanup/close handlers added
+
+## Performance Considerations
+
+When making changes, consider:
+
+1. **Memory**: Node-RED runs long-lived processes
+2. **Process cleanup**: Always close child processes
+3. **File handles**: Close file descriptors
+4. **Timers**: Clear intervals/timeouts on node close
+5. **WebSocket connections**: Clean up on disconnect
+6. **SDK processes**: Ensure proper termination
+
+## Security Considerations
+
+When making changes, ensure:
+
+1. **No credentials in code**: Use environment variables
+2. **Input validation**: Validate all user inputs
+3. **SQL injection**: Not applicable (no SQL)
+4. **XSS**: Sanitize HTML in editor
+5. **Process spawning**: Validate paths and arguments
+6. **File access**: Restrict to intended directories
+7. **API keys**: Never log or expose

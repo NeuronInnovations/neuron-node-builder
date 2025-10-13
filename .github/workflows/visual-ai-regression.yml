@@ -61,6 +61,10 @@ jobs:
         shell: bash
         run: npm ci
 
+      - name: Build Node-RED editor assets
+        shell: bash
+        run: npx grunt build
+
       - name: Install Playwright browsers
         shell: bash
         run: npx playwright install chromium

@@ -215,6 +215,20 @@ jobs:
           npm ci
           echo "SUCCESS: Dependencies installed successfully"
 
+      - name: Build Node-RED editor assets
+        shell: bash
+        run: |
+          echo "Building Node-RED editor assets (required for UI to load)..."
+          npx grunt build
+
+          # Verify build succeeded
+          if [ ! -d "packages/node_modules/@node-red/editor-client/public/red" ]; then
+            echo "ERROR: Build failed - public/red directory not created"
+            exit 1
+          fi
+
+          echo "SUCCESS: Node-RED editor assets built"
+
       - name: Install Playwright browsers
         shell: bash
         run: |
