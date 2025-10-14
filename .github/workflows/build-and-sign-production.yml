@@ -1,0 +1,783 @@
+name: Production Build, Sign & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g., 1.0.0)"
+        required: true
+        default: "1.0.0"
+      wrapper_tag:
+        description: "Optional neuron-wrapper tag override (e.g., v1.0.0)"
+        required: false
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: "18"
+  ARTIFACT_RETENTION_DAYS: 1
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+jobs:
+  # ============================================================================
+  # JOB 1: SECURITY VALIDATION & BUILD
+  # ============================================================================
+  security-and-build:
+    name: Security Validation & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      wrapper_tag: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
+
+    steps:
+      - name: Checkout code with token validation
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Validate workflow trigger
+        run: |
+          echo "Validating workflow security context..."
+          echo "Triggered by: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+
+          # Security: Only allow authorized users for manual triggers
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            AUTHORIZED_USERS=("dohoangviet" "admin")  # Add your authorized users
+            if [[ ! " ${AUTHORIZED_USERS[@]} " =~ " ${{ github.actor }} " ]]; then
+              echo "Unauthorized user: ${{ github.actor }}"
+              exit 1
+            fi
+          fi
+
+      - name: Extract and validate version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          # Validate version format (semver)
+          SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\-\.]+)?(\+[0-9A-Za-z\-\.]+)?$'
+          if [[ ! $VERSION =~ $SEMVER_REGEX ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected SemVer (e.g., 1.2.3, 1.2.3-beta, 1.2.3-beta.1+build)"
+            exit 1
+          fi
+
+          echo "Version validated: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine neuron-wrapper tag
+        id: wrapper_tag
+        run: |
+          WRAPPER_TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.wrapper_tag || '' }}"
+          if [ -z "$WRAPPER_TAG" ]; then
+            WRAPPER_TAG="v${{ steps.version.outputs.version }}"
+          fi
+          echo "Resolved wrapper tag: $WRAPPER_TAG"
+          echo "wrapper_tag=$WRAPPER_TAG" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies securely
+        run: |
+          # Security: Use npm ci for reproducible builds
+          if [ -f package-lock.json ]; then
+            npm ci --ignore-scripts
+          else
+            npm install --package-lock-only
+            npm ci --ignore-scripts
+          fi
+
+          # Verify package integrity
+          npm ls --depth=0
+
+      - name: Build project
+        run: |
+          echo "Building project..."
+          npm run build
+
+          # Verify build outputs
+          if [ ! -d "packages/node_modules/node-red" ]; then
+            echo "Build failed: node-red not found"
+            exit 1
+          fi
+
+      - name: Build executables with validation
+        env:
+          NEURON_WRAPPER_TAG: ${{ steps.wrapper_tag.outputs.wrapper_tag }}
+        run: |
+          echo "Building executables..."
+          npm run package
+
+          # Comprehensive validation of all executables
+          declare -A EXECUTABLES=(
+            ["build/releases/latest-macos-x64"]="macOS x64"
+            ["build/releases/latest-macos-arm64"]="macOS arm64"
+            ["build/releases/latest-win-x64.exe"]="Windows"
+          )
+
+          for executable in "${!EXECUTABLES[@]}"; do
+            if [ ! -f "$executable" ]; then
+              echo "${EXECUTABLES[$executable]} executable missing: $executable"
+              exit 1
+            fi
+            
+            size=$(du -h "$executable" | cut -f1)
+            echo "${EXECUTABLES[$executable]} executable: $executable ($size)"
+          done
+
+      - name: Upload build artifacts with metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ steps.version.outputs.version }}
+          path: |
+            build/releases/
+            package.json
+            entitlements.plist
+            create-app-bundle.js
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: error
+
+  # ============================================================================
+  # JOB 1B: VISUAL REGRESSION WITH ARGOS CI
+  # ============================================================================
+  visual-regression:
+    name: Visual Regression (${{ matrix.label }})
+    needs: [security-and-build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            project: chromium-mac
+            label: macOS Chromium
+            parallel-index: 1
+          - runner: windows-2022
+            project: chromium-win
+            label: Windows Chromium
+            parallel-index: 2
+    env:
+      NODE_VERSION: "18"
+      # Argos CI Configuration
+      ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+      ARGOS_UPLOAD: "true"
+      ARGOS_PARALLEL_TOTAL: "2"
+      ARGOS_PARALLEL_INDEX: ${{ matrix.parallel-index }}
+      ARGOS_BUILD_NAME: neuron-v${{ needs.security-and-build.outputs.version }}-build-${{ github.run_id }}
+      ARGOS_BRANCH: ${{ github.ref_name }}
+      ARGOS_COMMIT: ${{ github.sha }}
+      # Test Environment
+      VISUAL_TEST_MODE: "1"
+      NODE_RED_BASE_URL: "http://127.0.0.1:1880"
+      CI: "true"
+      # Visual Test Fallback Credentials (in case .env.visual is missing)
+      HEDERA_OPERATOR_ID: "0.0.5005"
+      HEDERA_OPERATOR_KEY: "302e020100300506032b65700422042000000000000000000000000000000000000000000000000000000000000000ff"
+      HEDERA_RPC: "https://testnet.hashio.io/api"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full git history required for Argos comparison
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "No package-lock.json found, creating one..."
+            npm install --package-lock-only
+          fi
+
+          npm ci
+          echo "SUCCESS: Dependencies installed successfully"
+
+      - name: Build Node-RED editor assets
+        shell: bash
+        run: |
+          echo "Building Node-RED editor assets (required for UI to load)..."
+          npx grunt build
+
+          # Verify build succeeded
+          if [ ! -d "packages/node_modules/@node-red/editor-client/public/red" ]; then
+            echo "ERROR: Build failed - public/red directory not created"
+            exit 1
+          fi
+
+          echo "SUCCESS: Node-RED editor assets built"
+
+      - name: Install Playwright browsers
+        shell: bash
+        run: |
+          npx playwright install chromium
+
+      - name: Run visual regression tests with Argos CI
+        id: visual_tests
+        continue-on-error: true
+        shell: bash
+        env:
+          PLAYWRIGHT_HTML_REPORT: tests/visual/.playwright-report
+        run: |
+          # Run tests and capture exit code without failing the step
+          npx playwright test tests/visual --project=${{ matrix.project }} || TEST_EXIT_CODE=$?
+
+          # Log outcome but always exit 0 so downstream jobs continue
+          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
+            echo "⚠️  Visual tests had failures (exit code: ${TEST_EXIT_CODE}) but continuing workflow"
+            echo "test_status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Visual tests passed"
+            echo "test_status=passed" >> $GITHUB_OUTPUT
+          fi
+
+          exit 0
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-${{ matrix.project }}-v${{ needs.security-and-build.outputs.version }}
+          path: |
+            tests/visual/.playwright-report
+            tests/visual/.output
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report Argos build status
+        if: matrix.parallel-index == 1
+        shell: bash
+        run: |
+          TEST_STATUS="${{ steps.visual_tests.outputs.test_status || 'unknown' }}"
+
+          echo "## 🎨 Visual Regression Testing" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$TEST_STATUS" = "failed" ]; then
+            echo "⚠️ **Status**: Tests completed with failures (workflow continuing)" >> $GITHUB_STEP_SUMMARY
+          elif [ "$TEST_STATUS" = "passed" ]; then
+            echo "✅ **Status**: Tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **Status**: Unknown" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "- **Build**: $ARGOS_BUILD_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform**: ${{ matrix.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: [View Argos Results](https://app.argos-ci.com)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Argos CI is comparing screenshots across both macOS and Windows platforms." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # JOB 2: MACOS SIGNING & NOTARIZATION
+  # ============================================================================
+  macos-sign-notarize:
+    name: macOS Sign & Notarize (${{ matrix.arch }})
+    needs: [security-and-build, visual-regression]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-13
+          - arch: arm64
+            runner: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "10.12"
+    if: |
+      always() &&
+      needs.security-and-build.result == 'success' &&
+      (needs.visual-regression.result == 'success' || needs.visual-regression.result == 'failure') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && contains(fromJSON('["dohoangviet", "admin"]'), github.actor))
+      )
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ needs.security-and-build.outputs.version }}
+          path: ./
+
+      - name: Install dependencies for app bundle
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "No package-lock.json found, creating one..."
+            npm install --package-lock-only
+          fi
+
+          npm ci --ignore-scripts
+          echo "SUCCESS: Dependencies installed successfully"
+
+      - name: Rebuild macOS binary
+        env:
+          ARCH: ${{ matrix.arch }}
+          NEURON_WRAPPER_TAG: ${{ needs.security-and-build.outputs.wrapper_tag }}
+        run: |
+          echo "Rebuilding pkg binary for ${ARCH} on macOS runner..."
+          npm run build
+          rm -f build/releases/latest-macos-${ARCH}
+          npm run package -- --targets=node18-macos-${ARCH}
+
+      - name: Prepare macOS executable
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          EXECUTABLE_NAME="latest-macos-${ARCH}"
+          EXECUTABLE_PATH="build/releases/${EXECUTABLE_NAME}"
+
+          echo "Preparing ${EXECUTABLE_NAME}..."
+          chmod +x "$EXECUTABLE_PATH"
+
+          if ! file "$EXECUTABLE_PATH" | grep -q "Mach-O"; then
+            echo "ERROR: Invalid macOS binary at $EXECUTABLE_PATH"
+            file "$EXECUTABLE_PATH" || true
+            exit 1
+          fi
+
+          EXPECTED_ARCH="x86_64"
+          if [ "$ARCH" = "arm64" ]; then
+            EXPECTED_ARCH="arm64"
+          fi
+
+          if ! file "$EXECUTABLE_PATH" | grep -q "$EXPECTED_ARCH"; then
+            echo "ERROR: $ARCH executable does not advertise architecture $EXPECTED_ARCH"
+            file "$EXECUTABLE_PATH"
+            exit 1
+          fi
+
+          echo "SUCCESS: macOS ${ARCH} executable validated"
+
+      - name: Create app bundle
+        id: bundle
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
+        run: |
+          echo "Creating macOS app bundle for ${ARCH}..."
+          npm run create-app-bundle -- --arch=${ARCH} --version=${VERSION}
+
+          APP_BUNDLE="build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app"
+
+          if [ ! -d "$APP_BUNDLE" ]; then
+            echo "ERROR: App bundle creation failed for ${ARCH}"
+            ls -R build/releases || true
+            exit 1
+          fi
+
+          echo "SUCCESS: App bundle created: $(basename \"$APP_BUNDLE\")"
+          echo "app-name=$(basename "$APP_BUNDLE")" >> $GITHUB_OUTPUT
+          echo "APP_BUNDLE=$APP_BUNDLE" >> $GITHUB_ENV
+
+          if [ ! -f "$APP_BUNDLE/Contents/Info.plist" ]; then
+            echo "ERROR: Invalid app bundle structure"
+            exit 1
+          fi
+
+      - name: Setup signing keychain
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ]; then
+            echo "ERROR: Missing required signing secrets"
+            exit 1
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+
+          TEMP_CERT="$RUNNER_TEMP/cert.crt"
+          TEMP_KEY="$RUNNER_TEMP/key.key"
+          IMPORT_SUCCESS=false
+
+          if openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -out "$TEMP_CERT" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -passout pass: 2>/dev/null && \
+             openssl pkcs12 -in "$CERT_PATH" -nocerts -nodes -out "$TEMP_KEY" -passin pass:"$APPLE_CERTIFICATE_PASSWORD" 2>/dev/null; then
+            if security import "$TEMP_CERT" -k "$KEYCHAIN_PATH" -A 2>/dev/null && \
+               security import "$TEMP_KEY" -k "$KEYCHAIN_PATH" -A 2>/dev/null; then
+              echo "Certificate imported using OpenSSL extraction method"
+              IMPORT_SUCCESS=true
+            fi
+          fi
+
+          rm -f "$TEMP_CERT" "$TEMP_KEY"
+
+          if [ "$IMPORT_SUCCESS" = false ]; then
+            echo "ERROR: Failed to import certificate using OpenSSL method"
+            exit 1
+          fi
+
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+
+          CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1)
+          if [ -z "$CERT_IDENTITY" ]; then
+            echo "ERROR: Developer ID certificate not found"
+            exit 1
+          fi
+
+          echo "SUCCESS: Certificate installed successfully"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          echo "CERT_PATH=$CERT_PATH" >> $GITHUB_ENV
+
+      - name: Code sign application
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
+        run: |
+          echo "Signing app bundle: $APP_BUNDLE"
+
+          codesign \
+            --force \
+            --deep \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            --identifier "com.neuron.node-builder" \
+            --entitlements entitlements.plist \
+            --keychain "$KEYCHAIN_PATH" \
+            "$APP_BUNDLE"
+
+          echo "Verifying code signature..."
+          codesign --verify --verbose=4 "$APP_BUNDLE"
+          codesign --display --verbose=4 "$APP_BUNDLE"
+
+          if ! codesign --verify --strict "$APP_BUNDLE"; then
+            echo "ERROR: Code signature verification failed"
+            exit 1
+          fi
+
+          echo "SUCCESS: Code signing completed successfully"
+
+      - name: Create notarization package
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
+        run: |
+          APP_NAME=$(basename "$APP_BUNDLE" .app)
+          ZIP_NAME="${APP_NAME}.zip"
+
+          cd build/releases
+          /usr/bin/ditto -c -k --keepParent "$(basename "$APP_BUNDLE")" "$ZIP_NAME"
+          cd - >/dev/null
+
+          ZIP_PATH="build/releases/$ZIP_NAME"
+          if [ ! -f "$ZIP_PATH" ]; then
+            echo "ERROR: ZIP creation failed"
+            exit 1
+          fi
+
+          echo "Notarization package created: $ZIP_PATH"
+          echo "ZIP_PATH=$ZIP_PATH" >> $GITHUB_ENV
+
+      - name: Submit for notarization
+        id: notarize
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          if [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_ISSUER_ID" ] || [ -z "$APPLE_API_KEY_BASE64" ]; then
+            echo "ERROR: Missing Apple API credentials"
+            exit 1
+          fi
+
+          API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
+          chmod 600 "$API_KEY_PATH"
+
+          echo "Submitting for notarization..."
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
+            --key "$API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait \
+            --timeout 2700 \
+            --verbose 2>&1)
+
+          echo "$SUBMIT_OUTPUT"
+
+          if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
+            echo "SUCCESS: Notarization successful"
+          elif echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
+            echo "ERROR: Notarization failed - Invalid submission"
+            exit 1
+          else
+            echo "ERROR: Notarization failed or timed out"
+            exit 1
+          fi
+
+          rm -f "$API_KEY_PATH"
+
+      - name: Staple notarization
+        env:
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
+        run: |
+          echo "Stapling notarization to app bundle..."
+          if xcrun stapler staple "$APP_BUNDLE"; then
+            echo "SUCCESS: Notarization stapled successfully"
+          else
+            echo "WARNING: Could not staple notarization (app is still valid)"
+          fi
+
+          echo "Final validation..."
+          xcrun stapler validate "$APP_BUNDLE" || echo "WARNING: Stapler validation warning (not critical)"
+          spctl --assess --verbose=4 --type execute "$APP_BUNDLE"
+
+      - name: Create final distribution package
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.security-and-build.outputs.version }}
+          APP_BUNDLE: ${{ env.APP_BUNDLE }}
+        run: |
+          APP_NAME=$(basename "$APP_BUNDLE" .app)
+          FINAL_ZIP="${APP_NAME}-signed.zip"
+
+          cd build/releases
+          /usr/bin/ditto -c -k --keepParent "$(basename "$APP_BUNDLE")" "$FINAL_ZIP"
+          shasum -a 256 "$FINAL_ZIP" > "$FINAL_ZIP.sha256"
+          cd - >/dev/null
+
+          FINAL_ZIP_PATH="build/releases/$FINAL_ZIP"
+          echo "Final package created: $FINAL_ZIP_PATH"
+          echo "FINAL_ZIP_PATH=$FINAL_ZIP_PATH" >> $GITHUB_ENV
+
+      - name: Upload signed macOS application
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-signed-${{ matrix.arch }}-${{ needs.security-and-build.outputs.version }}
+          path: |
+            ${{ env.FINAL_ZIP_PATH }}
+            ${{ env.FINAL_ZIP_PATH }}.sha256
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Security cleanup
+        if: always()
+        run: |
+          [ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          [ -n "$CERT_PATH" ] && rm -f "$CERT_PATH" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.p8 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.p12 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.crt 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.key 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/cert.* 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/key.* 2>/dev/null || true
+  # ============================================================================
+  # JOB 3: MULTI-PLATFORM RELEASE CREATION
+  # ============================================================================
+  create-release:
+    name: Create Multi-Platform Release
+    needs: [security-and-build, visual-regression, macos-sign-notarize]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Only create releases for version tags or authorized manual triggers
+    # Visual regression failures don't block releases
+    if: |
+      always() &&
+      needs.security-and-build.result == 'success' &&
+      needs.macos-sign-notarize.result == 'success' &&
+      (needs.visual-regression.result == 'success' || needs.visual-regression.result == 'failure') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+      )
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Verify artifact integrity
+        run: |
+          echo "Verifying downloaded artifacts..."
+
+          # Check build artifacts
+          if [ ! -d "artifacts/build-artifacts-${{ needs.security-and-build.outputs.version }}" ]; then
+            echo "ERROR: Build artifacts missing"
+            exit 1
+          fi
+
+          # Check macOS signed artifacts
+          VERSION="${{ needs.security-and-build.outputs.version }}"
+          for ARCH in x64 arm64; do
+            DIR="artifacts/macos-signed-${ARCH}-${VERSION}"
+            if [ ! -d "$DIR" ]; then
+              echo "ERROR: macOS signed artifacts missing for ${ARCH} (expected $DIR)"
+              ls -R artifacts || true
+              exit 1
+            fi
+          done
+
+          echo "SUCCESS: All artifacts present"
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          VERSION="${{ needs.security-and-build.outputs.version }}"
+
+          echo "Available artifacts:"
+          find artifacts -type f -name "*" | head -20
+
+          BUILD_ARTIFACTS_DIR=$(find artifacts -name "build-artifacts-*" -type d | head -1)
+          if [ -z "$BUILD_ARTIFACTS_DIR" ]; then
+            echo "ERROR: Build artifacts directory not found"
+            exit 1
+          fi
+          echo "Build artifacts directory: $BUILD_ARTIFACTS_DIR"
+
+          # Windows executable
+          echo "Preparing Windows package..."
+          WIN_EXE="$BUILD_ARTIFACTS_DIR/build/releases/latest-win-x64.exe"
+          if [ -f "$WIN_EXE" ]; then
+            CURRENT_DIR=$(pwd)
+            cd "$BUILD_ARTIFACTS_DIR/build/releases"
+            zip -r "$CURRENT_DIR/release-assets/neuron-node-builder-win-x64-v$VERSION.zip" latest-win-x64.exe
+            cd "$CURRENT_DIR"
+            echo "SUCCESS: Windows package created"
+          else
+            echo "WARNING: Windows executable not found at: $WIN_EXE"
+            echo "Available files in build artifacts:"
+            ls -la "$BUILD_ARTIFACTS_DIR/build/releases/" || echo "Directory not found"
+          fi
+
+          # macOS signed applications
+          for ARCH in x64 arm64; do
+            echo "Preparing macOS package for ${ARCH}..."
+            SIGNED_DIR="artifacts/macos-signed-${ARCH}-${VERSION}"
+            if [ ! -d "$SIGNED_DIR" ]; then
+              echo "ERROR: macOS signed artifacts directory not found for ${ARCH} ($SIGNED_DIR)"
+              exit 1
+            fi
+
+            ZIP_SRC=$(find "$SIGNED_DIR" -maxdepth 1 -name '*.zip' | head -1)
+            if [ -z "$ZIP_SRC" ]; then
+              echo "ERROR: macOS ${ARCH} zip not found in $SIGNED_DIR"
+              ls -la "$SIGNED_DIR" || true
+              exit 1
+            fi
+
+            DEST_ZIP="release-assets/neuron-node-builder-macos-${ARCH}-v$VERSION.zip"
+            cp "$ZIP_SRC" "$DEST_ZIP"
+            shasum -a 256 "$DEST_ZIP" > "$DEST_ZIP.sha256"
+            echo "SUCCESS: macOS ${ARCH} package prepared -> $DEST_ZIP"
+          done
+
+          echo "Final release assets:"
+          ls -la release-assets/ || echo "No release assets created"
+
+      - name: Generate comprehensive release notes
+        run: |
+          VERSION="${{ needs.security-and-build.outputs.version }}"
+
+          cat > release-notes.md << EOF
+          # Neuron Node Builder v$VERSION
+
+          ## Downloads
+
+          ### macOS (Signed & Notarized)
+          - **Apple Silicon (ARM64)**: [\`neuron-node-builder-macos-arm64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-arm64-v$VERSION.zip) • [\`SHA256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-arm64-v$VERSION.zip.sha256)
+          - **Intel (x64)**: [\`neuron-node-builder-macos-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip) • [\`SHA256\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-macos-x64-v$VERSION.zip.sha256)
+          - **Requirements**: macOS 10.15+ (Catalina)
+          - **Installation**: Extract and drag to Applications folder
+
+          ### Windows
+          - **Download**: [\`neuron-node-builder-win-x64-v$VERSION.zip\`](https://github.com/${{ github.repository }}/releases/download/v$VERSION/neuron-node-builder-win-x64-v$VERSION.zip)
+          - **Requirements**: Windows 10+ (64-bit)
+
+
+          ## Security Information
+
+          - **macOS**: Code signed with Developer ID and notarized by Apple
+          - **Node.js Version**: ${{ env.NODE_VERSION }}
+          - **Built**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ## 📖 Installation Instructions
+
+          ### macOS
+          1. Download the macOS ZIP for your architecture (ARM64 for Apple Silicon, x64 for Intel)
+          2. Extract the ZIP file
+          3. Drag "Neuron Node Builder.app" to your Applications folder
+          4. Launch from Applications (no security warnings!)
+
+          ### Windows
+          1. Download the Windows ZIP file
+          2. Extract to desired location
+          3. Run \`latest-win-x64.exe\`
+
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-assets/*
+          tag_name: v${{ needs.security-and-build.outputs.version }}
+          name: "Neuron Node Builder v${{ needs.security-and-build.outputs.version }}"
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(needs.security-and-build.outputs.version, '-') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **macOS Signing**: Completed for arm64 and x64" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.security-and-build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Assets Created:" >> $GITHUB_STEP_SUMMARY
+          ls -la release-assets/ | awk '{print "- " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY

@@ -402,6 +402,48 @@ module.exports = function (RED) {
             }
 
             if (!node.deviceInfo) {
+                // VISUAL TEST MODE: Skip SDK creation and use mock deviceInfo from config
+                if (process.env.VISUAL_TEST_MODE === '1') {
+                    console.log(`[visual-test] Buyer node ${node.id}: Creating mock deviceInfo from config (skipping SDK)`);
+
+                    const contracts = {
+                        "jetvision": process.env.JETVISION_CONTRACT_EVM,
+                        "chat": process.env.CHAT_CONTRACT_EVM,
+                        "challenges": process.env.CHALLENGES_CONTRACT_EVM,
+                    };
+
+                    // Create minimal deviceInfo from config for visual tests
+                    node.deviceInfo = {
+                        nodeType: "buyer",
+                        nodeId: node.id,
+                        deviceName: config.deviceName || "Test Buyer Device",
+                        deviceRole: "buyer",
+                        serialNumber: "buyer device",
+                        deviceType: config.deviceType || "Control Center",
+                        price: 0,
+                        description: config.description || "",
+                        accountId: config.evmAddress?.split('@')[0] || "0.0.888888",
+                        evmAddress: config.evmAddress || "0.0.888888@hedera",
+                        publicKey: config.publicKey || "302a300506032b65700321008f9d4b",
+                        extractedPrivateKey: "0000000000000000000000000000000000000000000000000000000000000002",
+                        stdInTopic: config.stdInTopic || "0.0.777777-stdin",
+                        stdOutTopic: config.stdOutTopic || "0.0.777777-stdout",
+                        stdErrTopic: config.stdErrTopic || "0.0.777777-stderr",
+                        smartContract: contracts[config.smartContract?.toLowerCase()] || contracts["jetvision"],
+                        balance: config.balance || "0 ℏ",
+                        sellerAdminKeys: [],
+                        sellerEvmAddresses: safeParseSellerAddresses(config.sellerEvmAddress) || []
+                    };
+
+                    // Save to file and context
+                    fs.writeFileSync(deviceFile, JSON.stringify(node.deviceInfo, null, 2), 'utf-8');
+                    context.set('deviceInfo', node.deviceInfo);
+
+                    node.status({ fill: "yellow", shape: "dot", text: "visual test mode" });
+                    console.log(`[visual-test] Buyer node ${node.id}: Mock deviceInfo created successfully`);
+                    return; // Skip SDK creation entirely
+                }
+
                 try {
                     node.status({ fill: "blue", shape: "dot", text: "Creating new device. Please wait..." });
 

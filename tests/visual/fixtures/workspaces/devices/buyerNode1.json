@@ -1,0 +1,25 @@
+{
+  "nodeId": "buyerNode1",
+  "nodeType": "buyer",
+  "deviceName": "Ops Control Center",
+  "deviceType": "Control Center",
+  "description": "Ops center subscriber",
+  "evmAddress": "0.0.239991@hedera",
+  "accountId": "0.0.239991",
+  "publicKey": "302a300506032b65700321008f9d4b",
+  "stdInTopic": "0.0.998877-stdin",
+  "stdOutTopic": "0.0.998877-stdout",
+  "stdErrTopic": "0.0.998877-stderr",
+  "sellers": [
+    {
+      "evmAddress": "0x19AF…f9c2",
+      "status": "Connected",
+      "lastSeen": "Just now"
+    },
+    {
+      "evmAddress": "0xb18C…92aa",
+      "status": "Pending",
+      "lastSeen": "2m ago"
+    }
+  ]
+}

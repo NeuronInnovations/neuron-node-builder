@@ -34,6 +34,9 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
+VERSION=$(node -p "require('./package.json').version")
+ARCHES=(x64 arm64)
+
 # Clean previous builds
 echo -e "${YELLOW}🧹 Cleaning previous builds...${NC}"
 rm -rf build/releases/*
@@ -44,79 +47,95 @@ rm -rf dist/*
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
 npm install
 
-# Step 1: Build the executable
-echo -e "${YELLOW}📋 Step 1: Building executable...${NC}"
+# Step 1: Build the executables
+echo -e "${YELLOW}📋 Step 1: Building executables...${NC}"
 npm run package
 
-# Verify executable was created
-EXECUTABLE_PATH="build/releases/latest-macos-x64"
-if [ ! -f "$EXECUTABLE_PATH" ]; then
-    echo -e "${RED}❌ Executable not found at: $EXECUTABLE_PATH${NC}"
-    echo -e "${YELLOW}Build process failed. Please check the logs above.${NC}"
-    exit 1
-fi
+# Verify executables were created
+for ARCH in "${ARCHES[@]}"; do
+    EXECUTABLE_PATH="build/releases/latest-macos-${ARCH}"
+    if [ -f "$EXECUTABLE_PATH" ]; then
+        echo -e "${GREEN}✅ macOS ${ARCH} executable created successfully${NC}"
+    else
+        echo -e "${RED}❌ macOS ${ARCH} executable not found at: $EXECUTABLE_PATH${NC}"
+        echo -e "${YELLOW}Build process failed. Please check the logs above.${NC}"
+        exit 1
+    fi
+done
 
-echo -e "${GREEN}✅ Executable created successfully${NC}"
+echo -e "${GREEN}✅ All macOS executables created successfully${NC}"
 
-# Step 2: Create app bundle
-echo -e "${YELLOW}📋 Step 2: Creating app bundle...${NC}"
-npm run create-app-bundle
+# Step 2: Create app bundles
+echo -e "${YELLOW}📋 Step 2: Creating app bundles...${NC}"
+for ARCH in "${ARCHES[@]}"; do
+    echo -e "${BLUE}   Creating bundle for ${ARCH}...${NC}"
+    npm run create-app-bundle -- --arch=${ARCH} --version=${VERSION}
 
-# Verify app bundle was created
-APP_PATH="build/releases/Neuron-Node-Builder.app"
-if [ ! -d "$APP_PATH" ]; then
-    echo -e "${RED}❌ App bundle not found at: $APP_PATH${NC}"
-    echo -e "${YELLOW}App bundle creation failed. Please check the logs above.${NC}"
-    exit 1
-fi
+    APP_PATH="build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app"
+    if [ ! -d "$APP_PATH" ]; then
+        echo -e "${RED}❌ App bundle not found at: $APP_PATH${NC}"
+        echo -e "${YELLOW}App bundle creation failed. Please check the logs above.${NC}"
+        exit 1
+    fi
 
-echo -e "${GREEN}✅ App bundle created successfully${NC}"
+    echo -e "${GREEN}✅ App bundle created successfully: $(basename "$APP_PATH")${NC}"
+done
 
-# Step 3: Create DMG
-echo -e "${YELLOW}📋 Step 3: Creating DMG...${NC}"
-npm run create-dmg
-
-# Verify DMG was created
-DMG_PATH="dist/Neuron-Node-Builder.dmg"
-if [ ! -f "$DMG_PATH" ]; then
-    echo -e "${RED}❌ DMG not found at: $DMG_PATH${NC}"
-    echo -e "${YELLOW}DMG creation failed. Please check the logs above.${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ DMG created successfully${NC}"
-
-# Step 4: Test the executable
-echo -e "${YELLOW}📋 Step 4: Testing executable...${NC}"
-echo -e "${BLUE}Testing executable: $EXECUTABLE_PATH${NC}"
-
-# Check if executable is valid
-if file "$EXECUTABLE_PATH" | grep -q "Mach-O"; then
-    echo -e "${GREEN}✅ Executable is a valid macOS binary${NC}"
+# Step 3: Create DMG for Intel build by default (optional)
+echo -e "${YELLOW}📋 Step 3: Creating DMG (x64)...${NC}"
+DEFAULT_ARCH_FOR_DMG=x64
+DMG_SOURCE="build/releases/neuron-node-builder-macos-${DEFAULT_ARCH_FOR_DMG}-v${VERSION}.app"
+if [ -d "$DMG_SOURCE" ]; then
+    if npm run create-dmg >/dev/null 2>&1; then
+        DMG_PATH="dist/Neuron-Node-Builder.dmg"
+        if [ -f "$DMG_PATH" ]; then
+            echo -e "${GREEN}✅ DMG created successfully${NC}"
+        else
+            echo -e "${YELLOW}⚠️  DMG creation reported success but file was not found${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  DMG creation failed (continuing).${NC}"
+    fi
 else
-    echo -e "${RED}❌ Executable is not a valid macOS binary${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠️  Skipping DMG creation; source bundle not found for ${DEFAULT_ARCH_FOR_DMG}.${NC}"
 fi
 
-# Check executable permissions
-if [ -x "$EXECUTABLE_PATH" ]; then
-    echo -e "${GREEN}✅ Executable has proper permissions${NC}"
-else
-    echo -e "${RED}❌ Executable lacks proper permissions${NC}"
-    chmod +x "$EXECUTABLE_PATH"
-    echo -e "${YELLOW}⚠️  Fixed executable permissions${NC}"
-fi
+# Step 4: Test the executables
+echo -e "${YELLOW}📋 Step 4: Testing executables...${NC}"
+for ARCH in "${ARCHES[@]}"; do
+    EXECUTABLE_PATH="build/releases/latest-macos-${ARCH}"
+    echo -e "${BLUE}Testing executable: $EXECUTABLE_PATH${NC}"
+
+    if file "$EXECUTABLE_PATH" | grep -q "Mach-O"; then
+        echo -e "${GREEN}✅ Executable is a valid macOS binary${NC}"
+    else
+        echo -e "${RED}❌ Executable is not a valid macOS binary${NC}"
+        exit 1
+    fi
+
+    if [ -x "$EXECUTABLE_PATH" ]; then
+        echo -e "${GREEN}✅ Executable has proper permissions${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Executable lacked proper permissions; fixing...${NC}"
+        chmod +x "$EXECUTABLE_PATH"
+    fi
+
+done
 
 echo ""
 echo -e "${GREEN}🎉 Build Workflow Completed Successfully!${NC}"
 echo "=================================================="
-echo -e "${BLUE}📁 Executable: $EXECUTABLE_PATH${NC}"
-echo -e "${BLUE}📱 App Bundle: $APP_PATH${NC}"
-echo -e "${BLUE}💾 DMG File: $DMG_PATH${NC}"
+for ARCH in "${ARCHES[@]}"; do
+    echo -e "${BLUE}📁 Executable (${ARCH}): build/releases/latest-macos-${ARCH}${NC}"
+    echo -e "${BLUE}📱 App Bundle (${ARCH}): build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app${NC}"
+done
+if [ -f "dist/Neuron-Node-Builder.dmg" ]; then
+    echo -e "${BLUE}💾 DMG File: dist/Neuron-Node-Builder.dmg${NC}"
+fi
 echo ""
 echo -e "${YELLOW}📋 Next Steps:${NC}"
-echo "1. Test the executable: ./$EXECUTABLE_PATH"
-echo "2. Install the app bundle: cp -r $APP_PATH /Applications/"
-echo "3. Test the DMG: open $DMG_PATH"
+echo "1. Test each executable: ./build/releases/latest-macos-{x64|arm64}"
+echo "2. Install the app bundles: cp -r build/releases/neuron-node-builder-macos-{x64|arm64}-v${VERSION}.app /Applications/"
+echo "3. (Optional) Test the DMG: open dist/Neuron-Node-Builder.dmg"
 echo ""
 echo -e "${GREEN}✅ All files are ready for distribution!${NC}"

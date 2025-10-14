@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Connection Status Fixture</title>
+    <link rel="stylesheet" href="../harness/styles/node-editor.css" />
+    <style>
+      .status-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+        background: #6c757d;
+      }
+      .status-dot.connected {
+        background: #2ecc71;
+        box-shadow: 0 0 14px rgba(46, 204, 113, 0.6);
+      }
+      .status-dot.connecting {
+        background: #f1c40f;
+        box-shadow: 0 0 14px rgba(241, 196, 15, 0.45);
+      }
+      .status-dot.disconnected {
+        background: #e74c3c;
+        box-shadow: 0 0 14px rgba(231, 76, 60, 0.45);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="panel" id="connection-status">
+      <div class="panel-header">
+        <h2>Peer Connectivity</h2>
+        <span class="context">Runtime health across buyers & sellers</span>
+      </div>
+      <div class="form-row">
+        <label><span>Connection Status</span></label>
+        <div id="connection-status-indicator" style="display: inline-flex; align-items: center; gap: 8px;">
+          <span id="status-dot" class="status-dot disconnected"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+        <button type="button" id="refresh-connections-btn" class="red-ui-button">Refresh</button>
+      </div>
+
+      <div class="form-row">
+        <label><span>Connected Peers</span></label>
+        <div id="connected-peers-container" style="width: 100%;">
+          <div id="peers-loading" style="display: none; text-align: center; padding: 20px;">
+            <span class="badge warning">Loading peers…</span>
+          </div>
+          <div id="peers-content" style="display: none;">
+            <div id="peers-summary" style="margin-bottom: 12px; font-weight: bold;">
+              <span id="connected-count">0</span> connected, <span id="total-count">0</span> total peers
+            </div>
+            <div id="peers-list" class="table-card">
+              <table id="peers-table">
+                <thead>
+                  <tr>
+                    <th>Public Key</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: center;">Last Update</th>
+                  </tr>
+                </thead>
+                <tbody id="peers-table-body"></tbody>
+              </table>
+            </div>
+            <div id="last-update-info" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+              Last updated: <span id="last-update-time">Never</span>
+            </div>
+          </div>
+          <div id="no-peers-message" style="text-align: center; color: var(--text-muted); font-style: italic; padding: 24px;">
+            No active peer sessions detected.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const indicator = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+      const loading = document.getElementById('peers-loading');
+      const content = document.getElementById('peers-content');
+      const table = document.getElementById('peers-table');
+      const tbody = document.getElementById('peers-table-body');
+      const summary = document.getElementById('peers-summary');
+      const noPeers = document.getElementById('no-peers-message');
+      const connectedCount = document.getElementById('connected-count');
+      const totalCount = document.getElementById('total-count');
+      const lastUpdate = document.getElementById('last-update-time');
+
+      function setStatus(mode) {
+        indicator.className = 'status-dot ' + mode;
+        statusText.textContent =
+          mode === 'connected' ? 'Connected (2/3 peers)' : mode === 'connecting' ? 'Connecting…' : 'Disconnected';
+      }
+
+      window.renderConnectionIdleState = function renderConnectionIdleState() {
+        setStatus('disconnected');
+        loading.style.display = 'none';
+        content.style.display = 'none';
+        noPeers.style.display = 'block';
+        tbody.innerHTML = '';
+        summary.style.display = 'none';
+        lastUpdate.textContent = 'Never';
+      };
+
+      window.renderConnectionLoadingState = function renderConnectionLoadingState() {
+        setStatus('connecting');
+        loading.style.display = 'block';
+        content.style.display = 'none';
+        noPeers.style.display = 'none';
+      };
+
+      window.renderConnectionActiveState = function renderConnectionActiveState(peers) {
+        setStatus('connected');
+        loading.style.display = 'none';
+        content.style.display = 'block';
+        noPeers.style.display = 'none';
+        tbody.innerHTML = '';
+
+        const connectedPeers = peers.filter((peer) => peer.status === 'Connected').length;
+        connectedCount.textContent = connectedPeers.toString();
+        totalCount.textContent = peers.length.toString();
+        summary.style.display = 'block';
+
+        peers.forEach((peer) => {
+          const row = document.createElement('tr');
+          const pk = document.createElement('td');
+          pk.innerHTML = `<span class="code-text">${peer.publicKey}</span>`;
+          const status = document.createElement('td');
+          status.style.textAlign = 'center';
+          status.innerHTML = `<span class="badge ${peer.status === 'Connected' ? 'success' : 'warning'}">${peer.status}</span>`;
+          const last = document.createElement('td');
+          last.style.textAlign = 'center';
+          last.textContent = peer.lastUpdate;
+          row.appendChild(pk);
+          row.appendChild(status);
+          row.appendChild(last);
+          tbody.appendChild(row);
+        });
+
+        lastUpdate.textContent = new Date().toLocaleTimeString();
+      };
+
+      window.renderConnectionIdleState();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "nodeId": "sellerNode1",
+  "nodeType": "seller",
+  "deviceName": "Orbital Sensor",
+  "deviceRole": "Publisher",
+  "serialNumber": "JET-23944",
+  "deviceType": "Edge",
+  "price": 39,
+  "description": "Live aircraft tracking feed",
+  "evmAddress": "0.0.482193@hedera",
+  "accountId": "0.0.482193",
+  "publicKey": "302e020100300506032b657004220420b1938e6",
+  "stdInTopic": "0.0.123456-stdin",
+  "stdOutTopic": "0.0.123456-stdout",
+  "stdErrTopic": "0.0.123456-stderr",
+  "lastSeen": "Just now",
+  "buyers": [
+    {
+      "address": "0x19AF…f9c2",
+      "status": "Connected",
+      "lastSeen": "Now"
+    },
+    {
+      "address": "0xb18C…92aa",
+      "status": "Pending",
+      "lastSeen": "2m ago"
+    }
+  ]
+}

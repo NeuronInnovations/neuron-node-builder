@@ -1,0 +1,4 @@
+- JavaScript focused; follow existing Node-RED conventions: 4-space indentation, braces on same line, prefer Apache-2.0 header retained in files.
+- `.jshintrc` allows missing semicolons but enforces curly braces, freezes, loopfunc, ES2020; avoid tabs and keep code lint-clean under Grunt jshint tasks.
+- Tests use Mocha/Should; adhere to BDD style (`describe`/`it`) and ensure globals expected by simplemocha.
+- Keep editor assets compatible with Grunt build pipeline (CommonJS modules inside `packages/node_modules/**`).

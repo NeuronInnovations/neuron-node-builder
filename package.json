@@ -21,8 +21,15 @@
         "docs": "grunt docs",
         "package": "node --max-old-space-size=8192 build.js",
         "copy-binaries": "node copy-binaries.js",
-        "create-app-bundle": "node create-app-bundle.js"
-     },
+        "create-app-bundle": "node create-app-bundle.js",
+        "test:visual": "playwright test --config=playwright.config.ts",
+        "test:visual:ui": "playwright test --config=playwright.config.ts --ui",
+        "test:visual:report": "playwright show-report tests/visual/.playwright-report",
+        "test:visual:headed": "playwright test --config=playwright.config.ts --headed",
+        "test:visual:debug": "playwright test --config=playwright.config.ts --debug",
+        "test:visual:argos": "ARGOS_UPLOAD=true playwright test --config=playwright.config.ts",
+        "test:visual:ci": "ARGOS_UPLOAD=true playwright test --config=playwright.config.ts"
+    },
     "contributors": [
         {
             "name": "Nick O'Leary"
@@ -31,7 +38,6 @@
             "name": "Dave Conway-Jones"
         }
     ],
-    
     "dependencies": {
         "@hashgraph/sdk": "^2.49.2",
         "@inquirer/prompts": "^7.8.3",
@@ -99,12 +105,16 @@
         "uglify-js": "3.19.3",
         "uuid": "9.0.1",
         "ws": "7.5.10",
-        "xml2js": "0.6.2"
+        "xml2js": "0.6.2",
+        "chalk": "^4.1.2"
     },
     "optionalDependencies": {
         "@node-rs/bcrypt": "1.10.7"
     },
     "devDependencies": {
+        "@argos-ci/playwright": "^6.1.8",
+        "@playwright/test": "^1.55.1",
+        "@types/node": "^20.17.6",
         "dompurify": "2.5.8",
         "grunt": "^1.6.1",
         "grunt-chmod": "~1.1.1",
@@ -139,7 +149,9 @@
         "should": "13.2.3",
         "sinon": "11.1.2",
         "stoppable": "^1.1.0",
-        "supertest": "6.3.3"
+        "supertest": "6.3.3",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.6.3"
     },
     "engines": {
         "node": ">=18.5"

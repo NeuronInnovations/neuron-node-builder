@@ -1,0 +1,5 @@
+- Run `npm test` (Grunt suite) after backend/editor changes; target sub-tasks (`grunt simplemocha:nodes` or `:core`) if needed.
+- Rebuild editor assets with `npx grunt build` whenever client JS/CSS or nodes change and ensure `public/` updates.
+- For packaging-related updates, confirm `npm run package` and downstream bundle commands succeed locally.
+- If touching signing workflows, execute `./scripts/test-signing-setup.sh` and, when possible, trigger staging GitHub Action before shipping.
+- Verify `.env` and compiled Go binaries paths remain correct; avoid committing sensitive credentials. Ensure docs (README/build guides) stay in sync with functional changes.

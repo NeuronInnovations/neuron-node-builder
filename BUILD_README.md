@@ -80,8 +80,10 @@ The `create-dmg.js` script:
 ```
 build/
 ├── releases/
-│   ├── latest-macos-x64          # Standalone executable
-│   └── Neuron-Node-Builder.app/  # App bundle
+│   ├── latest-macos-arm64          # Standalone Apple Silicon executable
+│   ├── latest-macos-x64            # Standalone Intel executable
+│   ├── neuron-node-builder-macos-arm64-v<version>.app/  # ARM64 app bundle
+│   └── neuron-node-builder-macos-x64-v<version>.app/    # x64 app bundle
 ├── bin/                          # Downloaded binaries
 └── config/                       # pkg configuration files
 
@@ -124,13 +126,15 @@ dist/
 node --version
 
 # Verify executable
-file build/releases/latest-macos-x64
+ARCH=arm64  # or x64 for Intel Macs
+file build/releases/latest-macos-${ARCH}
 
 # Test executable permissions
-ls -la build/releases/latest-macos-x64
+ls -la build/releases/latest-macos-${ARCH}
 
 # Check app bundle structure
-ls -la build/releases/Neuron-Node-Builder.app/Contents/
+VERSION=$(node -p "require('./package.json').version")
+ls -la build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app/Contents/
 
 # Verify DMG file
 file dist/Neuron-Node-Builder.dmg
@@ -141,7 +145,8 @@ file dist/Neuron-Node-Builder.dmg
 ### Test the Executable
 ```bash
 cd build/releases
-./latest-macos-x64
+ARCH=arm64  # or x64 for Intel Macs
+./latest-macos-${ARCH}
 ```
 
 **Expected Behavior:**
@@ -152,10 +157,12 @@ cd build/releases
 ### Test the App Bundle
 ```bash
 # Copy to Applications
-cp -r build/releases/Neuron-Node-Builder.app /Applications/
+VERSION=$(node -p "require('./package.json').version")
+ARCH=arm64  # or x64 for Intel Macs
+cp -r build/releases/neuron-node-builder-macos-${ARCH}-v${VERSION}.app /Applications/
 
 # Launch from Applications
-open /Applications/Neuron-Node-Builder.app
+open /Applications/neuron-node-builder-macos-${ARCH}-v${VERSION}.app
 ```
 
 ### Test the DMG
@@ -184,8 +191,10 @@ The build process includes several memory optimizations:
 
 The generated files are ready for distribution:
 
-- **`latest-macos-x64`**: Standalone executable for direct distribution
-- **`Neuron-Node-Builder.app`**: macOS app bundle for installation
+- **`latest-macos-arm64`**: Standalone Apple Silicon executable for direct distribution
+- **`latest-macos-x64`**: Standalone Intel executable for direct distribution
+- **`neuron-node-builder-macos-arm64-v<version>.app`**: Apple Silicon app bundle for installation
+- **`neuron-node-builder-macos-x64-v<version>.app`**: Intel app bundle for installation
 - **`Neuron-Node-Builder.dmg`**: Professional installer for end users
 
 ## Support

@@ -250,15 +250,22 @@
     
     // Initialize server health monitoring
     function initializeServerHealthMonitoring() {
+        // VISUAL TEST MODE: Skip health monitoring to prevent false "Reconnecting" banners
+        // Check for visual test mode flag (set by Playwright tests)
+        if (window.NEURON_VISUAL_TEST_MODE === true) {
+            console.log('[SERVER HEALTH] Skipping health monitoring in visual test mode');
+            return;
+        }
+
         console.log('[SERVER HEALTH] Initializing server health monitoring...');
-        
+
         // Initial health check
         checkServerHealth().then(isHealthy => {
             if (!isHealthy) {
                 showReconnectingBanner();
             }
         });
-        
+
         // Set up periodic health monitoring (every 30 seconds)
         setInterval(async () => {
             const isHealthy = await checkServerHealth();
@@ -268,7 +275,7 @@
                 showReconnectingBanner();
             }
         }, 30000);
-        
+
         console.log('[SERVER HEALTH] Server health monitoring initialized');
     }
     

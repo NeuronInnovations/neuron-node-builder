@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "types": ["node", "@playwright/test"],
+    "lib": ["ES2022", "DOM"],
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "target": "ES2022",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "outDir": "tests/visual/.tsbuild"
+  },
+  "include": [
+    "tests/visual/**/*.ts",
+    "tests/visual/**/*.d.ts",
+    "playwright.config.ts"
+  ]
+}

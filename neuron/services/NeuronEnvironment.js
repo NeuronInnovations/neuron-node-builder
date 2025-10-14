@@ -1,143 +1,200 @@
-const fs = require('fs');
-const path = require('path');
-const { EventEmitter } = require('events');
+const fs = require("fs");
+const path = require("path");
+const { EventEmitter } = require("events");
 
 // Create an EventEmitter instance for environment changes
 const envEventEmitter = new EventEmitter();
 
 const determineEnvPath = () => {
-    if (process.env.NEURON_ENV_PATH && fs.existsSync(process.env.NEURON_ENV_PATH)) {
-        return process.env.NEURON_ENV_PATH;
+  // VISUAL TEST MODE: Check explicitly set path first
+  if (
+    process.env.NEURON_ENV_PATH &&
+    fs.existsSync(process.env.NEURON_ENV_PATH)
+  ) {
+    return process.env.NEURON_ENV_PATH;
+  }
+
+  const envPath = path.resolve(__dirname, "..", "..", ".env");
+
+  if (!fs.existsSync(envPath)) {
+    // VISUAL TEST MODE: Create minimal env in memory instead of crashing
+    if (process.env.VISUAL_TEST_MODE === "1") {
+      console.warn(
+        "⚠️  Visual test mode: .env file missing, using in-memory defaults"
+      );
+      // Set minimal required env vars for visual tests
+      process.env.HEDERA_OPERATOR_ID =
+        process.env.HEDERA_OPERATOR_ID || "0.0.123456";
+      process.env.HEDERA_OPERATOR_KEY =
+        process.env.HEDERA_OPERATOR_KEY ||
+        "302e020100300506032b65700422042000000000000000000000000000000000000000000000000000000000000000ff";
+      return null; // Signal to skip file loading
     }
+    throw new Error(`Environment file not found at: ${envPath}`);
+  }
 
-    const envPath = path.resolve(__dirname, '..', '..', '.env');
+  process.env.NEURON_ENV_PATH = envPath;
 
-    if (!fs.existsSync(envPath)) {
-        throw new Error(`Environment file not found at: ${envPath}`);
-    }
-
-    process.env.NEURON_ENV_PATH = envPath;
-
-    return envPath;
-}
+  return envPath;
+};
 
 module.exports.getPath = function getPath() {
-    return determineEnvPath();
-}
+  const envPath = determineEnvPath();
+
+  // If in visual test mode with in-memory defaults, return a placeholder path
+  if (envPath === null && process.env.VISUAL_TEST_MODE === "1") {
+    return path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "tests",
+      "visual",
+      "fixtures",
+      "env",
+      ".env.visual"
+    );
+  }
+
+  return envPath;
+};
 
 module.exports.load = function load() {
-    const envPath = determineEnvPath();
+  const envPath = determineEnvPath();
 
-    console.log(`🔧 Loading environment from: ${envPath}`);
+  // Skip file loading if running with in-memory defaults (visual test fallback)
+  if (envPath === null) {
+    console.log("🧪 Visual test mode using in-memory environment");
+    return;
+  }
 
-    require('dotenv').config({
-        path: envPath
-    });
+  console.log(`🔧 Loading environment from: ${envPath}`);
+
+  require("dotenv").config({
+    path: envPath,
+  });
+
+  // Verify critical environment variables for visual tests
+  if (process.env.VISUAL_TEST_MODE === "1") {
+    console.log("🧪 Visual test mode - verifying credentials loaded:");
+    console.log(
+      `  HEDERA_OPERATOR_ID: ${
+        process.env.HEDERA_OPERATOR_ID ? "✅ Set" : "❌ Missing"
+      }`
+    );
+    console.log(
+      `  HEDERA_OPERATOR_KEY: ${
+        process.env.HEDERA_OPERATOR_KEY
+          ? "✅ Set (length: " + process.env.HEDERA_OPERATOR_KEY.length + ")"
+          : "❌ Missing"
+      }`
+    );
+  }
 };
 
 module.exports.reload = function reload() {
-    const envPath = determineEnvPath();
+  const envPath = determineEnvPath();
 
-    // Store current environment state before reloading
-    const currentEnv = { ...process.env };
+  // Store current environment state before reloading
+  const currentEnv = { ...process.env };
 
-    const originalLog = console.log;
-    console.log = () => {};
+  const originalLog = console.log;
+  console.log = () => {};
 
-    require('dotenv').config({
-        path: envPath
-    });
+  require("dotenv").config({
+    path: envPath,
+  });
 
-    console.log = originalLog;
+  console.log = originalLog;
 
-    // Check if environment has actually changed
-    const hasChanged = hasEnvironmentChanged(currentEnv, process.env);
-    
-    if (hasChanged) {
-        console.log('✅ Environment variables changed, emitting change event');
-        envEventEmitter.emit('change');
-    }
-}
+  // Check if environment has actually changed
+  const hasChanged = hasEnvironmentChanged(currentEnv, process.env);
+
+  if (hasChanged) {
+    console.log("✅ Environment variables changed, emitting change event");
+    envEventEmitter.emit("change");
+  }
+};
 
 // Helper function to detect environment changes
 function hasEnvironmentChanged(oldEnv, newEnv) {
-    // Get all unique keys from both environments
-    const allKeys = new Set([...Object.keys(oldEnv), ...Object.keys(newEnv)]);
-    
-    for (const key of allKeys) {
-        // Skip internal Node.js environment variables that might change
-        if (key.startsWith('NODE_') || key === 'PWD' || key === 'OLDPWD') {
-            continue;
-        }
-        
-        const oldValue = oldEnv[key];
-        const newValue = newEnv[key];
-        
-        // Check if value has changed
-        if (oldValue !== newValue) {
-            console.log(` Environment change detected: ${key} = "${oldValue}" → "${newValue}"`);
-            return true;
-        }
+  // Get all unique keys from both environments
+  const allKeys = new Set([...Object.keys(oldEnv), ...Object.keys(newEnv)]);
+
+  for (const key of allKeys) {
+    // Skip internal Node.js environment variables that might change
+    if (key.startsWith("NODE_") || key === "PWD" || key === "OLDPWD") {
+      continue;
     }
-    
-    return false;
+
+    const oldValue = oldEnv[key];
+    const newValue = newEnv[key];
+
+    // Check if value has changed
+    if (oldValue !== newValue) {
+      console.log(
+        ` Environment change detected: ${key} = "${oldValue}" → "${newValue}"`
+      );
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // Function to update a single .env value
 module.exports.updateEnvValue = function updateEnvValue(key, value) {
-    const envPath = determineEnvPath();
-    
-    try {
-        // Read existing .env file
-        let envContent = '';
-        if (fs.existsSync(envPath)) {
-            envContent = fs.readFileSync(envPath, 'utf-8');
-        }
-        
-        // Parse existing content
-        const lines = envContent.split('\n');
-        let keyFound = false;
-        
-        // Update existing key or add new one
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            
-            // Skip empty lines and comments
-            if (!line || line.startsWith('#')) {
-                continue;
-            }
-            
-            // Check if this line contains our key
-            if (line.startsWith(`${key}=`)) {
-                lines[i] = `${key}=${value}`;
-                keyFound = true;
-                break;
-            }
-        }
-        
-        // If key wasn't found, add it to the end
-        if (!keyFound) {
-            lines.push(`${key}=${value}`);
-        }
-        
-        // Write updated content back to file
-        const updatedContent = lines.join('\n');
-        fs.writeFileSync(envPath, updatedContent, 'utf-8');
-        
-        console.log(`✅ Updated .env file: ${key}=${value}`);
-        
-        // Reload environment to apply changes
-        this.reload();
-        
-        return true;
-        
-    } catch (error) {
-        console.error(`❌ Failed to update .env value: ${error.message}`);
-        throw error;
+  const envPath = determineEnvPath();
+
+  try {
+    // Read existing .env file
+    let envContent = "";
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, "utf-8");
     }
-}
+
+    // Parse existing content
+    const lines = envContent.split("\n");
+    let keyFound = false;
+
+    // Update existing key or add new one
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Skip empty lines and comments
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      // Check if this line contains our key
+      if (line.startsWith(`${key}=`)) {
+        lines[i] = `${key}=${value}`;
+        keyFound = true;
+        break;
+      }
+    }
+
+    // If key wasn't found, add it to the end
+    if (!keyFound) {
+      lines.push(`${key}=${value}`);
+    }
+
+    // Write updated content back to file
+    const updatedContent = lines.join("\n");
+    fs.writeFileSync(envPath, updatedContent, "utf-8");
+
+    console.log(`✅ Updated .env file: ${key}=${value}`);
+
+    // Reload environment to apply changes
+    this.reload();
+
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to update .env value: ${error.message}`);
+    throw error;
+  }
+};
 
 // Expose the onEnvChange event listener
 module.exports.onEnvironmentChange = function onEnvironmentChange(callback) {
-    envEventEmitter.on('change', callback);
+  envEventEmitter.on("change", callback);
 };

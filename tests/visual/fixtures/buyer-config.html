@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Buyer Configuration Fixture</title>
+    <link rel="stylesheet" href="../harness/styles/node-editor.css" />
+  </head>
+  <body>
+    <section class="panel" id="buyer-config">
+      <div class="panel-header">
+        <h2>Buyer Config</h2>
+        <span class="context">Neuron ▸ Marketplace ▸ Consumption Node</span>
+      </div>
+      <div class="helper-text">
+        Define how this buyer ingests seller data streams and monitors runtime topics.
+      </div>
+      <div class="neuron-buyer-config">
+        <div class="form-row">
+          <label for="node-input-name"><span>Name</span></label>
+          <input type="text" id="node-input-name" placeholder="Node name" value="Ops Control Center" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-smartContract"><span>Smart Contract</span></label>
+          <select id="node-input-smartContract" style="width: 70%;">
+            <option value="jetvision" selected>JETVISION DEMO</option>
+            <option value="chat">P2P CHAT DEMO</option>
+            <option value="challenges">DEVELOPER OPEN CHALLENGES</option>
+          </select>
+        </div>
+        <div class="helper-text">Select existing device configurations to reinstate their credentials.</div>
+        <div class="form-row">
+          <label for="node-input-loadDevice">Reinstantiate Device</label>
+          <select id="node-input-loadDevice" style="width: 70%;">
+            <option value="">Create new device configuration</option>
+            <option value="ops-edge.json">ops-edge.json</option>
+          </select>
+          <button type="button" id="refresh-devices-btn" class="red-ui-button">Refresh</button>
+        </div>
+        <div class="form-row">
+          <label for="node-input-deviceType"><span>Device Type</span></label>
+          <input type="text" id="node-input-deviceType" placeholder="Enter Device Type" value="Control Center" />
+        </div>
+
+        <span style="margin-top: 16px; display: inline-block; color: var(--text-muted);">
+          Sellers I want data from (must match selected smart contract)
+        </span>
+        <div class="form-row">
+          <div style="margin-top: 2px; width: 100%;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+              <input
+                type="text"
+                id="evm-address-input"
+                placeholder="Enter EVM address (0x...)"
+                style="flex: 1; font-family: 'Fira Code', monospace;"
+              />
+              <button type="button" id="add-device-btn" class="red-ui-button">➕ Add Seller</button>
+            </div>
+            <div id="devices-table-container" class="table-card">
+              <table id="devices-table" style="display: none;">
+                <thead>
+                  <tr>
+                    <th>EVM Address</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: center;">Last Seen</th>
+                    <th style="text-align: center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="devices-table-body"></tbody>
+              </table>
+              <div id="no-devices-message" style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
+                No devices added yet. Enter an address above to add a seller.
+              </div>
+            </div>
+            <div id="devices-summary" style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+              <span id="device-count">0</span> device(s) configured
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <label for="node-input-description"><span>Description</span></label>
+          <input type="text" id="node-input-description" placeholder="Description (optional)" value="Ops center subscriber" />
+        </div>
+
+        <div class="runtime-banner warning" id="buyer-runtime-banner">
+          <span class="icon">ℹ️</span>
+          Runtime information is available after the first deployment.
+        </div>
+
+        <hr class="section-divider" />
+
+        <div id="runtime-information-section" style="display: none;">
+          <h3 style="margin: 10px 0; color: var(--success);">Runtime Information</h3>
+          <div class="form-row">
+            <label for="node-input-evmAddress"><span>EVM Address</span></label>
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+              <input type="text" id="node-input-evmAddress" placeholder="EVM address" readonly />
+              <button type="button" id="copy-evm-address-btn" class="red-ui-button" style="padding: 8px 12px;">Copy</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="node-input-balance"><span>Balance</span></label>
+            <input type="text" id="node-input-balance" placeholder="Account balance" readonly />
+            <small><a href="https://portal.hedera.com/faucet" target="_blank" style="color: var(--accent);">Top up account</a></small>
+          </div>
+          <div class="form-row">
+            <label for="node-input-publicKey"><span>Public Key</span></label>
+            <input type="text" id="node-input-publicKey" class="code-text" placeholder="Public key" readonly />
+          </div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label for="node-input-stdInTopic"><span>StdIn Topic</span></label>
+              <input type="text" id="node-input-stdInTopic" class="code-text" placeholder="StdIn topic" readonly />
+            </div>
+            <div class="form-row">
+              <label for="node-input-stdOutTopic"><span>StdOut Topic</span></label>
+              <input type="text" id="node-input-stdOutTopic" class="code-text" placeholder="StdOut topic" readonly />
+            </div>
+            <div class="form-row">
+              <label for="node-input-stdErrTopic"><span>StdErr Topic</span></label>
+              <input type="text" id="node-input-stdErrTopic" class="code-text" placeholder="StdErr topic" readonly />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      function $(selector) {
+        return document.querySelector(selector);
+      }
+
+      function addSellerRow({ address, status, lastSeen }) {
+        const table = $('#devices-table');
+        const tbody = $('#devices-table-body');
+        const empty = $('#no-devices-message');
+
+        table.style.display = 'table';
+        empty.style.display = 'none';
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><span class="code-text">${address}</span></td>
+          <td style="text-align:center;"><span class="badge ${status === 'Connected' ? 'success' : 'warning'}">${status}</span></td>
+          <td style="text-align:center;">${lastSeen}</td>
+          <td style="text-align:center;"><button class="red-ui-button" style="padding:6px 10px;">Remove</button></td>
+        `;
+        tbody.appendChild(row);
+
+        $('#device-count').textContent = tbody.children.length;
+      }
+
+      window.renderBuyerInitialState = function renderBuyerInitialState() {
+        $('#runtime-information-section').style.display = 'none';
+        $('#buyer-runtime-banner').style.display = 'flex';
+        $('#devices-table').style.display = 'none';
+        $('#no-devices-message').style.display = 'block';
+        $('#devices-table-body').innerHTML = '';
+        $('#device-count').textContent = '0';
+      };
+
+      window.renderBuyerConfiguredState = function renderBuyerConfiguredState() {
+        $('#buyer-runtime-banner').style.display = 'none';
+        $('#runtime-information-section').style.display = 'block';
+
+        addSellerRow({ address: '0x19AF…f9c2', status: 'Connected', lastSeen: 'Just now' });
+        addSellerRow({ address: '0xb18C…92aa', status: 'Pending', lastSeen: '2 min ago' });
+
+        $('#node-input-evmAddress').value = '0.0.239991@hedera';
+        $('#node-input-balance').value = '88.100 ℏ';
+        $('#node-input-publicKey').value = '302a300506032b65700321008f9d4b';
+        $('#node-input-stdInTopic').value = '0.0.998877-stdin';
+        $('#node-input-stdOutTopic').value = '0.0.998877-stdout';
+        $('#node-input-stdErrTopic').value = '0.0.998877-stderr';
+      };
+
+      window.renderBuyerInitialState();
+    </script>
+  </body>
+</html>

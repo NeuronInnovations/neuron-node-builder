@@ -1,473 +1,610 @@
 // Load environment variables with configurable path
-require('../services/NeuronEnvironment').load();
+require("../services/NeuronEnvironment").load();
 
-const path = require('path');
-const fs = require('fs');
-const { HederaContractService } = require('neuron-js-registration-sdk');
+const path = require("path");
+const fs = require("fs");
+const { HederaContractService } = require("neuron-js-registration-sdk");
 
 // --- GLOBAL CONTRACT MONITORING SERVICE (Singleton) ---
 // Separate data structures for each contract
 let globalPeerCounts = {
-    jetvision: 0,
-    chat: 0,
-    challenges: 0
+  jetvision: 0,
+  chat: 0,
+  challenges: 0,
 };
 let globalAllDevices = {
-    jetvision: [],
-    chat: [],
-    challenges: []
+  jetvision: [],
+  chat: [],
+  challenges: [],
 };
 let contractLoadingStates = {
-    jetvision: false,
-    chat: false,
-    challenges: false
+  jetvision: false,
+  chat: false,
+  challenges: false,
 };
 let contractMonitoringInterval = null;
 let isContractMonitoringActive = false;
 let contractServices = {};
 
 // Cache file paths for persistent storage
-const cacheDir = path.join(require('../services/NeuronUserHome').load(), 'cache');
+const cacheDir = path.join(
+  require("../services/NeuronUserHome").load(),
+  "cache"
+);
 if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
+  fs.mkdirSync(cacheDir, { recursive: true });
 }
 const cacheFiles = {
-    jetvision: 'contract-data-jetvision.json',
-    chat: 'contract-data-chat.json',
-    challenges: 'contract-data-challenges.json'
+  jetvision: "contract-data-jetvision.json",
+  chat: "contract-data-chat.json",
+  challenges: "contract-data-challenges.json",
 };
 for (let cacheFile in cacheFiles) {
-    const cacheFilePath = path.join(cacheDir, cacheFiles[cacheFile]);
+  const cacheFilePath = path.join(cacheDir, cacheFiles[cacheFile]);
 
-    if (!fs.existsSync(cacheFilePath)) {
-        let cacheSampleData = {};
+  if (!fs.existsSync(cacheFilePath)) {
+    let cacheSampleData = {};
 
-        if (fs.existsSync(path.join(__dirname, 'cache', cacheFiles[cacheFile]))) {
-            cacheSampleData = fs.readFileSync(path.join(__dirname, 'cache', cacheFiles[cacheFile]), 'utf-8');
-            cacheSampleData = JSON.parse(cacheSampleData);
-        }
-
-        fs.writeFileSync(cacheFilePath, JSON.stringify(cacheSampleData, null, 2));
+    if (fs.existsSync(path.join(__dirname, "cache", cacheFiles[cacheFile]))) {
+      cacheSampleData = fs.readFileSync(
+        path.join(__dirname, "cache", cacheFiles[cacheFile]),
+        "utf-8"
+      );
+      cacheSampleData = JSON.parse(cacheSampleData);
     }
 
-    cacheFiles[cacheFile] = cacheFilePath;
+    fs.writeFileSync(cacheFilePath, JSON.stringify(cacheSampleData, null, 2));
+  }
+
+  cacheFiles[cacheFile] = cacheFilePath;
 }
 
 // Contract configuration
-const contracts = ['jetvision', 'chat', 'challenges'];
+const contracts = ["jetvision", "chat", "challenges"];
 const contractConfigs = {
-    jetvision: {
-        contractId: process.env.JETVISION_CONTRACT_ID,
-        contractEvm: process.env.JETVISION_CONTRACT_EVM
-    },
-    chat: {
-        contractId: process.env.CHAT_CONTRACT_ID,
-        contractEvm: process.env.CHAT_CONTRACT_EVM
-    },
-    challenges: {
-        contractId: process.env.CHALLENGES_CONTRACT_ID,
-        contractEvm: process.env.CHALLENGES_CONTRACT_EVM
-    }
+  jetvision: {
+    contractId: process.env.JETVISION_CONTRACT_ID,
+    contractEvm: process.env.JETVISION_CONTRACT_EVM,
+  },
+  chat: {
+    contractId: process.env.CHAT_CONTRACT_ID,
+    contractEvm: process.env.CHAT_CONTRACT_EVM,
+  },
+  challenges: {
+    contractId: process.env.CHALLENGES_CONTRACT_ID,
+    contractEvm: process.env.CHALLENGES_CONTRACT_EVM,
+  },
 };
 
 // Load cached contract data for a specific contract
 function loadCachedContractData(contract) {
-    try {
-        const cacheFile = cacheFiles[contract];
-        if (fs.existsSync(cacheFile)) {
-            const cachedData = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
-            globalPeerCounts[contract] = cachedData.peerCount || 0;
-            globalAllDevices[contract] = cachedData.allDevices || [];
-            
-            const lastUpdated = new Date(cachedData.lastUpdated);
-            const hoursSinceUpdate = (new Date() - lastUpdated) / (1000 * 60 * 60);
-            
-            console.log(`Loaded cached ${contract} contract data: ${globalPeerCounts[contract]} peers, ${globalAllDevices[contract].length} devices (updated ${hoursSinceUpdate.toFixed(1)} hours ago)`);
-            return true;
-        }
-    } catch (error) {
-        console.error(`Failed to load cached ${contract} contract data:`, error.message);
+  try {
+    const cacheFile = cacheFiles[contract];
+    if (fs.existsSync(cacheFile)) {
+      const cachedData = JSON.parse(fs.readFileSync(cacheFile, "utf-8"));
+      globalPeerCounts[contract] = cachedData.peerCount || 0;
+      globalAllDevices[contract] = cachedData.allDevices || [];
+
+      const lastUpdated = new Date(cachedData.lastUpdated);
+      const hoursSinceUpdate = (new Date() - lastUpdated) / (1000 * 60 * 60);
+
+      console.log(
+        `Loaded cached ${contract} contract data: ${
+          globalPeerCounts[contract]
+        } peers, ${
+          globalAllDevices[contract].length
+        } devices (updated ${hoursSinceUpdate.toFixed(1)} hours ago)`
+      );
+      return true;
     }
-    return false;
+  } catch (error) {
+    console.error(
+      `Failed to load cached ${contract} contract data:`,
+      error.message
+    );
+  }
+  return false;
 }
 
 // Save contract data to cache for a specific contract
 function saveContractDataToCache(contract) {
-    try {
-        const cacheData = {
-            peerCount: globalPeerCounts[contract],
-            allDevices: globalAllDevices[contract],
-            lastUpdated: new Date().toISOString()
-        };
-        
-        // Custom JSON serializer to handle BigInt values
-        const jsonString = JSON.stringify(cacheData, (key, value) => {
-            if (typeof value === 'bigint') {
-                return value.toString();
-            }
-            return value;
-        }, 2);
-        
-        fs.writeFileSync(cacheFiles[contract], jsonString, 'utf-8');
-        console.log(`Saved ${contract} contract data to cache: ${globalPeerCounts[contract]} peers, ${globalAllDevices[contract].length} devices`);
-    } catch (error) {
-        console.error(`Failed to save ${contract} contract data to cache:`, error.message);
-    }
+  try {
+    const cacheData = {
+      peerCount: globalPeerCounts[contract],
+      allDevices: globalAllDevices[contract],
+      lastUpdated: new Date().toISOString(),
+    };
+
+    // Custom JSON serializer to handle BigInt values
+    const jsonString = JSON.stringify(
+      cacheData,
+      (key, value) => {
+        if (typeof value === "bigint") {
+          return value.toString();
+        }
+        return value;
+      },
+      2
+    );
+
+    fs.writeFileSync(cacheFiles[contract], jsonString, "utf-8");
+    console.log(
+      `Saved ${contract} contract data to cache: ${globalPeerCounts[contract]} peers, ${globalAllDevices[contract].length} devices`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to save ${contract} contract data to cache:`,
+      error.message
+    );
+  }
 }
 
 // Fetch data for a specific contract
 async function fetchContractData(contract) {
-    try {
-        console.log(`Fetching fresh ${contract} contract data...`);
-        contractLoadingStates[contract] = true;
-        
-        const contractService = contractServices[contract];
-        if (!contractService) {
-            console.error(`Cannot fetch data - no service for ${contract}`);
-            return;
-        }   
-        const contractId = contractConfigs[contract].contractId;
-        const contractEvm = contractConfigs[contract].contractEvm;
-        
-        const freshPeerCount = await contractService.getPeerArraySize(contractEvm);
-        console.log(`Fresh ${contract} peer count: ${freshPeerCount}`);
-        
-        if (freshPeerCount <= globalPeerCounts[contract]) {
-            console.log(`No changes in ${contract} peer count (${freshPeerCount}). Skipping fetch.`);
-            contractLoadingStates[contract] = false;
-            return;
-        }
-        
-        if (freshPeerCount > 0) {
-            // Start from existing peer count + 1 to avoid re-fetching known devices
-            const startIndex = globalPeerCounts[contract] > 0 ? globalPeerCounts[contract]  : 0;
-            console.log(`Fetching ${contract} devices starting from index: ${startIndex}`);
-            
-            const freshAllDevices = await contractService.getAllDevices(
-                contractEvm,
-                startIndex
-            );
-            console.log(`Fresh ${contract} device count: ${freshAllDevices.length}`);
-            
-            // If we started from an index > 0, merge with existing devices
-            if (startIndex > 0) {
-                globalAllDevices[contract] = [...globalAllDevices[contract], ...freshAllDevices];
-                console.log(`Total ${contract} devices after merge: ${globalAllDevices[contract].length}`);
-            } else {
-                globalAllDevices[contract] = freshAllDevices;
-            }
-            
-            // Update global variables
-            globalPeerCounts[contract] = freshPeerCount;
-            
-            // Save to cache
-            saveContractDataToCache(contract);
-            
-            console.log(`Fresh ${contract} contract data loaded and cached successfully`);
-        } else {
-            console.log(`No peers found in fresh ${contract} data`);
-            globalPeerCounts[contract] = 0;
-            globalAllDevices[contract] = [];
-            saveContractDataToCache(contract);
-        }
-    } catch (error) {
-        console.error(`Failed to fetch fresh ${contract} contract data:`, error.message);
-        // Continue with empty data for failed contracts
-        globalPeerCounts[contract] = 0;
-        globalAllDevices[contract] = [];
-        saveContractDataToCache(contract);
-    } finally {
-        contractLoadingStates[contract] = false;
+  try {
+    // VISUAL TEST MODE: Skip live contract fetching
+    if (process.env.VISUAL_TEST_MODE === "1") {
+      console.log(
+        `[visual-test] Skipping ${contract} contract data fetch (using cached data)`
+      );
+      contractLoadingStates[contract] = false;
+      return;
     }
+
+    console.log(`Fetching fresh ${contract} contract data...`);
+    contractLoadingStates[contract] = true;
+
+    const contractService = contractServices[contract];
+    if (!contractService) {
+      console.error(`Cannot fetch data - no service for ${contract}`);
+      return;
+    }
+    const contractId = contractConfigs[contract].contractId;
+    const contractEvm = contractConfigs[contract].contractEvm;
+
+    const freshPeerCount = await contractService.getPeerArraySize(contractEvm);
+    console.log(`Fresh ${contract} peer count: ${freshPeerCount}`);
+
+    if (freshPeerCount <= globalPeerCounts[contract]) {
+      console.log(
+        `No changes in ${contract} peer count (${freshPeerCount}). Skipping fetch.`
+      );
+      contractLoadingStates[contract] = false;
+      return;
+    }
+
+    if (freshPeerCount > 0) {
+      // Start from existing peer count + 1 to avoid re-fetching known devices
+      const startIndex =
+        globalPeerCounts[contract] > 0 ? globalPeerCounts[contract] : 0;
+      console.log(
+        `Fetching ${contract} devices starting from index: ${startIndex}`
+      );
+
+      const freshAllDevices = await contractService.getAllDevices(
+        contractEvm,
+        startIndex
+      );
+      console.log(`Fresh ${contract} device count: ${freshAllDevices.length}`);
+
+      // If we started from an index > 0, merge with existing devices
+      if (startIndex > 0) {
+        globalAllDevices[contract] = [
+          ...globalAllDevices[contract],
+          ...freshAllDevices,
+        ];
+        console.log(
+          `Total ${contract} devices after merge: ${globalAllDevices[contract].length}`
+        );
+      } else {
+        globalAllDevices[contract] = freshAllDevices;
+      }
+
+      // Update global variables
+      globalPeerCounts[contract] = freshPeerCount;
+
+      // Save to cache
+      saveContractDataToCache(contract);
+
+      console.log(
+        `Fresh ${contract} contract data loaded and cached successfully`
+      );
+    } else {
+      console.log(`No peers found in fresh ${contract} data`);
+      globalPeerCounts[contract] = 0;
+      globalAllDevices[contract] = [];
+      saveContractDataToCache(contract);
+    }
+  } catch (error) {
+    console.error(
+      `Failed to fetch fresh ${contract} contract data:`,
+      error.message
+    );
+    // Continue with empty data for failed contracts
+    globalPeerCounts[contract] = 0;
+    globalAllDevices[contract] = [];
+    saveContractDataToCache(contract);
+  } finally {
+    contractLoadingStates[contract] = false;
+  }
 }
 
 // Initialize global contract monitoring service
 async function initializeGlobalContractMonitoring() {
-    if (isContractMonitoringActive) {
-        console.log('Global contract monitoring service already active');
-        return; // Already initialized and running
-    }
+  if (isContractMonitoringActive) {
+    console.log("Global contract monitoring service already active");
+    return; // Already initialized and running
+  }
 
-    console.log('Initializing global contract monitoring service for all contracts...');
-    
-    // Step 1: Load cached data immediately for fast startup
-    const hasCachedData = {};
-    contracts.forEach(contract => {
-        hasCachedData[contract] = loadCachedContractData(contract);
-    });
-    
-    try {
-        // Initialize HederaContractService for each contract
-        const HederaContractServiceClass = HederaContractService.default || HederaContractService;
-        
-        contracts.forEach(contract => {
-            try {
-                const setup = () => {
-                    const operatorId = process.env.HEDERA_OPERATOR_ID;
-                    const operatorKey = process.env.HEDERA_OPERATOR_KEY;
-                    const contractId = contractConfigs[contract].contractId
-                    if (!operatorId || !operatorKey || !contractId) {
-                        console.error(`Missing required environment variables for ${contract} contract`);
-                        console.log('\x1b[1m\x1b[33m===========>Go to http://localhost:1880 to add credentials <===========\x1b[0m');
-                        console.error("Please go to http://localhost:1880 to add your Hedera credentials (Hedera Account ID and Private Key)");
+  console.log(
+    "Initializing global contract monitoring service for all contracts..."
+  );
 
-                        return;
-                    }
-                    contractServices[contract] = new HederaContractServiceClass({
-                        network: process.env.HEDERA_NETWORK || 'testnet',
-                        operatorId: process.env.HEDERA_OPERATOR_ID,
-                        operatorKey: process.env.HEDERA_OPERATOR_KEY,
-                        contractId: contractConfigs[contract].contractId
-                    });
-                };
+  // Step 1: Load cached data immediately for fast startup
+  const hasCachedData = {};
+  contracts.forEach((contract) => {
+    hasCachedData[contract] = loadCachedContractData(contract);
+  });
 
-                setup();
-                
-                console.log(`Initialized ${contract} contract service`);
+  try {
+    // Initialize HederaContractService for each contract
+    const HederaContractServiceClass =
+      HederaContractService.default || HederaContractService;
 
-                require('../services/NeuronEnvironment').onEnvironmentChange(() => {
-                    console.log('Environment changed, reloading contract service for ' + contract);
-                    
-                    setup();
-                });
-            } catch (error) {
-                console.error(`Failed to initialize ${contract} contract service:`, error.message);
-                contractServices[contract] = null;
-            }
-        });
+    contracts.forEach((contract) => {
+      try {
+        const setup = () => {
+          const operatorId = process.env.HEDERA_OPERATOR_ID;
+          const operatorKey = process.env.HEDERA_OPERATOR_KEY;
+          const contractId = contractConfigs[contract].contractId;
+          if (!operatorId || !operatorKey || !contractId) {
+            console.error(
+              `Missing required environment variables for ${contract} contract`
+            );
+            console.log(
+              "\x1b[1m\x1b[33m===========>Go to http://localhost:1880 to add credentials <===========\x1b[0m"
+            );
+            console.error(
+              "Please go to http://localhost:1880 to add your Hedera credentials (Hedera Account ID and Private Key)"
+            );
 
-        const validContracts = contracts.filter(contract => contractServices[contract] !== null);
-    
-        if (validContracts.length === 0) {
-            throw new Error('No contract services initialized successfully');
-        }
-
-        // Step 2: Fetch fresh data for all contracts sequentially (to avoid rate limiting)
-        const fetchAllContractsData = async () => {
-            console.log('Fetching fresh data for all contracts sequentially...');
-            for (const contract of contracts) {
-                try {
-                    console.log(`Fetching data for ${contract} contract...`);
-                    await fetchContractData(contract);
-                    // Add a small delay between contracts to avoid rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                } catch (error) {
-                    console.error(`Failed to fetch data for ${contract} contract:`, error.message);
-                }
-            }
-            console.log('Completed fetching fresh data for all contracts');
+            return;
+          }
+          contractServices[contract] = new HederaContractServiceClass({
+            network: process.env.HEDERA_NETWORK || "testnet",
+            operatorId: process.env.HEDERA_OPERATOR_ID,
+            operatorKey: process.env.HEDERA_OPERATOR_KEY,
+            contractId: contractConfigs[contract].contractId,
+          });
         };
 
-        // Start fresh data fetch in background (non-blocking)
-        fetchAllContractsData();
+        setup();
 
-        // Step 3: Set up monitoring interval (every 5 minutes) for all contracts
-        contractMonitoringInterval = setInterval(async () => {
-            try {
-                console.log('Contract monitoring: Checking all contracts for updates...');
-                
-                for (const contract of contracts) {
-                    try {
-                        const contractService = contractServices[contract];
-                        if (!contractService) {
-                            console.warn(`No service available for ${contract} contract`);
-                            console.log('\x1b[1m\x1b[33m===========>Go to http://localhost:1880 <===========\x1b[0m');
+        console.log(`Initialized ${contract} contract service`);
 
-                            continue;
-                        }
-                        
-                        const contractId = contractConfigs[contract].contractId;
-                        const currentPeerCount = await contractService.getPeerArraySize(contractId);
-                        console.log(`Contract monitoring: Current ${contract} peer count: ${currentPeerCount}, Previous: ${globalPeerCounts[contract]}`);
-                        
-                        if (currentPeerCount !== globalPeerCounts[contract]) {
-                            console.log(`${contract} peer count changed from ${globalPeerCounts[contract]} to ${currentPeerCount}. Updating device list...`);
-                            
-                            if (currentPeerCount > 0) {
-                                // Start from existing peer count + 1 to avoid re-fetching known devices
-                                const startIndex = globalPeerCounts[contract] > 0 ? globalPeerCounts[contract]  : 0;
-                                console.log(`Fetching new ${contract} devices starting from index: ${startIndex}`);
-                                
-                                const contractEvm = contractConfigs[contract].contractEvm;
-                                const newDevices = await contractService.getAllDevices(
-                                    contractEvm,
-                                    startIndex
-                                );
-                                console.log(`New ${contract} device count: ${newDevices.length}`);
-                                
-                                // If we started from an index > 0, merge with existing devices
-                                if (startIndex > 0) {
-                                    globalAllDevices[contract] = [...globalAllDevices[contract], ...newDevices];
-                                    console.log(`Total ${contract} devices after merge: ${globalAllDevices[contract].length}`);
-                                } else {
-                                    globalAllDevices[contract] = newDevices;
-                                }
-                            } else {
-                                globalAllDevices[contract] = [];
-                                console.log(`No peers found in ${contract}, cleared device list`);
-                            }
-                            
-                            globalPeerCounts[contract] = currentPeerCount;
-                            
-                            // Save updated data to cache
-                            saveContractDataToCache(contract);
-                        }
-                        
-                        // Add a small delay between contracts to avoid rate limiting
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    } catch (error) {
-                        console.error(`Error monitoring ${contract} contract:`, error.message);
-                    }
-                }
-            } catch (error) {
-                console.error('Error in contract monitoring interval:', error.message);
-            }
-        }, 1 * 60 * 1000); // 1 minute
+        require("../services/NeuronEnvironment").onEnvironmentChange(() => {
+          console.log(
+            "Environment changed, reloading contract service for " + contract
+          );
 
-        isContractMonitoringActive = true;
-        console.log('Global contract monitoring service initialized successfully for all contracts');
-        
-    } catch (error) {
-        console.error('Failed to initialize global contract monitoring service:', error.message);
-        const hasAnyCachedData = Object.values(hasCachedData).some(hasData => hasData);
-        if (!hasAnyCachedData) {
-            console.error('No cached data available. Contract monitoring service failed to initialize.');
-        } else {
-            console.log('Using cached data only. Contract monitoring service partially initialized.');
-            isContractMonitoringActive = true;
-        }
+          setup();
+        });
+      } catch (error) {
+        console.error(
+          `Failed to initialize ${contract} contract service:`,
+          error.message
+        );
+        contractServices[contract] = null;
+      }
+    });
+
+    const validContracts = contracts.filter(
+      (contract) => contractServices[contract] !== null
+    );
+
+    if (validContracts.length === 0) {
+      throw new Error("No contract services initialized successfully");
     }
+
+    // Step 2: Fetch fresh data for all contracts sequentially (to avoid rate limiting)
+    const fetchAllContractsData = async () => {
+      console.log("Fetching fresh data for all contracts sequentially...");
+      for (const contract of contracts) {
+        try {
+          console.log(`Fetching data for ${contract} contract...`);
+          await fetchContractData(contract);
+          // Add a small delay between contracts to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error(
+            `Failed to fetch data for ${contract} contract:`,
+            error.message
+          );
+        }
+      }
+      console.log("Completed fetching fresh data for all contracts");
+    };
+
+    // Start fresh data fetch in background (non-blocking)
+    fetchAllContractsData();
+
+    // Step 3: Set up monitoring interval (every 5 minutes) for all contracts
+    // VISUAL TEST MODE: Skip periodic monitoring to avoid contract call errors
+    if (process.env.VISUAL_TEST_MODE === "1") {
+      console.log(
+        "[visual-test] Skipping periodic contract monitoring (using cached data only)"
+      );
+    } else {
+      contractMonitoringInterval = setInterval(async () => {
+        try {
+          console.log(
+            "Contract monitoring: Checking all contracts for updates..."
+          );
+
+          for (const contract of contracts) {
+            try {
+              const contractService = contractServices[contract];
+              if (!contractService) {
+                console.warn(`No service available for ${contract} contract`);
+                console.log(
+                  "\x1b[1m\x1b[33m===========>Go to http://localhost:1880 <===========\x1b[0m"
+                );
+
+                continue;
+              }
+
+              const contractId = contractConfigs[contract].contractId;
+              const currentPeerCount = await contractService.getPeerArraySize(
+                contractId
+              );
+              console.log(
+                `Contract monitoring: Current ${contract} peer count: ${currentPeerCount}, Previous: ${globalPeerCounts[contract]}`
+              );
+
+              if (currentPeerCount !== globalPeerCounts[contract]) {
+                console.log(
+                  `${contract} peer count changed from ${globalPeerCounts[contract]} to ${currentPeerCount}. Updating device list...`
+                );
+
+                if (currentPeerCount > 0) {
+                  // Start from existing peer count + 1 to avoid re-fetching known devices
+                  const startIndex =
+                    globalPeerCounts[contract] > 0
+                      ? globalPeerCounts[contract]
+                      : 0;
+                  console.log(
+                    `Fetching new ${contract} devices starting from index: ${startIndex}`
+                  );
+
+                  const contractEvm = contractConfigs[contract].contractEvm;
+                  const newDevices = await contractService.getAllDevices(
+                    contractEvm,
+                    startIndex
+                  );
+                  console.log(
+                    `New ${contract} device count: ${newDevices.length}`
+                  );
+
+                  // If we started from an index > 0, merge with existing devices
+                  if (startIndex > 0) {
+                    globalAllDevices[contract] = [
+                      ...globalAllDevices[contract],
+                      ...newDevices,
+                    ];
+                    console.log(
+                      `Total ${contract} devices after merge: ${globalAllDevices[contract].length}`
+                    );
+                  } else {
+                    globalAllDevices[contract] = newDevices;
+                  }
+                } else {
+                  globalAllDevices[contract] = [];
+                  console.log(
+                    `No peers found in ${contract}, cleared device list`
+                  );
+                }
+
+                globalPeerCounts[contract] = currentPeerCount;
+
+                // Save updated data to cache
+                saveContractDataToCache(contract);
+              }
+
+              // Add a small delay between contracts to avoid rate limiting
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            } catch (error) {
+              console.error(
+                `Error monitoring ${contract} contract:`,
+                error.message
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Error in contract monitoring interval:",
+            error.message
+          );
+        }
+      }, 1 * 60 * 1000); // 1 minute
+    }
+
+    isContractMonitoringActive = true;
+    console.log(
+      "Global contract monitoring service initialized successfully for all contracts"
+    );
+  } catch (error) {
+    console.error(
+      "Failed to initialize global contract monitoring service:",
+      error.message
+    );
+    const hasAnyCachedData = Object.values(hasCachedData).some(
+      (hasData) => hasData
+    );
+    if (!hasAnyCachedData) {
+      console.error(
+        "No cached data available. Contract monitoring service failed to initialize."
+      );
+    } else {
+      console.log(
+        "Using cached data only. Contract monitoring service partially initialized."
+      );
+      isContractMonitoringActive = true;
+    }
+  }
 }
 
 // Cleanup function for contract monitoring
 function cleanupGlobalContractMonitoring() {
-    if (contractMonitoringInterval) {
-        clearInterval(contractMonitoringInterval);
-        contractMonitoringInterval = null;
-        console.log('Global contract monitoring service stopped');
-    }
-    isContractMonitoringActive = false;
+  if (contractMonitoringInterval) {
+    clearInterval(contractMonitoringInterval);
+    contractMonitoringInterval = null;
+    console.log("Global contract monitoring service stopped");
+  }
+  isContractMonitoringActive = false;
 }
 
 // Getter functions for accessing global data (with contract parameter)
-function getGlobalPeerCount(contract = 'jetvision') {
-    const count = globalPeerCounts[contract] || 0;
-    console.log(`getGlobalPeerCount called for ${contract}. Returning: ${count}`);
-    return count;
+function getGlobalPeerCount(contract = "jetvision") {
+  const count = globalPeerCounts[contract] || 0;
+  console.log(`getGlobalPeerCount called for ${contract}. Returning: ${count}`);
+  return count;
 }
 
-function getGlobalAllDevices(contract = 'jetvision') {
-    const devices = globalAllDevices[contract] || [];
-    
-    // Filter to get unique devices based on contract address
-    const uniqueDevices = [];
-    const seenContracts = new Set();
-    
-    for (const device of devices) {
-        if (!seenContracts.has(device.contract)) {
-            seenContracts.add(device.contract);
-            uniqueDevices.push(device);
-        }
+function getGlobalAllDevices(contract = "jetvision") {
+  const devices = globalAllDevices[contract] || [];
+
+  // Filter to get unique devices based on contract address
+  const uniqueDevices = [];
+  const seenContracts = new Set();
+
+  for (const device of devices) {
+    if (!seenContracts.has(device.contract)) {
+      seenContracts.add(device.contract);
+      uniqueDevices.push(device);
     }
-    
-    console.log(`getGlobalAllDevices called for ${contract}. Returning ${uniqueDevices.length} unique devices (filtered from ${devices.length} total):`, uniqueDevices);
-    return uniqueDevices;
+  }
+
+  console.log(
+    `getGlobalAllDevices called for ${contract}. Returning ${uniqueDevices.length} unique devices (filtered from ${devices.length} total):`,
+    uniqueDevices
+  );
+  return uniqueDevices;
 }
 
-function isContractLoading(contract = 'jetvision') {
-    const loading = contractLoadingStates[contract] || false;
-    console.log(`isContractLoading called for ${contract}. Returning: ${loading}`);
-    return loading;
+function isContractLoading(contract = "jetvision") {
+  const loading = contractLoadingStates[contract] || false;
+  console.log(
+    `isContractLoading called for ${contract}. Returning: ${loading}`
+  );
+  return loading;
 }
 
 function isMonitoringActive() {
-    console.log(`isMonitoringActive called. Returning: ${isContractMonitoringActive}`);
-    return isContractMonitoringActive;
+  console.log(
+    `isMonitoringActive called. Returning: ${isContractMonitoringActive}`
+  );
+  return isContractMonitoringActive;
 }
 
 /**
  * Search for a device in the cache by EVM address
  */
 function searchDeviceInCache(contract, evmAddress) {
-    try {
-        const userHome = require('../services/NeuronUserHome').load();
-        const cacheDirectory = path.join(userHome, 'cache');
-        const fileName = `contract-data-${contract}.json`;
-        const cacheFilePath = path.join(cacheDirectory, fileName);
-        
-        console.log(`[DEBUG] Constructing cache path: ${cacheFilePath}`);
-        
-        if (!fs.existsSync(cacheFilePath)) {
-            console.log(`[DEBUG] Cache file not found: ${cacheFilePath}`);
-            return null;
-        }
-        
-        const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf-8'));
-        const allDevices = cacheData.allDevices || [];
-        
-        const device = allDevices.find(d => 
-            d.contract && d.contract.toLowerCase() === evmAddress.toLowerCase()
-        );
-        
-        console.log(`[DEBUG] Searched ${allDevices.length} devices in ${contract} cache, found: ${device ? 'YES' : 'NO'}`);
-        return device || null;
-        
-    } catch (error) {
-        console.error(`[DEBUG] Error searching device in cache:`, error);
-        return null;
+  try {
+    const userHome = require("../services/NeuronUserHome").load();
+    const cacheDirectory = path.join(userHome, "cache");
+    const fileName = `contract-data-${contract}.json`;
+    const cacheFilePath = path.join(cacheDirectory, fileName);
+
+    console.log(`[DEBUG] Constructing cache path: ${cacheFilePath}`);
+
+    if (!fs.existsSync(cacheFilePath)) {
+      console.log(`[DEBUG] Cache file not found: ${cacheFilePath}`);
+      return null;
     }
+
+    const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, "utf-8"));
+    const allDevices = cacheData.allDevices || [];
+
+    const device = allDevices.find(
+      (d) => d.contract && d.contract.toLowerCase() === evmAddress.toLowerCase()
+    );
+
+    console.log(
+      `[DEBUG] Searched ${
+        allDevices.length
+      } devices in ${contract} cache, found: ${device ? "YES" : "NO"}`
+    );
+    return device || null;
+  } catch (error) {
+    console.error(`[DEBUG] Error searching device in cache:`, error);
+    return null;
+  }
 }
 
 /**
  * Trigger cache update for specific contract with retry logic
  */
 async function triggerCacheUpdate(contract) {
-    const maxRetries = 4;
-    const retryDelay = 5000; // 5 seconds
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`[DEBUG] Triggering cache update for contract: ${contract} (Attempt ${attempt}/${maxRetries})`);
-            
-            // Use the existing fetchContractData function that's already in the file
-            await fetchContractData(contract);
-            
-            console.log(`[DEBUG] Cache update successful for ${contract} on attempt ${attempt}`);
-            return { success: true, attempt: attempt };
-            
-        } catch (error) {
-            lastError = error;
-            console.error(`[DEBUG] Cache update attempt ${attempt}/${maxRetries} failed for ${contract}:`, error.message);
-            
-            // If this is not the last attempt, wait before retrying
-            if (attempt < maxRetries) {
-                console.log(`[DEBUG] Waiting ${retryDelay/1000} seconds before retry ${attempt + 1}...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-            }
-        }
+  const maxRetries = 4;
+  const retryDelay = 5000; // 5 seconds
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(
+        `[DEBUG] Triggering cache update for contract: ${contract} (Attempt ${attempt}/${maxRetries})`
+      );
+
+      // Use the existing fetchContractData function that's already in the file
+      await fetchContractData(contract);
+
+      console.log(
+        `[DEBUG] Cache update successful for ${contract} on attempt ${attempt}`
+      );
+      return { success: true, attempt: attempt };
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `[DEBUG] Cache update attempt ${attempt}/${maxRetries} failed for ${contract}:`,
+        error.message
+      );
+
+      // If this is not the last attempt, wait before retrying
+      if (attempt < maxRetries) {
+        console.log(
+          `[DEBUG] Waiting ${retryDelay / 1000} seconds before retry ${
+            attempt + 1
+          }...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
     }
-    
-    // All attempts failed
-    console.error(`[DEBUG] All ${maxRetries} cache update attempts failed for ${contract}. Final error:`, lastError?.message);
-    return { 
-        success: false, 
-        error: lastError?.message || 'All retry attempts failed',
-        attempts: maxRetries
-    };
+  }
+
+  // All attempts failed
+  console.error(
+    `[DEBUG] All ${maxRetries} cache update attempts failed for ${contract}. Final error:`,
+    lastError?.message
+  );
+  return {
+    success: false,
+    error: lastError?.message || "All retry attempts failed",
+    attempts: maxRetries,
+  };
 }
 
 // Export the singleton interface
 module.exports = {
-    initializeGlobalContractMonitoring,
-    cleanupGlobalContractMonitoring,
-    getGlobalPeerCount,
-    getGlobalAllDevices,
-    isContractLoading,
-    isMonitoringActive,
-    searchDeviceInCache,
-    triggerCacheUpdate,
-    globalAllDevices,
-    globalPeerCounts,
-    saveContractDataToCache
+  initializeGlobalContractMonitoring,
+  cleanupGlobalContractMonitoring,
+  getGlobalPeerCount,
+  getGlobalAllDevices,
+  isContractLoading,
+  isMonitoringActive,
+  searchDeviceInCache,
+  triggerCacheUpdate,
+  globalAllDevices,
+  globalPeerCounts,
+  saveContractDataToCache,
 };

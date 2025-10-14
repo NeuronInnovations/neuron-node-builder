@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Seller Configuration Fixture</title>
+    <link rel="stylesheet" href="../harness/styles/node-editor.css" />
+  </head>
+  <body>
+    <section class="panel" id="seller-config">
+      <div class="panel-header">
+        <h2>Seller Config</h2>
+        <span class="context">Neuron ▸ Catalog ▸ Device Publisher</span>
+      </div>
+      <div class="helper-text">
+        Configure device metadata and runtime wiring for marketplace sellers.
+      </div>
+      <div class="neuron-seller-config">
+        <div class="form-row">
+          <label for="node-input-name"><span>Name</span></label>
+          <input type="text" id="node-input-name" placeholder="Node name" value="Jetvision Seller" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-smartContract"><span>Smart Contract</span></label>
+          <select id="node-input-smartContract">
+            <option value="jetvision" selected>JETVISION DEMO</option>
+            <option value="chat">P2P CHAT DEMO</option>
+            <option value="challenges">DEVELOPER OPEN CHALLENGES</option>
+          </select>
+        </div>
+
+        <div class="form-row" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 15px; margin-top: 15px;">
+          <label for="node-input-loadDevice">Reinstantiate Device</label>
+          <select id="node-input-loadDevice" style="flex: 1;">
+            <option value="">Create new device configuration</option>
+            <option value="device-a.json">device-a.json</option>
+            <option value="device-b.json">device-b.json</option>
+          </select>
+          <button type="button" id="refresh-devices-btn" class="red-ui-button" title="Refresh device list">
+            ⟳ Refresh
+          </button>
+        </div>
+
+        <div class="form-row">
+          <label for="node-input-deviceName"><span>Device Name</span></label>
+          <input type="text" id="node-input-deviceName" placeholder="Enter Device Name" value="Orbital Sensor" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-deviceRole"><span>Device Role</span></label>
+          <input type="text" id="node-input-deviceRole" placeholder="Enter Device Role" value="Publisher" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-serialNumber"><span>Serial Number</span></label>
+          <input type="text" id="node-input-serialNumber" placeholder="Enter Serial Number" value="JET-23944" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-deviceType"><span>Device Type</span></label>
+          <input type="text" id="node-input-deviceType" placeholder="Enter Device Type" value="Edge" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-price"><span>Price (USD)</span></label>
+          <input type="number" id="node-input-price" placeholder="Enter Price" min="0" step="any" value="39" />
+        </div>
+        <div class="form-row">
+          <label for="node-input-description"><span>Description</span></label>
+          <input type="text" id="node-input-description" placeholder="Description (optional)" value="Live aircraft tracking feed" />
+        </div>
+
+        <div class="form-row">
+          <div><span>Allowed buyers: Everyone</span></div>
+          <button class="red-ui-button disabled" disabled style="margin-left: auto;">Setup buyer whitelist</button>
+        </div>
+        <div class="helper-text">Click <strong>Done</strong> then <strong>Deploy</strong> to publish.</div>
+
+        <div id="no-device-message" class="runtime-banner warning">
+          <span class="icon">ℹ️</span>
+          <span>Runtime information appears after the first deployment.</span>
+        </div>
+
+        <hr class="section-divider" />
+
+        <div id="runtime-information-section" style="display: none;">
+          <h3 style="margin: 10px 0; color: var(--success);">Runtime Information</h3>
+          <div class="form-row">
+            <label for="node-input-evmAddress"><span>EVM Address</span></label>
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+              <input type="text" id="node-input-evmAddress" placeholder="EVM address" readonly />
+              <button type="button" id="copy-evm-address-btn" class="red-ui-button" style="padding: 8px 12px;">Copy</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="node-input-balance"><span>Balance</span></label>
+            <input type="text" id="node-input-balance" placeholder="Account balance" readonly />
+            <small><a href="https://portal.hedera.com/faucet" target="_blank" style="color: var(--accent); text-decoration: underline;">Top up account</a></small>
+          </div>
+          <div class="form-row">
+            <label for="node-input-publicKey"><span>Public Key</span></label>
+            <input type="text" id="node-input-publicKey" class="code-text" placeholder="Public key" readonly />
+          </div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label for="node-input-stdInTopic"><span>StdIn Topic</span></label>
+              <input type="text" id="node-input-stdInTopic" class="code-text" placeholder="StdIn topic" readonly />
+            </div>
+            <div class="form-row">
+              <label for="node-input-stdOutTopic"><span>StdOut Topic</span></label>
+              <input type="text" id="node-input-stdOutTopic" class="code-text" placeholder="StdOut topic" readonly />
+            </div>
+            <div class="form-row">
+              <label for="node-input-stdErrTopic"><span>StdErr Topic</span></label>
+              <input type="text" id="node-input-stdErrTopic" class="code-text" placeholder="StdErr topic" readonly />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div id="connected-peers-container" style="width: 100%;">
+              <div class="inline-actions">
+                <span id="peers-summary" style="display: none;"></span>
+                <button type="button" id="refresh-connections-btn" class="red-ui-button">Refresh</button>
+              </div>
+              <div id="peers-loading" style="text-align: center; padding: 20px; display: none;">
+                <span class="badge warning">Loading connection status…</span>
+              </div>
+              <div id="peers-list" class="table-card" style="margin-top: 12px;">
+                <table id="peers-table" style="display: none;">
+                  <thead>
+                    <tr>
+                      <th>EVM Address</th>
+                      <th style="text-align: center;">Status</th>
+                      <th style="text-align: center;">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="peers-table-body"></tbody>
+                </table>
+                <div id="no-peers-message" style="padding: 24px; text-align: center; color: var(--text-muted); font-style: italic;">
+                  No peers connected
+                </div>
+              </div>
+              <div id="last-update-info" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                Last updated: <span id="last-update-time">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      function $(selector) {
+        return document.querySelector(selector);
+      }
+
+      function setText(selector, value) {
+        const el = $(selector);
+        if (el) {
+          el.value = value;
+        }
+      }
+
+      window.renderSellerInitialState = function renderSellerInitialState() {
+        $('#runtime-information-section').style.display = 'none';
+        $('#no-device-message').style.display = 'flex';
+        $('#peers-summary').style.display = 'none';
+        $('#peers-table').style.display = 'none';
+        $('#no-peers-message').style.display = 'block';
+        $('#last-update-time').textContent = '-';
+      };
+
+      window.renderSellerRuntimeState = function renderSellerRuntimeState() {
+        $('#no-device-message').style.display = 'none';
+        $('#runtime-information-section').style.display = 'block';
+        setText('#node-input-evmAddress', '0.0.482193@hedera');
+        setText('#node-input-balance', '132.442 ℏ');
+        setText('#node-input-publicKey', '302e020100300506032b657004220420b1938e6');
+        setText('#node-input-stdInTopic', '0.0.123456-stdin');
+        setText('#node-input-stdOutTopic', '0.0.123456-stdout');
+        setText('#node-input-stdErrTopic', '0.0.123456-stderr');
+      };
+
+      window.renderSellerPeersState = function renderSellerPeersState(peers) {
+        const peersSummary = $('#peers-summary');
+        const table = $('#peers-table');
+        const tbody = $('#peers-table-body');
+        const empty = $('#no-peers-message');
+
+        tbody.innerHTML = '';
+
+        if (!peers || peers.length === 0) {
+          peersSummary.style.display = 'none';
+          table.style.display = 'none';
+          empty.style.display = 'block';
+          $('#last-update-time').textContent = '-';
+          return;
+        }
+
+        peersSummary.style.display = 'inline-flex';
+        peersSummary.textContent = `${peers.filter((p) => p.status === 'Connected').length} connected, ${peers.length} total peers`;
+        table.style.display = 'table';
+        empty.style.display = 'none';
+
+        peers.forEach((peer) => {
+          const row = document.createElement('tr');
+          const addr = document.createElement('td');
+          addr.innerHTML = `<span class="code-text">${peer.address}</span>`;
+          const status = document.createElement('td');
+          status.style.textAlign = 'center';
+          status.innerHTML = `<span class="badge ${peer.status === 'Connected' ? 'success' : 'warning'}">${peer.status}</span>`;
+          const lastSeen = document.createElement('td');
+          lastSeen.style.textAlign = 'center';
+          lastSeen.textContent = peer.lastSeen;
+          row.appendChild(addr);
+          row.appendChild(status);
+          row.appendChild(lastSeen);
+          tbody.appendChild(row);
+        });
+
+        $('#last-update-time').textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      };
+
+      window.renderSellerInitialState();
+    </script>
+  </body>
+</html>
