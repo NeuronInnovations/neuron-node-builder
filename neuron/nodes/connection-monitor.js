@@ -13,7 +13,7 @@ class ConnectionMonitor {
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 5000; // 5 seconds
         this.pollingInterval = null;
-        this.pollingFrequency = 5000; // 5 seconds
+        this.pollingFrequency = 15000; // 15 seconds (reduced from 5 seconds)
         this.statusCallbacks = new Set();
         this.isPolling = false;
     }
@@ -103,6 +103,12 @@ class ConnectionMonitor {
 
         if (this.isPolling) {
             //console.log(`ConnectionMonitor [${this.nodeId}]: Polling already in progress, skipping`);
+            return false;
+        }
+
+        // Add backoff if we've had too many consecutive failures
+        if (this.reconnectAttempts >= 3) {
+            console.warn(`ConnectionMonitor [${this.nodeId}]: Too many connection failures, reducing polling frequency`);
             return false;
         }
 

@@ -19,8 +19,8 @@ function startExponentialBalanceCheck({
   onLowBalance,
   onZeroBalance,
   onError,
-  initialDelayMs = 5000,
-  maxDelayMs = 5 * 60 * 1000
+  initialDelayMs = 30000, // 30 seconds (increased from 5 seconds)
+  maxDelayMs = 10 * 60 * 1000 // 10 minutes (increased from 5 minutes)
 }) {
   let balanceCheckTimeout = null;
   let delay = initialDelayMs;

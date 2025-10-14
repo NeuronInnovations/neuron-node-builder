@@ -30,7 +30,7 @@ class ProcessManager {
     constructor() {
         this.registry = new ProcessRegistry();
         this.portManager = new PortManager();
-        this.healthCheckInterval = 30000; // 30 seconds
+        this.healthCheckInterval = 60000; // 60 seconds (reduced from 30 seconds)
         this.healthMonitors = new Map(); // nodeId -> interval
         this.activeProcesses = new Map(); // nodeId -> process object
         
@@ -729,11 +729,23 @@ class ProcessManager {
     startHealthMonitoring(nodeId, goProcess) {
         this.stopHealthMonitoring(nodeId); // Clear any existing monitor
         
+        let consecutiveFailures = 0;
+        const maxConsecutiveFailures = 5; // Stop monitoring after 5 consecutive failures
+        
         const monitor = setInterval(() => {
             if (!this.isProcessAlive(goProcess.pid)) {
-                console.warn(`Health check failed: Process ${goProcess.pid} for node ${nodeId} is not running`);
+                consecutiveFailures++;
+                console.warn(`Health check failed: Process ${goProcess.pid} for node ${nodeId} is not running (failure ${consecutiveFailures}/${maxConsecutiveFailures})`);
+                
+                if (consecutiveFailures >= maxConsecutiveFailures) {
+                    console.warn(`Stopping health monitoring for node ${nodeId} due to consecutive failures`);
+                    this.stopHealthMonitoring(nodeId);
+                    return;
+                }
+                
                 this.handleProcessExit(nodeId, null, 'health-check-failed');
             } else {
+                consecutiveFailures = 0; // Reset failure count on success
                 // Update registry with last seen
                 this.registry.updateProcessStatus(nodeId, 'running');
             }
