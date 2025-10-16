@@ -577,6 +577,30 @@ module.exports = function (RED) {
                 await updateSelectedBuyers(node, initialBuyerEvmAddresses, true);
                 //console.log(`Node ${node.id}: Starting Go process via ProcessManager.`);
 
+                // Store connection status and balance status for combined display
+                let connectionStatus = { text: "Connecting...", fill: "yellow", shape: "ring" };
+                let balanceStatus = null;
+
+                // Helper function to update combined status
+                const updateCombinedStatus = () => {
+                    let statusText = connectionStatus.text;
+                    let statusFill = connectionStatus.fill;
+                    let statusShape = connectionStatus.shape;
+
+                    // Append balance info if available
+                    if (balanceStatus) {
+                        statusText += ` | ${balanceStatus.text}`;
+                        // Use the more critical status color (red > yellow > green)
+                        if (balanceStatus.fill === "red" || statusFill === "red") {
+                            statusFill = "red";
+                        } else if (balanceStatus.fill === "yellow" || statusFill === "yellow") {
+                            statusFill = "yellow";
+                        }
+                    }
+
+                    node.status({ fill: statusFill, shape: statusShape, text: statusText });
+                };
+
                 try {
                     node.status({ fill: "blue", shape: "dot", text: "Starting process..." });
                     node.goProcess = await processManager.ensureProcess(node, node.deviceInfo, 'seller');
@@ -591,13 +615,14 @@ module.exports = function (RED) {
                             if (status.isConnected) {
                                 const peerText = ` (${status.connectedPeers}/${status.totalPeers} peers)`;
                                 if (status.totalPeers > 0 && status.connectedPeers > 0) {
-                                    node.status({ fill: "green", shape: "dot", text: `Connected${peerText}` });
+                                    connectionStatus = { text: `Connected${peerText}`, fill: "green", shape: "dot" };
                                 } else {
-                                    node.status({ fill: "yellow", shape: "ring", text: "Connected - no peers" });
+                                    connectionStatus = { text: "Connected - no peers", fill: "yellow", shape: "ring" };
                                 }
                             } else {
-                                node.status({ fill: "yellow", shape: "ring", text: "Connecting..." });
+                                connectionStatus = { text: "Connecting...", fill: "yellow", shape: "ring" };
                             }
+                            updateCombinedStatus();
                         });
 
                         console.log(`Connection monitoring initialized for seller node ${node.id}`);
@@ -610,13 +635,22 @@ module.exports = function (RED) {
                     node.error(`Go process startup failed: ${error.message}`);
                     node.status({ fill: "red", shape: "ring", text: "Process failed" });
                 }
-                       cleanupBalanceCheck = startExponentialBalanceCheck({
+                cleanupBalanceCheck = startExponentialBalanceCheck({
                     node,
                     hederaService,
                     getAccountId: () => node.deviceInfo && node.deviceInfo.accountId,
-                    onLowBalance: (balanceHbars) => node.status({ fill: "yellow", shape: "ring", text: `Low balance: ${balanceHbars} HBAR` }),
-                    onZeroBalance: (balanceHbars) => node.status({ fill: "red", shape: "ring", text: `Balance: ${balanceHbars} HBAR` }),
-                    onError: () => node.status({ fill: "red", shape: "ring", text: "Balance check failed" }),
+                    onLowBalance: (balanceHbars) => {
+                        balanceStatus = { text: `Balance: ${balanceHbars} HBAR`, fill: "yellow" };
+                        updateCombinedStatus();
+                    },
+                    onZeroBalance: (balanceHbars) => {
+                        balanceStatus = { text: `Balance: ${balanceHbars} HBAR`, fill: "red" };
+                        updateCombinedStatus();
+                    },
+                    onError: () => {
+                        balanceStatus = { text: "Balance check failed", fill: "red" };
+                        updateCombinedStatus();
+                    },
                     initialDelayMs: 5000,
                     maxDelayMs: 5 * 60 * 1000
                 });
@@ -1220,34 +1254,251 @@ module.exports = function (RED) {
         }
     });
 
+    // Heartbeat endpoint - Get last recorded heartbeat from stdout topic
+    RED.httpAdmin.get('/seller/heartbeat/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let sellerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!sellerNode) {
+                const instanceId = sellerTemplateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    sellerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!sellerNode || sellerNode.type !== 'seller config') {
+                return res.status(404).json({ 
+                    error: 'Seller node not found'
+                });
+            }
+
+            if (!sellerNode.deviceInfo || !sellerNode.deviceInfo.topics || !sellerNode.deviceInfo.topics[1]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdout topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdout topic (deviceInfo.topics[1])
+            const stdoutTopic = sellerNode.deviceInfo.topics[1];
+            
+            // Fetch the latest message from stdout topic
+            const messages = await hederaService.getTopicMessages(stdoutTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastHeartbeatTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last heartbeat
+                const now = Date.now();
+                const millisecondsAgo = now - lastHeartbeatTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                // Extract natReachability from heartbeat message
+                let natReachability = null;
+                try {
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        const parsedMessage = JSON.parse(messageContent);
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[SELLER HEARTBEAT] Found natReachability:', natReachability);
+                        }
+                    }
+                } catch (parseError) {
+                    console.log('[SELLER HEARTBEAT] Could not parse message:', parseError.message);
+                }
+                
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString(),
+                        natReachability: natReachability
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastHeartbeatTime: null,
+                        natReachability: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting heartbeat for seller node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get heartbeat: ' + error.message 
+            });
+        }
+    });
+
+    // Shared accounts endpoint - Get shared accounts from stdin topic messages
+    RED.httpAdmin.get('/seller/shared-accounts/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let sellerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!sellerNode) {
+                const instanceId = sellerTemplateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    sellerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!sellerNode || sellerNode.type !== 'seller config') {
+                return res.status(404).json({ 
+                    error: 'Seller node not found'
+                });
+            }
+
+            if (!sellerNode.deviceInfo || !sellerNode.deviceInfo.topics || !sellerNode.deviceInfo.topics[0]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdin topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdin topic (deviceInfo.topics[0])
+            const stdinTopic = sellerNode.deviceInfo.topics[0];
+            
+            // Fetch recent messages from stdin topic (get more to find all peers)
+            const messages = await hederaService.getTopicMessages(stdinTopic, 1, 100, "desc");
+            
+            // Build a map of buyer EVM address -> shared account
+            const sharedAccounts = {};
+            
+            if (messages && messages.length > 0) {
+                for (const message of messages) {
+                    try {
+                        const messageContent = message.message;
+                        if (messageContent) {
+                            const parsedMessage = JSON.parse(messageContent);
+                            
+                            // Check if this is a serviceRequest message with 'e' and 'a' fields
+                            if (parsedMessage.messageType === 'serviceRequest' && 
+                                parsedMessage.e && 
+                                parsedMessage.a) {
+                                // Normalize EVM address to lowercase without 0x prefix for case-insensitive comparison
+                                const buyerEvmAddress = parsedMessage.e.toLowerCase().replace(/^0x/, '');
+                                const sharedAccount = parsedMessage.a;
+                                
+                                // Store the mapping (use the most recent one for each buyer)
+                                if (!sharedAccounts[buyerEvmAddress]) {
+                                    sharedAccounts[buyerEvmAddress] = sharedAccount;
+                                    console.log(`[SELLER SHARED ACCOUNTS] Found shared account for buyer ${buyerEvmAddress}: ${sharedAccount}`);
+                                }
+                            }
+                        }
+                    } catch (parseError) {
+                        // Skip messages that can't be parsed
+                        continue;
+                    }
+                }
+            }
+            
+            res.json({
+                success: true,
+                sharedAccounts: sharedAccounts
+            });
+            
+        } catch (error) {
+            console.error(`Error getting shared accounts for seller node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get shared accounts: ' + error.message 
+            });
+        }
+    });
+
+    // Helper function to format last seen time
+    function formatLastSeen(seconds) {
+        if (seconds === null || seconds === undefined) return 'Never';
+        
+        // Handle negative values (future timestamps - shouldn't happen but just in case)
+        if (seconds < 0) return 'Just now';
+        
+        if (seconds < 60) {
+            return `${seconds}s ago`;
+        } else if (seconds < 3600) {
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}m ago`;
+        } else if (seconds < 86400) {
+            const hours = Math.floor(seconds / 3600);
+            return `${hours}h ago`;
+        } else {
+            const days = Math.floor(seconds / 86400);
+            return `${days}d ago`;
+        }
+    }
+
     // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
     
     // Import deviceManager for new endpoints
     const deviceManager = require('../lib/deviceManager');
 
-    // Endpoint for Seller Device List - Get eligible seller devices for reinstatement
+    // Endpoint for Seller Device List - Get all seller devices with status information
     RED.httpAdmin.get('/seller/devices/eligible', function (req, res) {
         try {
-            // Get currently active node IDs to exclude from the list
+            // Get currently active node IDs and their names
             const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            const activeNodeInfo = {};
             
-            // Get eligible seller devices
-            const eligibleDevices = deviceManager.listEligibleDevices('seller', activeNodeIds);
+            // Get node names for active nodes
+            RED.nodes.eachNode((node) => {
+                if (node.type === 'buyer config' || node.type === 'seller config' || 
+                    node.type === 'buyer' || node.type === 'seller') {
+                    activeNodeInfo[node.id] = node.name || node.type;
+                }
+            });
             
-            console.log(`[SELLER DEVICES] Found ${eligibleDevices.length} eligible seller devices (excluding ${activeNodeIds.length} active nodes)`);
+            // Get all seller devices (not just eligible ones)
+            const allSellerDevices = deviceManager.listAllDevicesWithStatus('seller', activeNodeIds, activeNodeInfo);
+            
+            console.log(`[SELLER DEVICES] Found ${allSellerDevices.length} seller devices (${allSellerDevices.filter(d => d.available).length} available, ${allSellerDevices.filter(d => !d.available).length} in use)`);
             
             res.json({
                 success: true,
-                devices: eligibleDevices,
+                devices: allSellerDevices,
                 activeNodeIds: activeNodeIds,
-                count: eligibleDevices.length
+                count: allSellerDevices.length,
+                availableCount: allSellerDevices.filter(d => d.available).length
             });
             
         } catch (error) {
-            console.error('[SELLER DEVICES] Error fetching eligible seller devices:', error);
+            console.error('[SELLER DEVICES] Error fetching seller devices:', error);
             res.status(500).json({
                 success: false,
-                error: `Failed to fetch eligible seller devices: ${error.message}`
+                error: `Failed to fetch seller devices: ${error.message}`
             });
         }
     });

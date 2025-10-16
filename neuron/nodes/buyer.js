@@ -366,7 +366,10 @@ module.exports = function (RED) {
 
             if (loadedDeviceInfo) {
                 // Update configuration fields while preserving existing Hedera account data
-                loadedDeviceInfo.sellerEvmAddress = config.sellerEvmAddress;
+                // Only update sellerEvmAddress if config has a value, otherwise preserve loaded value
+                if (config.sellerEvmAddress && config.sellerEvmAddress !== '[]' && config.sellerEvmAddress !== '') {
+                    loadedDeviceInfo.sellerEvmAddress = config.sellerEvmAddress;
+                }
                 loadedDeviceInfo.description = config.description;
                 loadedDeviceInfo.deviceName = config.deviceName;
                 loadedDeviceInfo.deviceRole = config.deviceRole;
@@ -605,8 +608,8 @@ module.exports = function (RED) {
                 const initialSellerEvmAddresses = safeParseSellerAddresses(config.sellerEvmAddress);
                 
                 if (initialSellerEvmAddresses.length === 0) {
-                    node.warn("No seller addresses configured for initialization");
-                    node.status({ fill: "yellow", shape: "ring", text: "No sellers configured" });
+                    console.log(`Node ${node.id}: No seller addresses configured - this is normal for a new buyer node`);
+                    node.status({ fill: "blue", shape: "dot", text: "Ready - no sellers configured" });
                 } else {
                     await updateSelectedSellers(node, initialSellerEvmAddresses, true);
                     console.log(`Node ${node.id}: Initialized with ${initialSellerEvmAddresses.length} seller address(es)`);
@@ -1407,6 +1410,163 @@ module.exports = function (RED) {
         }
     });
 
+    // Shared account endpoint - Get shared account for a specific seller
+    RED.httpAdmin.get('/buyer/shared-account/:nodeId/:sellerEvmAddress', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        const sellerEvmAddress = req.params.sellerEvmAddress;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.evmAddress) {
+                return res.status(400).json({ 
+                    error: 'Buyer node not initialized - no EVM address available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            const buyerEvmAddress = buyerNode.deviceInfo.evmAddress;
+            console.log(`[BUYER SHARED ACCOUNT] Looking for shared account with seller ${sellerEvmAddress}, buyer EVM: ${buyerEvmAddress}`);
+
+            // Get smart contract EVM directly from device info
+            const contractEVM = buyerNode.deviceInfo.smartContract;
+            if (!contractEVM) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Smart contract EVM not found in device info'
+                });
+            }
+            
+            console.log(`[BUYER SHARED ACCOUNT] Using contract EVM: ${contractEVM}`);
+
+            // Import and create contract service instance
+            const { HederaContractService } = require('neuron-js-registration-sdk');
+            const contractService = new HederaContractService({
+                network: process.env.HEDERA_NETWORK || 'testnet',
+                operatorId: process.env.HEDERA_OPERATOR_ID,
+                operatorKey: process.env.HEDERA_OPERATOR_KEY,
+                contractEVM
+            });
+
+            // Get seller's device info from smart contract
+            const sellerDevices = await contractService.getDevicesByOwner(contractEVM, sellerEvmAddress);
+            
+            console.log(`[BUYER SHARED ACCOUNT] getDevicesByOwner result:`, {
+                sellerEvmAddress,
+                contractEVM,
+                devicesFound: sellerDevices ? sellerDevices.length : 0,
+                devices: sellerDevices
+            });
+            
+            if (!sellerDevices || sellerDevices.length === 0) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Seller device not found in smart contract'
+                });
+            }
+
+            // Get the first (should be only) seller device
+            const sellerDevice = sellerDevices[0];
+            
+            console.log(`[BUYER SHARED ACCOUNT] Seller device structure:`, {
+                hasTopics: !!sellerDevice.topics,
+                topicsLength: sellerDevice.topics ? sellerDevice.topics.length : 0,
+                topics: sellerDevice.topics,
+                stdInTopic: sellerDevice.stdInTopic,
+                fullDevice: sellerDevice
+            });
+            
+            // Use stdInTopic directly from the device structure
+            const sellerStdinTopic = sellerDevice.stdInTopic;
+            
+            if (!sellerStdinTopic) {
+                return res.json({
+                    success: true,
+                    sharedAccount: null,
+                    message: 'Seller device has no stdin topic'
+                });
+            }
+
+            console.log(`[BUYER SHARED ACCOUNT] Seller stdin topic: ${sellerStdinTopic}`);
+
+            // Fetch recent messages from seller's stdin topic
+            const messages = await hederaService.getTopicMessages(sellerStdinTopic, 1, 50, "desc");
+            
+            if (messages && messages.length > 0) {
+                // Look for serviceRequest messages where 'e' matches buyer's EVM address
+                const normalizedBuyerEvm = buyerEvmAddress.toLowerCase().replace(/^0x/, '');
+                
+                for (const message of messages) {
+                    try {
+                        const messageContent = message.message;
+                        if (messageContent) {
+                            const parsedMessage = JSON.parse(messageContent);
+                            
+                            // Check if this is a serviceRequest message
+                            if (parsedMessage.messageType === 'serviceRequest' && 
+                                parsedMessage.e && 
+                                parsedMessage.a) {
+                                // Normalize the 'e' field for comparison
+                                const normalizedMessageEvm = parsedMessage.e.toLowerCase().replace(/^0x/, '');
+                                
+                                // Check if this message is for this buyer
+                                if (normalizedMessageEvm === normalizedBuyerEvm) {
+                                    const sharedAccount = parsedMessage.a;
+                                    console.log(`[BUYER SHARED ACCOUNT] Found shared account: ${sharedAccount} for seller ${sellerEvmAddress}`);
+                                    
+                                    return res.json({
+                                        success: true,
+                                        sharedAccount: sharedAccount
+                                    });
+                                }
+                            }
+                        }
+                    } catch (parseError) {
+                        // Skip messages that can't be parsed
+                        continue;
+                    }
+                }
+            }
+
+            // No matching message found
+            console.log(`[BUYER SHARED ACCOUNT] No serviceRequest found for buyer ${buyerEvmAddress} in seller ${sellerEvmAddress}'s stdin`);
+            res.json({
+                success: true,
+                sharedAccount: null,
+                message: 'No matching serviceRequest message found'
+            });
+            
+        } catch (error) {
+            console.error(`Error getting shared account for seller ${sellerEvmAddress}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get shared account: ' + error.message 
+            });
+        }
+    });
+
     // Helper function to format last seen time
     function formatLastSeen(seconds) {
         if (seconds === null || seconds === undefined) return 'Never';
@@ -1495,34 +1655,301 @@ module.exports = function (RED) {
         }
     });
 
+    // Heartbeat endpoint - Get last recorded heartbeat from stdout topic
+    RED.httpAdmin.get('/buyer/heartbeat/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.topics || !buyerNode.deviceInfo.topics[1]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdout topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdout topic (deviceInfo.topics[1])
+            const stdoutTopic = buyerNode.deviceInfo.topics[1];
+            
+            // Fetch the latest message from stdout topic
+            const messages = await hederaService.getTopicMessages(stdoutTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastHeartbeatTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last heartbeat
+                const now = Date.now();
+                const millisecondsAgo = now - lastHeartbeatTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                // Extract natReachability from heartbeat message
+                let natReachability = null;
+                try {
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        const parsedMessage = JSON.parse(messageContent);
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[BUYER HEARTBEAT] Found natReachability:', natReachability);
+                        }
+                    }
+                } catch (parseError) {
+                    console.log('[BUYER HEARTBEAT] Could not parse message:', parseError.message);
+                }
+                
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastHeartbeatTime: new Date(lastHeartbeatTime).toISOString(),
+                        natReachability: natReachability
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    heartbeat: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastHeartbeatTime: null,
+                        natReachability: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting heartbeat for buyer node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get heartbeat: ' + error.message 
+            });
+        }
+    });
+
+    // Reachability endpoint - Get last received message from stdin topic
+    RED.httpAdmin.get('/buyer/reachability/:nodeId', async function (req, res) {
+        const nodeId = req.params.nodeId;
+        
+        try {
+            let buyerNode = RED.nodes.getNode(nodeId);
+            let actualNodeId = nodeId;
+            
+            // If not found directly, check if this is a template ID that maps to an instance
+            if (!buyerNode) {
+                const instanceId = templateToInstanceMap.get(nodeId);
+                if (instanceId) {
+                    buyerNode = RED.nodes.getNode(instanceId);
+                    actualNodeId = instanceId;
+                }
+            }
+            
+            if (!buyerNode || buyerNode.type !== 'buyer config') {
+                return res.status(404).json({ 
+                    error: 'Buyer node not found'
+                });
+            }
+
+            if (!buyerNode.deviceInfo || !buyerNode.deviceInfo.topics || !buyerNode.deviceInfo.topics[0]) {
+                return res.status(400).json({ 
+                    error: 'Node not initialized - no stdin topic available'
+                });
+            }
+
+            if (!hederaService) {
+                return res.status(500).json({ 
+                    error: 'Hedera service not initialized' 
+                });
+            }
+
+            // Get the stdin topic (deviceInfo.topics[0])
+            const stdinTopic = buyerNode.deviceInfo.topics[0];
+            
+            // Fetch the latest message from stdin topic
+            const messages = await hederaService.getTopicMessages(stdinTopic, 1, 1, "desc");
+            
+            if (messages && messages.length > 0) {
+                const lastMessage = messages[0];
+                
+                // Debug logging to understand message structure
+                console.log('[BUYER REACHABILITY] Raw message structure:', {
+                    sequenceNumber: lastMessage.sequenceNumber,
+                    timestamp: lastMessage.timestamp,
+                    messageLength: lastMessage.message ? lastMessage.message.length : 0,
+                    messagePreview: lastMessage.message ? lastMessage.message.substring(0, 100) : 'No message'
+                });
+                
+                // Extract timestamp from the message
+                const timestampString = lastMessage.timestamp;
+                const timestampSeconds = parseFloat(timestampString);
+                const lastMessageTime = timestampSeconds * 1000; // Convert to milliseconds
+                
+                // Calculate time since last message
+                const now = Date.now();
+                const millisecondsAgo = now - lastMessageTime;
+                const secondsAgo = Math.floor(millisecondsAgo / 1000);
+                
+                // Extract messageType and natReachability from the message
+                let messageType = 'Unknown';
+                let natReachability = null;
+                try {
+                    // The message content is base64 encoded, decode it first
+                    const messageContent = lastMessage.message;
+                    if (messageContent) {
+                        // Try to parse the message content as JSON
+                        const parsedMessage = JSON.parse(messageContent);
+                        
+                        // Debug logging for parsed message
+                        console.log('[BUYER REACHABILITY] Parsed message:', {
+                            keys: Object.keys(parsedMessage),
+                            messageType: parsedMessage.messageType,
+                            type: parsedMessage.type,
+                            topic: parsedMessage.topic,
+                            natReachability: parsedMessage.natReachability,
+                            payload: parsedMessage.payload,
+                            fullMessage: parsedMessage
+                        });
+                        
+                        // Extract natReachability from various possible locations
+                        if (parsedMessage.natReachability !== undefined && parsedMessage.natReachability !== null) {
+                            natReachability = parsedMessage.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability at root level:', natReachability);
+                        } else if (parsedMessage.payload && parsedMessage.payload.natReachability !== undefined && parsedMessage.payload.natReachability !== null) {
+                            // Check if natReachability is in payload
+                            natReachability = parsedMessage.payload.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability in payload:', natReachability);
+                        } else if (parsedMessage.data && parsedMessage.data.natReachability !== undefined && parsedMessage.data.natReachability !== null) {
+                            // Check if natReachability is in data
+                            natReachability = parsedMessage.data.natReachability;
+                            console.log('[BUYER REACHABILITY] Found natReachability in data:', natReachability);
+                        } else {
+                            console.log('[BUYER REACHABILITY] natReachability not found in message');
+                        }
+                        
+                        // Look for messageType in various possible locations
+                        if (parsedMessage.messageType) {
+                            messageType = parsedMessage.messageType;
+                        } else if (parsedMessage.type) {
+                            messageType = parsedMessage.type;
+                        } else if (parsedMessage.payload && typeof parsedMessage.payload === 'object') {
+                            // Check if payload contains messageType
+                            if (parsedMessage.payload.messageType) {
+                                messageType = parsedMessage.payload.messageType;
+                            } else if (parsedMessage.payload.type) {
+                                messageType = parsedMessage.payload.type;
+                            }
+                        } else if (parsedMessage.topic) {
+                            // If it's a topic-based message, use the topic as messageType
+                            messageType = parsedMessage.topic;
+                        } else if (typeof parsedMessage.payload === 'string') {
+                            // If payload is a string, it might be the message type
+                            messageType = parsedMessage.payload;
+                        }
+                    }
+                } catch (parseError) {
+                    // If JSON parsing fails, try to extract from raw message
+                    console.log('[BUYER REACHABILITY] Could not parse message as JSON:', parseError.message);
+                    messageType = 'Raw Message';
+                }
+                
+                res.json({
+                    success: true,
+                    reachability: {
+                        lastSeen: secondsAgo,
+                        lastSeenFormatted: formatLastSeen(secondsAgo),
+                        timestamp: timestampString,
+                        lastMessageTime: new Date(lastMessageTime).toISOString(),
+                        messageType: messageType,
+                        natReachability: natReachability
+                    }
+                });
+            } else {
+                res.json({
+                    success: true,
+                    reachability: {
+                        lastSeen: null,
+                        lastSeenFormatted: 'Never',
+                        timestamp: null,
+                        lastMessageTime: null,
+                        messageType: null
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error(`Error getting reachability for buyer node ${nodeId}:`, error);
+            res.status(500).json({ 
+                error: 'Failed to get reachability: ' + error.message 
+            });
+        }
+    });
+
     // ===== NEW DEVICE MANAGEMENT ENDPOINTS =====
     
     // Import deviceManager for new endpoints
     const deviceManager = require('../lib/deviceManager');
 
-    // Endpoint for Buyer Device List - Get eligible buyer devices for reinstatement
+    // Endpoint for Buyer Device List - Get all buyer devices with status information
     RED.httpAdmin.get('/buyer/devices/eligible', function (req, res) {
         try {
-            // Get currently active node IDs to exclude from the list
+            // Get currently active node IDs and their names
             const activeNodeIds = deviceManager.getActiveNodeIds(RED);
+            const activeNodeInfo = {};
             
-            // Get eligible buyer devices
-            const eligibleDevices = deviceManager.listEligibleDevices('buyer', activeNodeIds);
+            // Get node names for active nodes
+            RED.nodes.eachNode((node) => {
+                if (node.type === 'buyer config' || node.type === 'seller config' || 
+                    node.type === 'buyer' || node.type === 'seller') {
+                    activeNodeInfo[node.id] = node.name || node.type;
+                }
+            });
             
-            console.log(`[BUYER DEVICES] Found ${eligibleDevices.length} eligible buyer devices (excluding ${activeNodeIds.length} active nodes)`);
+            // Get all buyer devices (not just eligible ones)
+            const allBuyerDevices = deviceManager.listAllDevicesWithStatus('buyer', activeNodeIds, activeNodeInfo);
+            
+            console.log(`[BUYER DEVICES] Found ${allBuyerDevices.length} buyer devices (${allBuyerDevices.filter(d => d.available).length} available, ${allBuyerDevices.filter(d => !d.available).length} in use)`);
             
             res.json({
                 success: true,
-                devices: eligibleDevices,
+                devices: allBuyerDevices,
                 activeNodeIds: activeNodeIds,
-                count: eligibleDevices.length
+                count: allBuyerDevices.length,
+                availableCount: allBuyerDevices.filter(d => d.available).length
             });
             
         } catch (error) {
-            console.error('[BUYER DEVICES] Error fetching eligible buyer devices:', error);
+            console.error('[BUYER DEVICES] Error fetching buyer devices:', error);
             res.status(500).json({
                 success: false,
-                error: `Failed to fetch eligible buyer devices: ${error.message}`
+                error: `Failed to fetch buyer devices: ${error.message}`
             });
         }
     });

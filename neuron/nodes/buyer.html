@@ -1,4 +1,26 @@
 <script type="text/html" data-template-name="buyer config">
+
+<style>
+.device-available {
+    color: #4CAF50 !important;
+    font-weight: bold;
+}
+
+.device-in-use {
+    color: #f44336 !important;
+    font-style: italic;
+}
+
+#node-input-loadDevice option:disabled {
+    color: #999 !important;
+    background-color: #f5f5f5 !important;
+}
+
+#node-input-loadDevice option:disabled:hover {
+    background-color: #f5f5f5 !important;
+}
+</style>
+
 <div class="neuron-buyer-config">
 
     <div class="form-row">
@@ -16,11 +38,7 @@
 
         </select>
     </div>
-    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;"> </div>
-    <div style="margin-top: 5px; font-size: 12px; color: #888;">
-        <i>Select an existing device to reinstantiate its configuration</i>
-    </div>
-    <div class="form-row">
+    <div class="form-row" id="device-reinstatement-section" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px; display: none;">
         <label for="node-input-loadDevice">Reinstantiate Device</span></label>
          <select id="node-input-loadDevice" style="width: 70%;">
             <option value="">Create new device configuration</option>
@@ -28,8 +46,11 @@
         <button type="button" id="refresh-devices-btn" class="red-ui-button" title="Refresh device list">
             <i class="fa fa-refresh"></i>
         </button>
-
-</div>
+        <div style="margin-top: 5px; font-size: 12px; color: #888;">
+            <i>Select an existing device to reinstantiate its configuration</i>
+        </div>
+        <input type="hidden" id="node-input-originalDeviceFilename" />
+    </div>
 
     <!-- Device Reinstatement Section -->
     
@@ -58,6 +79,7 @@
                     <thead>
                         <tr style="background-color: #2d2d2d; color: white;">
                             <th style="padding: 8px; border: 1px solid #555; text-align: left;">EVM Address</th>
+                            <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 120px;">Shared Account</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 100px;">Status</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 100px;">Last Seen</th>
                             <th style="padding: 8px; border: 1px solid #555; text-align: center; width: 60px;">Actions</th>
@@ -136,6 +158,22 @@
         <div class="form-row">
             <label for="node-input-stdErrTopic"><span>StdErr Topic</span></label>
             <input type="text" id="node-input-stdErrTopic" placeholder="StdErr topic will appear here after initialization" readonly>
+        </div>
+
+        <div class="form-row">
+            <label for="node-input-heartbeat"><span>Reachability</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Reachability will appear here after initialization" readonly>
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+
+        <div class="form-row">
+            <label for="node-input-reachability"><span>STDIN</span></label>
+            <input type="text" id="node-input-reachability" placeholder="Last received message will appear here after initialization" readonly>
+            <button type="button" id="refresh-reachability-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh STDIN">
+                <i class="fa fa-refresh"></i>
+            </button>
         </div>
     </div>
 
@@ -230,8 +268,13 @@
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
             stdErrTopic: { value: "" },
+            // Heartbeat field
+            heartbeat: { value: "" },
+            // Reachability field
+            reachability: { value: "" },
             // Device reinstatement field
-            loadedDeviceFilename: { value: "" }
+            loadedDeviceFilename: { value: "" },
+            originalDeviceFilename: { value: "" }
         },
         inputs: 0,
         outputs: 1,
@@ -255,6 +298,13 @@
             if (loadedFilename && loadedFilename.trim() !== '') {
                 node.loadedDeviceFilename = loadedFilename;
                 console.log(`[BUYER INIT] Restored loaded device filename: ${node.loadedDeviceFilename}`);
+            }
+            
+            // Initialize originalDeviceFilename from hidden field if it exists
+            const originalFilename = $('#node-input-originalDeviceFilename').val();
+            if (originalFilename && originalFilename.trim() !== '') {
+                node.originalDeviceFilename = originalFilename;
+                console.log(`[BUYER INIT] Restored original device filename: ${node.originalDeviceFilename}`);
             }
 
             // Function to make configuration fields readonly after deployment
@@ -297,7 +347,10 @@
                                 }
                             });
                             
-                            console.log(`[BUYER READONLY] Made configuration fields readonly for deployed node: ${node.id}`);
+                            // Hide device configuration dropdown for deployed nodes
+                            $('#device-reinstatement-section').hide();
+                            
+                            console.log(`[BUYER READONLY] Made configuration fields readonly and hid device dropdown for deployed node: ${node.id}`);
                         } else {
                             // Node not deployed, ensure fields are editable
                             const editableInputFields = [
@@ -331,6 +384,9 @@
                                 }
                             });
                             
+                            // Show device configuration dropdown for new nodes
+                            // Note: The dropdown will be shown/hidden based on available configurations in loadEligibleDevices()
+                            
                             console.log(`[BUYER READONLY] Made configuration fields editable for new node: ${node.id}`);
                         }
                     } catch (error) {
@@ -353,7 +409,7 @@
 
             // ===== DEVICE REINSTATEMENT FUNCTIONALITY =====
 
-            // Load eligible devices into dropdown
+            // Load all devices with status into dropdown
             async function loadEligibleDevices() {
                 try {
                     const response = await fetch('/buyer/devices/eligible');
@@ -361,6 +417,7 @@
 
                     const dropdown = $('#node-input-loadDevice');
                     const currentValue = dropdown.val();
+                    const deviceSection = $('#device-reinstatement-section');
 
                     // Clear existing options except the first one
                     dropdown.find('option:not(:first)').remove();
@@ -369,21 +426,60 @@
                         data.devices.forEach(device => {
                             const formattedAddress = formatEvmAddress(device.evmAddress);
                             const truncatedAddress = formattedAddress.substring(0, 10) + '...';
-                            const option = $(`<option value="${device.filename}">${device.deviceName} (${truncatedAddress})</option>`);
+                            
+                            let optionText = `${device.deviceName} (${truncatedAddress})`;
+                            let optionClass = '';
+                            
+                            if (!device.available) {
+                                optionText += ` - In use by "${device.usedBy}"`;
+                                optionClass = 'device-in-use';
+                            } else {
+                                optionText += ' ✓ Available';
+                                optionClass = 'device-available';
+                            }
+                            
+                            const option = $(`<option value="${device.filename}" class="${optionClass}">${optionText}</option>`);
+                            
+                            // Disable unavailable options
+                            if (!device.available) {
+                                option.prop('disabled', true);
+                            }
+                            
                             dropdown.append(option);
                         });
-                        console.log(`[BUYER DEVICE LOAD] Loaded ${data.devices.length} eligible devices`);
+                        
+                        // Show the device section only if there are available configurations
+                        if (data.availableCount > 0) {
+                            deviceSection.show();
+                            console.log(`[BUYER DEVICE LOAD] Loaded ${data.devices.length} devices (${data.availableCount} available, ${data.devices.length - data.availableCount} in use) - showing dropdown`);
+                        } else {
+                            deviceSection.hide();
+                            console.log(`[BUYER DEVICE LOAD] Loaded ${data.devices.length} devices but none are available - hiding dropdown`);
+                        }
                     } else {
-                        console.log('[BUYER DEVICE LOAD] No eligible devices found');
+                        // Hide the device section if no devices
+                        deviceSection.hide();
+                        console.log('[BUYER DEVICE LOAD] No devices found');
                     }
 
-                    // Restore previous selection if it still exists
-                    if (currentValue && dropdown.find(`option[value="${currentValue}"]`).length > 0) {
-                        dropdown.val(currentValue);
+                    // Restore previous selection if it still exists, or pre-select current configuration
+                    let selectionToRestore = currentValue;
+                    
+                    // If no current selection but we have an original device filename, use that
+                    if (!selectionToRestore && node.originalDeviceFilename && node.originalDeviceFilename.trim() !== '') {
+                        selectionToRestore = node.originalDeviceFilename;
+                        console.log(`[BUYER DEVICE LOAD] Pre-selecting original device configuration: ${selectionToRestore}`);
+                    }
+                    
+                    if (selectionToRestore && dropdown.find(`option[value="${selectionToRestore}"]`).length > 0) {
+                        dropdown.val(selectionToRestore);
+                        console.log(`[BUYER DEVICE LOAD] Restored device selection: ${selectionToRestore}`);
                     }
 
                 } catch (error) {
-                    console.error('[BUYER DEVICE LOAD] Error loading eligible devices:', error);
+                    console.error('[BUYER DEVICE LOAD] Error loading devices:', error);
+                    // Hide section on error
+                    $('#device-reinstatement-section').hide();
                 }
             }
 
@@ -494,11 +590,39 @@
                             }
                         }
 
+                        // Fetch and populate heartbeat
+                        if (node.id) {
+                            try {
+                                const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                                const heartbeatData = await heartbeatResponse.json();
+
+                                if (heartbeatData.success && heartbeatData.heartbeat) {
+                                    const heartbeat = heartbeatData.heartbeat;
+                                    if (heartbeat.lastSeenFormatted) {
+                                        $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                                        console.log('[BUYER DEVICE LOAD] Fetched heartbeat:', heartbeat.lastSeenFormatted);
+                                    } else {
+                                        $('#node-input-heartbeat').val('Never');
+                                        console.log('[BUYER DEVICE LOAD] No heartbeat data available');
+                                    }
+                                } else {
+                                    $('#node-input-heartbeat').val('Heartbeat not available');
+                                    console.log('[BUYER DEVICE LOAD] Heartbeat fetch failed:', heartbeatData.error);
+                                }
+                            } catch (error) {
+                                console.error('[BUYER DEVICE LOAD] Error fetching heartbeat:', error);
+                                $('#node-input-heartbeat').val('Heartbeat fetch error');
+                            }
+                        }
+
                         // Update seller devices list if present
                         if (deviceData.sellerEvmAddress) {
                             try {
                                 const sellerAddresses = JSON.parse(deviceData.sellerEvmAddress);
                                 if (Array.isArray(sellerAddresses) && sellerAddresses.length > 0) {
+                                    // Update the config field with the loaded seller addresses
+                                    node.sellerEvmAddress = deviceData.sellerEvmAddress;
+                                    
                                     node.devicesList = sellerAddresses.map(addr => ({
                                         evmAddress: addr,
                                         deviceName: 'Loaded Device',
@@ -519,7 +643,9 @@
 
                         // Store the loaded device filename for later use
                         node.loadedDeviceFilename = filename;
+                        node.originalDeviceFilename = filename;
                         $('#node-input-loadedDeviceFilename').val(filename);
+                        $('#node-input-originalDeviceFilename').val(filename);
 
                         console.log('[BUYER DEVICE LOAD] Device configuration and runtime information loaded successfully');
                     } else {
@@ -535,6 +661,105 @@
             $('#refresh-devices-btn').on('click', function () {
                 console.log('[BUYER DEVICE LOAD] Refreshing device list...');
                 loadEligibleDevices();
+            });
+
+            // Event handler for heartbeat refresh
+            $('#refresh-heartbeat-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[BUYER HEARTBEAT] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[BUYER HEARTBEAT] Refreshed heartbeat:', displayText);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[BUYER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[BUYER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER HEARTBEAT] Error refreshing heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
+            });
+
+            // Event handler for reachability refresh
+            $('#refresh-reachability-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[BUYER REACHABILITY] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const reachabilityResponse = await fetch(`/buyer/reachability/${node.id}`);
+                    const reachabilityData = await reachabilityResponse.json();
+
+                    if (reachabilityData.success && reachabilityData.reachability) {
+                        const reachability = reachabilityData.reachability;
+                        if (reachability.lastSeenFormatted && reachability.messageType) {
+                            // Format: "natReachability - timestamp (messageType)"
+                            let displayText = '';
+                            if (reachability.natReachability !== null && reachability.natReachability !== undefined) {
+                                displayText = `${reachability.natReachability} - ${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            } else {
+                                displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            }
+                            $('#node-input-reachability').val(displayText);
+                            console.log('[BUYER REACHABILITY] Refreshed reachability:', displayText);
+                        } else if (reachability.lastSeenFormatted) {
+                            $('#node-input-reachability').val(reachability.lastSeenFormatted);
+                            console.log('[BUYER REACHABILITY] Refreshed reachability:', reachability.lastSeenFormatted);
+                        } else {
+                            $('#node-input-reachability').val('Never');
+                            console.log('[BUYER REACHABILITY] No reachability data available');
+                        }
+                    } else {
+                        $('#node-input-reachability').val('Reachability not available');
+                        console.log('[BUYER REACHABILITY] Reachability fetch failed:', reachabilityData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER REACHABILITY] Error refreshing reachability:', error);
+                    $('#node-input-reachability').val('Reachability fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
             });
 
             $('#node-input-loadDevice').on('change', function () {
@@ -670,11 +895,13 @@
 
                 node.devicesList.forEach((device, index) => {
                     const row = $(`
-                        <tr>
+                        <tr data-seller-evm="${device.evmAddress}">
                             <td style="padding: 8px; border: 1px solid #555; font-family: monospace; font-size: 11px; word-break: break-all;">
                                 ${device.evmAddress}
                             </td>
-                           
+                            <td id="shared-account-cell-${index}" class="buyer-shared-account-cell" style="padding: 8px; border: 1px solid #555; text-align: center; font-size: 11px;">
+                                -
+                            </td>
                             <td id="status-cell-${index}" style="padding: 8px; border: 1px solid #555; text-align: center; font-size: 11px;">
                                 <i class="fa fa-spinner fa-spin" style="color: #888;"></i>
                             </td>
@@ -727,6 +954,51 @@
                         autoUpdateInterval = null;
                     }
                 }, 30000); // 5 second
+            }
+
+            // Function to fetch shared account for a specific seller
+            async function fetchSharedAccountForSeller(sellerEvmAddress, index) {
+                const sharedAccountCell = $(`#shared-account-cell-${index}`);
+                
+                console.log(`[BUYER SHARED ACCOUNT] Cell selector: #shared-account-cell-${index}, found: ${sharedAccountCell.length}, current text: "${sharedAccountCell.text()}"`);
+                
+                // Check if already loaded (has a value other than '-')
+                // Check text content even if it's inside a link element
+                const currentValue = sharedAccountCell.text().trim();
+                if (currentValue !== '-' && currentValue !== '' && currentValue.startsWith('0.0.')) {
+                    console.log(`[BUYER SHARED ACCOUNT] Skipping fetch for seller ${sellerEvmAddress} - already loaded: ${currentValue}`);
+                    return;
+                }
+
+                if (!node.id) {
+                    console.warn('[BUYER SHARED ACCOUNT] No node ID available');
+                    return;
+                }
+
+                try {
+                    console.log(`[BUYER SHARED ACCOUNT] Fetching shared account for seller ${sellerEvmAddress}, index ${index}`);
+                    const response = await fetch(`/buyer/shared-account/${node.id}/${sellerEvmAddress}`);
+                    const data = await response.json();
+                    
+                    console.log(`[BUYER SHARED ACCOUNT] API response for seller ${sellerEvmAddress}:`, data);
+
+                    if (data.success && data.sharedAccount) {
+                        // Format as Hedera account: 0.0.{accountNumber}
+                        const formattedAccount = `0.0.${data.sharedAccount}`;
+                        const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                        sharedAccountCell.html(`<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`);
+                        sharedAccountCell.attr('title', `Click to view shared account: ${formattedAccount}`);
+                        console.log(`[BUYER SHARED ACCOUNT] Set shared account for seller ${sellerEvmAddress}: ${formattedAccount}`);
+                    } else {
+                        sharedAccountCell.text('-');
+                        sharedAccountCell.attr('title', data.message || 'No shared account found');
+                        console.log(`[BUYER SHARED ACCOUNT] No shared account for seller ${sellerEvmAddress}`);
+                    }
+                } catch (error) {
+                    console.error(`[BUYER SHARED ACCOUNT] Error fetching shared account for seller ${sellerEvmAddress}:`, error);
+                    sharedAccountCell.text('-');
+                    sharedAccountCell.attr('title', 'Error fetching shared account');
+                }
             }
 
             // Auto-check function - INSIDE oneditprepare
@@ -818,6 +1090,8 @@
                     let color = '#dc3545'; // red for disconnected
                     if (status === 'connected') {
                         color = '#28a745'; // green
+                        // Fetch shared account only for connected sellers
+                        fetchSharedAccountForSeller(device.evmAddress, index);
                     } else if (status === 'connecting') {
                         color = '#ffc107'; // yellow
                     }
@@ -1049,6 +1323,7 @@
                                         $('#node-input-stdInTopic').val('StdIn topic not intialised');
                                         $('#node-input-stdOutTopic').val('StdOut topic not intialised');
                                         $('#node-input-stdErrTopic').val('StdErr topic not intialised');
+                                        $('#node-input-heartbeat').val('Heartbeat not available');
                                     });
                             } else {
                                 // Device file doesn't exist, show new node messages
@@ -1057,6 +1332,7 @@
                                 $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                                 $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                                 $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                                $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                             }
                         })
                         .fail(function () {
@@ -1066,6 +1342,7 @@
                             $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                             $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                             $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                            $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                         });
                 } else {
                     $('#node-input-evmAddress').val('New node - EVM address will be generated after deployment');
@@ -1073,6 +1350,85 @@
                     $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                     $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                     $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                    $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
+                    $('#node-input-reachability').val('New node - Reachability will be available after deployment');
+                }
+            }
+
+            // Load heartbeat data
+            async function loadHeartbeat() {
+                if (!node.id) {
+                    $('#node-input-heartbeat').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const heartbeatResponse = await fetch(`/buyer/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[BUYER HEARTBEAT] Loaded heartbeat:', displayText);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[BUYER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[BUYER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER HEARTBEAT] Error loading heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                }
+            }
+
+            // Load reachability data
+            async function loadReachability() {
+                if (!node.id) {
+                    $('#node-input-reachability').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const reachabilityResponse = await fetch(`/buyer/reachability/${node.id}`);
+                    const reachabilityData = await reachabilityResponse.json();
+
+                    if (reachabilityData.success && reachabilityData.reachability) {
+                        const reachability = reachabilityData.reachability;
+                        if (reachability.lastSeenFormatted && reachability.messageType) {
+                            // Format: "natReachability - timestamp (messageType)"
+                            let displayText = '';
+                            if (reachability.natReachability !== null && reachability.natReachability !== undefined) {
+                                displayText = `${reachability.natReachability} - ${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            } else {
+                                displayText = `${reachability.lastSeenFormatted} (${reachability.messageType})`;
+                            }
+                            $('#node-input-reachability').val(displayText);
+                            console.log('[BUYER REACHABILITY] Loaded reachability:', displayText);
+                        } else if (reachability.lastSeenFormatted) {
+                            $('#node-input-reachability').val(reachability.lastSeenFormatted);
+                            console.log('[BUYER REACHABILITY] Loaded reachability:', reachability.lastSeenFormatted);
+                        } else {
+                            $('#node-input-reachability').val('Never');
+                            console.log('[BUYER REACHABILITY] No reachability data available');
+                        }
+                    } else {
+                        $('#node-input-reachability').val('Reachability not available');
+                        console.log('[BUYER REACHABILITY] Reachability fetch failed:', reachabilityData.error);
+                    }
+                } catch (error) {
+                    console.error('[BUYER REACHABILITY] Error loading reachability:', error);
+                    $('#node-input-reachability').val('Reachability fetch error');
                 }
             }
 
@@ -1175,6 +1531,11 @@
             } else {
                 console.log(`[BUYER INIT] Skipping balance update - device already loaded: ${node.loadedDeviceFilename}`);
             }
+
+            // Load heartbeat ONCE on dialog open (always load, regardless of device loading status)
+            loadHeartbeat();
+            // Load reachability ONCE on dialog open (always load, regardless of device loading status)
+            loadReachability();
         },
 
 
@@ -1203,6 +1564,10 @@
             this.stdInTopic = $('#node-input-stdInTopic').val();
             this.stdOutTopic = $('#node-input-stdOutTopic').val();
             this.stdErrTopic = $('#node-input-stdErrTopic').val();
+            // Save the heartbeat field
+            this.heartbeat = $('#node-input-heartbeat').val();
+            // Save the reachability field
+            this.reachability = $('#node-input-reachability').val();
         }
     });
 

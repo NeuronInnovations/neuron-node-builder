@@ -118,6 +118,64 @@ class DeviceManager {
     }
 
     /**
+     * List all device files with status information (available/in use)
+     * @param {string} role - 'buyer' or 'seller'
+     * @param {Array} activeNodeIds - Array of currently active node IDs
+     * @param {Object} activeNodeInfo - Object mapping node IDs to node names
+     * @returns {Array} Array of device objects with status information
+     */
+    listAllDevicesWithStatus(role, activeNodeIds = [], activeNodeInfo = {}) {
+        try {
+            const allFiles = this.listAllDeviceFiles();
+            const devicesWithStatus = [];
+
+            for (const filename of allFiles) {
+                try {
+                    const deviceData = this.loadDeviceFile(filename);
+                    const deviceRole = this.determineDeviceRole(deviceData);
+
+                    // Only include devices that match the requested role
+                    if (deviceRole === role) {
+                        // Check if this device is in use
+                        let isInUse = false;
+                        let usedBy = null;
+                        
+                        // Check if filename matches an active node
+                        if (activeNodeIds.includes(filename)) {
+                            isInUse = true;
+                            usedBy = activeNodeInfo[filename] || filename;
+                        }
+                        
+                        // Also check if the nodeId field inside the JSON matches an active node
+                        if (deviceData.nodeId && activeNodeIds.includes(deviceData.nodeId)) {
+                            isInUse = true;
+                            usedBy = activeNodeInfo[deviceData.nodeId] || deviceData.nodeId;
+                        }
+
+                        devicesWithStatus.push({
+                            filename: filename,
+                            role: deviceRole,
+                            deviceName: deviceData.deviceName || 'Unnamed Device',
+                            evmAddress: deviceData.evmAddress || 'No EVM Address',
+                            nodeId: deviceData.nodeId || null,
+                            available: !isInUse,
+                            usedBy: usedBy
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error processing device file ${filename}:`, error);
+                    // Continue processing other files even if one fails
+                }
+            }
+
+            return devicesWithStatus;
+        } catch (error) {
+            console.error('Error listing devices with status:', error);
+            return [];
+        }
+    }
+
+    /**
      * Load and parse a device file
      * @param {string} filename - The filename without .json extension
      * @returns {Object} Parsed device data

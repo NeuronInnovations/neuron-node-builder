@@ -1,6 +1,27 @@
 <script type="text/html" data-template-name="seller config">
      <!-- Device Reinstatement Section -->
      
+<style>
+.device-available {
+    color: #4CAF50 !important;
+    font-weight: bold;
+}
+
+.device-in-use {
+    color: #f44336 !important;
+    font-style: italic;
+}
+
+#node-input-loadDevice option:disabled {
+    color: #999 !important;
+    background-color: #f5f5f5 !important;
+}
+
+#node-input-loadDevice option:disabled:hover {
+    background-color: #f5f5f5 !important;
+}
+</style>
+
 <div class="neuron-seller-config">
     <div class="form-row">
         <label for="node-input-name"> <span>Name</span></label>
@@ -16,7 +37,7 @@
         </select>
     </div>
 
-    <div class="form-row" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px;">
+    <div class="form-row" id="device-reinstatement-section" style="border-top: 1px solid #555; padding-top: 15px; margin-top: 15px; display: none;">
         <label for="node-input-loadDevice">Reinstantiate Device</span></label>
              <select id="node-input-loadDevice" style="flex: 1;">
                 <option value="">Create new device configuration</option>
@@ -28,6 +49,7 @@
         <div style="margin-top: 5px; font-size: 12px; color: #888;">
             <i>Select an existing device to reinstantiate its configuration</i>
         </div>
+        <input type="hidden" id="node-input-originalDeviceFilename" />
     </div>
 
     <div class="form-row">
@@ -132,6 +154,14 @@
             <input type="text" id="node-input-stdErrTopic" placeholder="StdErr topic will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
         </div>
 
+        <div class="form-row">
+            <label for="node-input-heartbeat"><span>Reachability</span></label>
+            <input type="text" id="node-input-heartbeat" placeholder="Reachability will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
+            <button type="button" id="refresh-heartbeat-btn" class="red-ui-button" style="margin-left: 5px; padding: 4px 8px; font-size: 12px; min-width: auto;" title="Refresh Reachability">
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+
         <div class="form-row" style="display: none;">
             <label style="display: none;"><span>Connection Status</span></label>
             <div id="connection-status-indicator" style="display: none; margin-left: 10px;">
@@ -166,6 +196,7 @@
                            <thead>
                                <tr>
                                    <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">EVM Address</th>
+                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Shared Account</th>
                                    <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Status</th>
                                    <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Last Seen</th>
                                </tr>
@@ -249,9 +280,12 @@
             publicKey: { value: "" },
             // Device reinstatement field
             loadedDeviceFilename: { value: "" },
+            originalDeviceFilename: { value: "" },
             stdInTopic: { value: "" },
             stdOutTopic: { value: "" },
-            stdErrTopic: { value: "" }
+            stdErrTopic: { value: "" },
+            // Heartbeat field
+            heartbeat: { value: "" }
         },
         inputs: 0,
         outputs: 1,
@@ -274,6 +308,13 @@
             if (loadedFilename && loadedFilename.trim() !== '') {
                 node.loadedDeviceFilename = loadedFilename;
                 console.log(`[SELLER INIT] Restored loaded device filename: ${node.loadedDeviceFilename}`);
+            }
+            
+            // Initialize originalDeviceFilename from hidden field if it exists
+            const originalFilename = $('#node-input-originalDeviceFilename').val();
+            if (originalFilename && originalFilename.trim() !== '') {
+                node.originalDeviceFilename = originalFilename;
+                console.log(`[SELLER INIT] Restored original device filename: ${node.originalDeviceFilename}`);
             }
 
             // Function to make configuration fields readonly after deployment
@@ -319,7 +360,10 @@
                                 }
                             });
                             
-                            console.log(`[SELLER READONLY] Made configuration fields readonly for deployed node: ${node.id}`);
+                            // Hide device configuration dropdown for deployed nodes
+                            $('#device-reinstatement-section').hide();
+                            
+                            console.log(`[SELLER READONLY] Made configuration fields readonly and hid device dropdown for deployed node: ${node.id}`);
                         } else {
                             // Node not deployed, ensure fields are editable
                             const editableInputFields = [
@@ -356,6 +400,9 @@
                                 }
                             });
                             
+                            // Show device configuration dropdown for new nodes
+                            // Note: The dropdown will be shown/hidden based on available configurations in loadEligibleDevices()
+                            
                             console.log(`[SELLER READONLY] Made configuration fields editable for new node: ${node.id}`);
                         }
                     } catch (error) {
@@ -369,7 +416,7 @@
 
             // ===== DEVICE REINSTATEMENT FUNCTIONALITY =====
             
-            // Load eligible devices into dropdown
+            // Load all devices with status into dropdown
             async function loadEligibleDevices() {
                 try {
                     const response = await fetch('/seller/devices/eligible');
@@ -377,6 +424,7 @@
                     
                     const dropdown = $('#node-input-loadDevice');
                     const currentValue = dropdown.val();
+                    const deviceSection = $('#device-reinstatement-section');
                     
                     // Clear existing options except the first one
                     dropdown.find('option:not(:first)').remove();
@@ -385,21 +433,60 @@
                         data.devices.forEach(device => {
                             const formattedAddress = formatEvmAddress(device.evmAddress);
                             const truncatedAddress = formattedAddress.substring(0, 10) + '...';
-                            const option = $(`<option value="${device.filename}">${device.deviceName} (${truncatedAddress})</option>`);
+                            
+                            let optionText = `${device.deviceName} (${truncatedAddress})`;
+                            let optionClass = '';
+                            
+                            if (!device.available) {
+                                optionText += ` - In use by "${device.usedBy}"`;
+                                optionClass = 'device-in-use';
+                            } else {
+                                optionText += ' ✓ Available';
+                                optionClass = 'device-available';
+                            }
+                            
+                            const option = $(`<option value="${device.filename}" class="${optionClass}">${optionText}</option>`);
+                            
+                            // Disable unavailable options
+                            if (!device.available) {
+                                option.prop('disabled', true);
+                            }
+                            
                             dropdown.append(option);
                         });
-                        console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} eligible devices`);
+                        
+                        // Show the device section only if there are available configurations
+                        if (data.availableCount > 0) {
+                            deviceSection.show();
+                            console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} devices (${data.availableCount} available, ${data.devices.length - data.availableCount} in use) - showing dropdown`);
+                        } else {
+                            deviceSection.hide();
+                            console.log(`[SELLER DEVICE LOAD] Loaded ${data.devices.length} devices but none are available - hiding dropdown`);
+                        }
                     } else {
-                        console.log('[SELLER DEVICE LOAD] No eligible devices found');
+                        // Hide the device section if no devices
+                        deviceSection.hide();
+                        console.log('[SELLER DEVICE LOAD] No devices found');
                     }
                     
-                    // Restore previous selection if it still exists
-                    if (currentValue && dropdown.find(`option[value="${currentValue}"]`).length > 0) {
-                        dropdown.val(currentValue);
+                    // Restore previous selection if it still exists, or pre-select current configuration
+                    let selectionToRestore = currentValue;
+                    
+                    // If no current selection but we have an original device filename, use that
+                    if (!selectionToRestore && node.originalDeviceFilename && node.originalDeviceFilename.trim() !== '') {
+                        selectionToRestore = node.originalDeviceFilename;
+                        console.log(`[SELLER DEVICE LOAD] Pre-selecting original device configuration: ${selectionToRestore}`);
+                    }
+                    
+                    if (selectionToRestore && dropdown.find(`option[value="${selectionToRestore}"]`).length > 0) {
+                        dropdown.val(selectionToRestore);
+                        console.log(`[SELLER DEVICE LOAD] Restored device selection: ${selectionToRestore}`);
                     }
                     
                 } catch (error) {
-                    console.error('[SELLER DEVICE LOAD] Error loading eligible devices:', error);
+                    console.error('[SELLER DEVICE LOAD] Error loading devices:', error);
+                    // Hide section on error
+                    $('#device-reinstatement-section').hide();
                 }
             }
             
@@ -514,10 +601,37 @@
                                 $('#node-input-balance').val('Balance fetch error');
                             }
                         }
+
+                        // Fetch and populate heartbeat
+                        if (node.id) {
+                            try {
+                                const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                                const heartbeatData = await heartbeatResponse.json();
+
+                                if (heartbeatData.success && heartbeatData.heartbeat) {
+                                    const heartbeat = heartbeatData.heartbeat;
+                                    if (heartbeat.lastSeenFormatted) {
+                                        $('#node-input-heartbeat').val(heartbeat.lastSeenFormatted);
+                                        console.log('[SELLER DEVICE LOAD] Fetched heartbeat:', heartbeat.lastSeenFormatted);
+                                    } else {
+                                        $('#node-input-heartbeat').val('Never');
+                                        console.log('[SELLER DEVICE LOAD] No heartbeat data available');
+                                    }
+                                } else {
+                                    $('#node-input-heartbeat').val('Heartbeat not available');
+                                    console.log('[SELLER DEVICE LOAD] Heartbeat fetch failed:', heartbeatData.error);
+                                }
+                            } catch (error) {
+                                console.error('[SELLER DEVICE LOAD] Error fetching heartbeat:', error);
+                                $('#node-input-heartbeat').val('Heartbeat fetch error');
+                            }
+                        }
                         
                         // Store the loaded device filename for later use
                         node.loadedDeviceFilename = filename;
+                        node.originalDeviceFilename = filename;
                         $('#node-input-loadedDeviceFilename').val(filename);
+                        $('#node-input-originalDeviceFilename').val(filename);
                         
                         console.log('[SELLER DEVICE LOAD] Device configuration and runtime information loaded successfully');
                     } else {
@@ -634,6 +748,54 @@
                     document.body.removeChild(textArea);
                 }
             }
+
+            // Event handler for heartbeat refresh
+            $('#refresh-heartbeat-btn').on('click', async function () {
+                if (!node.id) {
+                    console.log('[SELLER HEARTBEAT] No node ID available');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalHtml = btn.html();
+                
+                // Show loading state
+                btn.html('<i class="fa fa-spinner fa-spin"></i>');
+                btn.prop('disabled', true);
+
+                try {
+                    const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[SELLER HEARTBEAT] Refreshed heartbeat:', displayText);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[SELLER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[SELLER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[SELLER HEARTBEAT] Error refreshing heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
+                } finally {
+                    // Restore button
+                    btn.html(originalHtml);
+                    btn.prop('disabled', false);
+                }
+            });
 
             $('<style>')
                 .text(`
@@ -758,6 +920,7 @@
                                         $('#node-input-stdInTopic').val('StdIn topic not initialized yet');
                                         $('#node-input-stdOutTopic').val('StdOut topic not initialized yet');
                                         $('#node-input-stdErrTopic').val('StdErr topic not initialized yet');
+                                        $('#node-input-heartbeat').val('Heartbeat not available');
                                     });
                             } else {
                                 // Device file doesn't exist - this is a new node
@@ -767,6 +930,7 @@
                                 $('#node-input-stdInTopic').val('New node');
                                 $('#node-input-stdOutTopic').val('New node');
                                 $('#node-input-stdErrTopic').val('New node');
+                                $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                             }
                         })
                         .fail(function () {
@@ -776,6 +940,7 @@
                             $('#node-input-stdInTopic').val('New node');
                             $('#node-input-stdOutTopic').val('New node');
                             $('#node-input-stdErrTopic').val('New node');
+                            $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
                         });
                 } else {
                     $('#node-input-evmAddress').val('New node - EVM address will be generated after deployment');
@@ -783,6 +948,45 @@
                     $('#node-input-stdInTopic').val('New node - StdIn topic will be generated after deployment');
                     $('#node-input-stdOutTopic').val('New node - StdOut topic will be generated after deployment');
                     $('#node-input-stdErrTopic').val('New node - StdErr topic will be generated after deployment');
+                    $('#node-input-heartbeat').val('New node - Heartbeat will be available after deployment');
+                    $('#node-input-reachability').val('New node - Reachability will be available after deployment');
+                }
+            }
+
+            // Load heartbeat data
+            async function loadHeartbeat() {
+                if (!node.id) {
+                    $('#node-input-heartbeat').val('No node ID available');
+                    return;
+                }
+
+                try {
+                    const heartbeatResponse = await fetch(`/seller/heartbeat/${node.id}`);
+                    const heartbeatData = await heartbeatResponse.json();
+
+                    if (heartbeatData.success && heartbeatData.heartbeat) {
+                        const heartbeat = heartbeatData.heartbeat;
+                        if (heartbeat.lastSeenFormatted) {
+                            // Format: "natReachability - last stdout timestamp" or just "last stdout timestamp"
+                            let displayText = '';
+                            if (heartbeat.natReachability !== null && heartbeat.natReachability !== undefined) {
+                                displayText = `${heartbeat.natReachability} - last stdout ${heartbeat.lastSeenFormatted}`;
+                            } else {
+                                displayText = `last stdout ${heartbeat.lastSeenFormatted}`;
+                            }
+                            $('#node-input-heartbeat').val(displayText);
+                            console.log('[SELLER HEARTBEAT] Loaded heartbeat:', displayText);
+                        } else {
+                            $('#node-input-heartbeat').val('Never');
+                            console.log('[SELLER HEARTBEAT] No heartbeat data available');
+                        }
+                    } else {
+                        $('#node-input-heartbeat').val('Heartbeat not available');
+                        console.log('[SELLER HEARTBEAT] Heartbeat fetch failed:', heartbeatData.error);
+                    }
+                } catch (error) {
+                    console.error('[SELLER HEARTBEAT] Error loading heartbeat:', error);
+                    $('#node-input-heartbeat').val('Heartbeat fetch error');
                 }
             }
 
@@ -931,6 +1135,9 @@
             } else {
                 console.log(`[SELLER INIT] Skipping public key update - device already loaded: ${node.loadedDeviceFilename}`);
             }
+
+            // Load heartbeat ONCE on dialog open (always load, regardless of device loading status)
+            loadHeartbeat();
 
             // Set up refresh intervals
             if (node.id) {
@@ -1242,6 +1449,12 @@
             this.evmAddress = $('#node-input-evmAddress').val();
             this.balance = $('#node-input-balance').val();
             this.publicKey = $('#node-input-publicKey').val();
+            // Save the topic fields
+            this.stdInTopic = $('#node-input-stdInTopic').val();
+            this.stdOutTopic = $('#node-input-stdOutTopic').val();
+            this.stdErrTopic = $('#node-input-stdErrTopic').val();
+            // Save the heartbeat field
+            this.heartbeat = $('#node-input-heartbeat').val();
 
             //  console.log('Saved buyer EVM addresses:', this.buyerEvmAddress);
         }
@@ -1255,6 +1468,10 @@
     let isRefreshing = false;
     let lastSeenInterval = null;
     let peerRefreshInterval = null;
+    
+    // Cache for shared accounts and last seen data to prevent flickering
+    let sharedAccountsCache = {};  // evmAddress (normalized) -> shared account
+    let lastSeenCache = {};        // publicKey -> {html, timestamp}
     
     // Debug flag for verbose auto-refresh logging (can be enabled in console)
     window.SELLER_AUTO_REFRESH_DEBUG = false;
@@ -1409,6 +1626,13 @@
                     // Store the original public key in data attribute for fetchLastSeen
                     row.setAttribute('data-public-key', peer.publicKey || '');
 
+                    // Create shared account cell
+                    const sharedAccountCell = document.createElement('td');
+                    sharedAccountCell.className = 'peers-table-cell peer-shared-account';
+                    sharedAccountCell.style.textAlign = 'center';
+                    sharedAccountCell.textContent = '-';
+                    sharedAccountCell.title = 'Shared account will appear after EVM conversion';
+
                     // Convert public key to EVM address
                     if (peer.publicKey) {
                         fetch(`/seller/publickey-to-evm/${peer.publicKey}`)
@@ -1418,6 +1642,18 @@
                                     const formattedAddress = formatEvmAddress(data.evmAddress);
                                     evmCell.textContent = formattedAddress;
                                     evmCell.title = formattedAddress;
+                                    // Store the full EVM address for shared account lookup
+                                    row.setAttribute('data-evm-address', data.evmAddress);
+                                    
+                                    // Check cache for shared account and populate immediately if available
+                                    const normalizedEvmAddress = data.evmAddress.toLowerCase().replace(/^0x/, '');
+                                    const cachedSharedAccount = sharedAccountsCache[normalizedEvmAddress];
+                                    if (cachedSharedAccount) {
+                                        const formattedAccount = `0.0.${cachedSharedAccount}`;
+                                        const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                                        sharedAccountCell.innerHTML = `<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`;
+                                        sharedAccountCell.title = `Click to view shared account: ${formattedAccount}`;
+                                    }
                                 } else {
                                     evmCell.textContent = 'Conversion failed';
                                     evmCell.title = 'Could not convert public key to EVM address';
@@ -1444,15 +1680,36 @@
                     const lastUpdateCell = document.createElement('td');
                     lastUpdateCell.className = 'peers-table-cell';
                     lastUpdateCell.style.textAlign = 'center';
-                    lastUpdateCell.innerHTML = '<span style="color: #666;">Checking...</span>';
-                    // Fetch last seen for this peer
+                    
+                    // Check cache for last seen data first
+                    const cachedLastSeen = lastSeenCache[peer.publicKey];
+                    if (cachedLastSeen) {
+                        lastUpdateCell.innerHTML = cachedLastSeen.html;
+                    } else {
+                        lastUpdateCell.innerHTML = '<span style="color: #666;">Checking...</span>';
+                    }
+                    
+                    // Fetch last seen for this peer (will update cache)
                     fetchLastSeen(peer, lastUpdateCell, smartContract);
 
                     row.appendChild(evmCell);
+                    row.appendChild(sharedAccountCell);
                     row.appendChild(statusCell);
                     row.appendChild(lastUpdateCell);
                     peersTableBody.appendChild(row);
                 });
+
+                // Fetch shared accounts only if we haven't fetched them yet
+                // Check if any row has a pending shared account (shows '-')
+                const hasPendingAccounts = Array.from(document.querySelectorAll('.peer-shared-account'))
+                    .some(cell => cell.textContent === '-');
+                
+                if (hasPendingAccounts) {
+                    console.log('[SELLER SHARED ACCOUNTS] Fetching shared accounts for new/pending peers');
+                    fetchSharedAccountsForPeers(nodeId);
+                } else {
+                    console.log('[SELLER SHARED ACCOUNTS] Skipping fetch - all shared accounts already loaded');
+                }
             }
 
             // Update last update time
@@ -1682,14 +1939,14 @@
                     }
                 }, 5000);
 
-                // Start 1-second auto-refresh for peer connection data
+                // Start auto-refresh for peer connection data
                 if (peerRefreshInterval) {
                     clearInterval(peerRefreshInterval);
                 }
-               //console.log(`[DEBUG] Starting 1-second peer refresh interval...`);
+               //console.log(`[DEBUG] Starting peer refresh interval...`);
                 peerRefreshInterval = setInterval(() => {
                     refreshPeersData();
-                }, 5000);
+                }, 10000);
             }).catch(() => {
                 // If initial load fails, still try to start the intervals
                 console.warn('Initial connection status load failed, but starting auto-refresh intervals anyway');
@@ -1698,10 +1955,10 @@
                 if (peerRefreshInterval) {
                     clearInterval(peerRefreshInterval);
                 }
-                // console.log(`[DEBUG] Starting 1-second peer refresh interval (fallback)...`);
+                // console.log(`[DEBUG] Starting peer refresh interval (fallback)...`);
                 peerRefreshInterval = setInterval(() => {
                     refreshPeersData();
-                }, 1000);
+                }, 10000);
             });
         }, 500); // 500ms delay to allow connection monitor to initialize
 
@@ -1731,6 +1988,75 @@
         if (/^0\.0\d+$/.test(topic)) return topic.replace(/^0\.0(\d+)$/, '0.0.$1');
         if (/^\d+$/.test(topic)) return `0.0.${topic}`;
         return topic;
+    }
+
+    // Function to fetch shared accounts for all peers
+    async function fetchSharedAccountsForPeers(nodeId) {
+        if (!nodeId) {
+            console.warn('[SELLER SHARED ACCOUNTS] No node ID available');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/seller/shared-accounts/${nodeId}`);
+            const data = await response.json();
+
+            if (data.success && data.sharedAccounts) {
+                console.log('[SELLER SHARED ACCOUNTS] Fetched shared accounts:', data.sharedAccounts);
+                
+                // Normalize shared accounts map to lowercase without 0x prefix for case-insensitive lookup
+                const normalizedSharedAccounts = {};
+                Object.keys(data.sharedAccounts).forEach(key => {
+                    const normalizedKey = key.toLowerCase().replace(/^0x/, '');
+                    normalizedSharedAccounts[normalizedKey] = data.sharedAccounts[key];
+                });
+                console.log('[SELLER SHARED ACCOUNTS] Normalized shared accounts:', normalizedSharedAccounts);
+                
+                // Update cache with fetched shared accounts
+                sharedAccountsCache = { ...sharedAccountsCache, ...normalizedSharedAccounts };
+                
+                // Wait a bit for EVM addresses to be converted and stored in data attributes
+                setTimeout(() => {
+                    // Update each row with its shared account
+                    const rows = document.querySelectorAll('#peers-table-body tr');
+                    console.log(`[SELLER SHARED ACCOUNTS] Found ${rows.length} rows to update`);
+                    
+                    rows.forEach((row, index) => {
+                        const evmAddress = row.getAttribute('data-evm-address');
+                        console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: data-evm-address="${evmAddress}"`);
+                        
+                        const sharedAccountCell = row.querySelector('.peer-shared-account');
+                        console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: sharedAccountCell found=${!!sharedAccountCell}`);
+                        
+                        if (evmAddress && sharedAccountCell) {
+                            // Normalize the EVM address for lookup (lowercase, no 0x prefix)
+                            const normalizedEvmAddress = evmAddress.toLowerCase().replace(/^0x/, '');
+                            const sharedAccount = normalizedSharedAccounts[normalizedEvmAddress];
+                            console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: Looking for account for ${evmAddress} (normalized: ${normalizedEvmAddress}), found: ${sharedAccount}`);
+                            
+                            if (sharedAccount) {
+                                // Format as Hedera account: 0.0.{accountNumber}
+                                const formattedAccount = `0.0.${sharedAccount}`;
+                                const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                                sharedAccountCell.innerHTML = `<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`;
+                                sharedAccountCell.title = `Click to view shared account: ${formattedAccount}`;
+                                console.log(`[SELLER SHARED ACCOUNTS] Set shared account for ${evmAddress}: ${formattedAccount}`);
+                            } else {
+                                sharedAccountCell.textContent = '-';
+                                sharedAccountCell.title = 'No shared account found';
+                                console.log(`[SELLER SHARED ACCOUNTS] No shared account found for ${evmAddress}`);
+                            }
+                        } else if (!evmAddress) {
+                            console.log(`[SELLER SHARED ACCOUNTS] Row ${index}: No EVM address set yet, will retry`);
+                        }
+                    });
+                }, 2000); // Wait 2 seconds for EVM conversions to complete
+            } else {
+                console.warn('[SELLER SHARED ACCOUNTS] Failed to fetch shared accounts:', data.error);
+            }
+        } catch (error) {
+            console.error('[SELLER SHARED ACCOUNTS] Error fetching shared accounts:', error);
+        }
     }
 
     async function fetchLastSeen(peer, lastSeenCell, smartContract) {
@@ -1784,9 +2110,21 @@
                     color = '#dc3545'; // red
                 }
 
-                lastSeenCell.innerHTML = `<span style="color: ${color};">${displayText}</span>`;
+                const html = `<span style="color: ${color};">${displayText}</span>`;
+                lastSeenCell.innerHTML = html;
+                
+                // Update cache with the formatted HTML and timestamp
+                lastSeenCache[peer.publicKey] = {
+                    html: html,
+                    timestamp: Date.now()
+                };
             } else {
                 lastSeenCell.textContent = 'Never';
+                // Cache "Never" state as well
+                lastSeenCache[peer.publicKey] = {
+                    html: 'Never',
+                    timestamp: Date.now()
+                };
             }
 
         } catch (error) {
