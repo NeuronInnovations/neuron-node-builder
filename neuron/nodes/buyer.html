@@ -963,6 +963,7 @@
                 console.log(`[BUYER SHARED ACCOUNT] Cell selector: #shared-account-cell-${index}, found: ${sharedAccountCell.length}, current text: "${sharedAccountCell.text()}"`);
                 
                 // Check if already loaded (has a value other than '-')
+                // Check text content even if it's inside a link element
                 const currentValue = sharedAccountCell.text().trim();
                 if (currentValue !== '-' && currentValue !== '' && currentValue.startsWith('0.0.')) {
                     console.log(`[BUYER SHARED ACCOUNT] Skipping fetch for seller ${sellerEvmAddress} - already loaded: ${currentValue}`);
@@ -984,8 +985,9 @@
                     if (data.success && data.sharedAccount) {
                         // Format as Hedera account: 0.0.{accountNumber}
                         const formattedAccount = `0.0.${data.sharedAccount}`;
-                        sharedAccountCell.text(formattedAccount);
-                        sharedAccountCell.attr('title', `Shared account: ${formattedAccount}`);
+                        const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                        sharedAccountCell.html(`<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`);
+                        sharedAccountCell.attr('title', `Click to view shared account: ${formattedAccount}`);
                         console.log(`[BUYER SHARED ACCOUNT] Set shared account for seller ${sellerEvmAddress}: ${formattedAccount}`);
                     } else {
                         sharedAccountCell.text('-');

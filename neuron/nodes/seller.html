@@ -1469,6 +1469,10 @@
     let lastSeenInterval = null;
     let peerRefreshInterval = null;
     
+    // Cache for shared accounts and last seen data to prevent flickering
+    let sharedAccountsCache = {};  // evmAddress (normalized) -> shared account
+    let lastSeenCache = {};        // publicKey -> {html, timestamp}
+    
     // Debug flag for verbose auto-refresh logging (can be enabled in console)
     window.SELLER_AUTO_REFRESH_DEBUG = false;
 
@@ -1640,6 +1644,16 @@
                                     evmCell.title = formattedAddress;
                                     // Store the full EVM address for shared account lookup
                                     row.setAttribute('data-evm-address', data.evmAddress);
+                                    
+                                    // Check cache for shared account and populate immediately if available
+                                    const normalizedEvmAddress = data.evmAddress.toLowerCase().replace(/^0x/, '');
+                                    const cachedSharedAccount = sharedAccountsCache[normalizedEvmAddress];
+                                    if (cachedSharedAccount) {
+                                        const formattedAccount = `0.0.${cachedSharedAccount}`;
+                                        const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                                        sharedAccountCell.innerHTML = `<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`;
+                                        sharedAccountCell.title = `Click to view shared account: ${formattedAccount}`;
+                                    }
                                 } else {
                                     evmCell.textContent = 'Conversion failed';
                                     evmCell.title = 'Could not convert public key to EVM address';
@@ -1666,8 +1680,16 @@
                     const lastUpdateCell = document.createElement('td');
                     lastUpdateCell.className = 'peers-table-cell';
                     lastUpdateCell.style.textAlign = 'center';
-                    lastUpdateCell.innerHTML = '<span style="color: #666;">Checking...</span>';
-                    // Fetch last seen for this peer
+                    
+                    // Check cache for last seen data first
+                    const cachedLastSeen = lastSeenCache[peer.publicKey];
+                    if (cachedLastSeen) {
+                        lastUpdateCell.innerHTML = cachedLastSeen.html;
+                    } else {
+                        lastUpdateCell.innerHTML = '<span style="color: #666;">Checking...</span>';
+                    }
+                    
+                    // Fetch last seen for this peer (will update cache)
                     fetchLastSeen(peer, lastUpdateCell, smartContract);
 
                     row.appendChild(evmCell);
@@ -1990,6 +2012,9 @@
                 });
                 console.log('[SELLER SHARED ACCOUNTS] Normalized shared accounts:', normalizedSharedAccounts);
                 
+                // Update cache with fetched shared accounts
+                sharedAccountsCache = { ...sharedAccountsCache, ...normalizedSharedAccounts };
+                
                 // Wait a bit for EVM addresses to be converted and stored in data attributes
                 setTimeout(() => {
                     // Update each row with its shared account
@@ -2012,8 +2037,9 @@
                             if (sharedAccount) {
                                 // Format as Hedera account: 0.0.{accountNumber}
                                 const formattedAccount = `0.0.${sharedAccount}`;
-                                sharedAccountCell.textContent = formattedAccount;
-                                sharedAccountCell.title = `Shared account: ${formattedAccount}`;
+                                const hashscanUrl = `https://hashscan.io/testnet/account/${formattedAccount}`;
+                                sharedAccountCell.innerHTML = `<a href="${hashscanUrl}" target="_blank" style="color: #0066cc; text-decoration: underline;">${formattedAccount}</a>`;
+                                sharedAccountCell.title = `Click to view shared account: ${formattedAccount}`;
                                 console.log(`[SELLER SHARED ACCOUNTS] Set shared account for ${evmAddress}: ${formattedAccount}`);
                             } else {
                                 sharedAccountCell.textContent = '-';
@@ -2084,9 +2110,21 @@
                     color = '#dc3545'; // red
                 }
 
-                lastSeenCell.innerHTML = `<span style="color: ${color};">${displayText}</span>`;
+                const html = `<span style="color: ${color};">${displayText}</span>`;
+                lastSeenCell.innerHTML = html;
+                
+                // Update cache with the formatted HTML and timestamp
+                lastSeenCache[peer.publicKey] = {
+                    html: html,
+                    timestamp: Date.now()
+                };
             } else {
                 lastSeenCell.textContent = 'Never';
+                // Cache "Never" state as well
+                lastSeenCache[peer.publicKey] = {
+                    html: 'Never',
+                    timestamp: Date.now()
+                };
             }
 
         } catch (error) {
