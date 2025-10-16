@@ -17,6 +17,7 @@ const {
 } = require('./global-contract-monitor.js');
 const { getConnectionMonitor, removeConnectionMonitor } = require('./connection-monitor.js');
 const ProcessManager = require('./process-manager.js');
+const ContractRegistryService = require('../services/ContractRegistryService');
 
 // At the top of the file, add a global mapping for seller nodes
 const sellerTemplateToInstanceMap = new Map();
@@ -171,7 +172,7 @@ module.exports = function (RED) {
     let hederaServiceError = null;
     
     try {
-        waitForEnvReady(() => {
+        waitForEnvReady(async () => {
             console.log("Hedera credentials loaded for seller");
 
             const operatorId = process.env.HEDERA_OPERATOR_ID;
@@ -184,16 +185,19 @@ module.exports = function (RED) {
             }
 
             try {
+                // Initialize contract registry
+                if (!ContractRegistryService.initialized) {
+                    await ContractRegistryService.initialize();
+                }
+                
+                // Get contracts from registry
+                const contractsMap = ContractRegistryService.getContractsMapForHedera();
+                
                 hederaService = new HederaAccountService({
                     network: process.env.HEDERA_NETWORK || 'testnet',
                     operatorId: process.env.HEDERA_OPERATOR_ID,
                     operatorKey: process.env.HEDERA_OPERATOR_KEY,
-                    contracts: {
-                        "jetvision": process.env.JETVISION_CONTRACT_ID,
-                        "chat": process.env.CHAT_CONTRACT_ID,
-                        "challenges": process.env.CHALLENGES_CONTRACT_ID,
-                        //"radiation": process.env.RADIATION_CONTRACT_ID
-                    }
+                    contracts: contractsMap
                 });
                 hederaServiceInitialized = true;
                 console.log("HederaAccountService initialized successfully for seller");
@@ -369,13 +373,12 @@ module.exports = function (RED) {
                 loadedDeviceInfo.deviceType = config.deviceType;
                 loadedDeviceInfo.price = config.price;
                 
-                // Set smart contract from configuration
-                const contracts = {
-                    "jetvision": process.env.JETVISION_CONTRACT_EVM,
-                    "chat": process.env.CHAT_CONTRACT_EVM,
-                    "challenges": process.env.CHALLENGES_CONTRACT_EVM,
-                };
-                loadedDeviceInfo.smartContract = contracts[config.smartContract.toLowerCase()];
+                // Set smart contract from configuration - get from registry
+                if (!ContractRegistryService.initialized) {
+                    await ContractRegistryService.initialize();
+                }
+                const contractsMap = ContractRegistryService.getContractsMapForEvm();
+                loadedDeviceInfo.smartContract = contractsMap[config.smartContract.toLowerCase()];
                 
                 node.deviceInfo = loadedDeviceInfo;
                 node.deviceInfo.nodeType = "seller";
@@ -428,12 +431,11 @@ module.exports = function (RED) {
                         return;
                     }
 
-                    const contracts = {
-                        "jetvision": process.env.JETVISION_CONTRACT_EVM,
-                        "chat": process.env.CHAT_CONTRACT_EVM,
-                        "challenges": process.env.CHALLENGES_CONTRACT_EVM,
-                        //"radiation": process.env.RADIATION_CONTRACT_EVM
-                    };
+                    // Get contracts from registry
+                    if (!ContractRegistryService.initialized) {
+                        await ContractRegistryService.initialize();
+                    }
+                    const contracts = ContractRegistryService.getContractsMapForEvm();
 
                     let device;
                     try {
@@ -662,6 +664,89 @@ module.exports = function (RED) {
 
         return obj;
     }
+
+    // ============================================
+    // Contract Registry API Endpoints
+    // ============================================
+
+    // Get all contracts from the registry
+    RED.httpAdmin.get('/registry/contracts', async function (req, res) {
+        try {
+            // Initialize registry if not already done
+            if (!ContractRegistryService.initialized) {
+                await ContractRegistryService.initialize();
+            }
+
+            const contracts = ContractRegistryService.getAllContracts();
+            res.json({ 
+                success: true, 
+                contracts,
+                count: contracts.length
+            });
+        } catch (error) {
+            console.error('[Registry API] Error getting contracts:', error);
+            res.json({ 
+                success: false, 
+                error: error.message 
+            });
+        }
+    });
+
+    // Get a specific contract by name
+    RED.httpAdmin.get('/registry/contract/:name', async function (req, res) {
+        try {
+            const { name } = req.params;
+            
+            // Initialize registry if not already done
+            if (!ContractRegistryService.initialized) {
+                await ContractRegistryService.initialize();
+            }
+
+            const contract = ContractRegistryService.getContract(name);
+            
+            if (contract) {
+                res.json({ 
+                    success: true, 
+                    contract 
+                });
+            } else {
+                res.json({ 
+                    success: false, 
+                    error: `Contract '${name}' not found` 
+                });
+            }
+        } catch (error) {
+            console.error('[Registry API] Error getting contract:', error);
+            res.json({ 
+                success: false, 
+                error: error.message 
+            });
+        }
+    });
+
+    // Refresh contracts from source (will trigger re-fetch from mother contract in future)
+    RED.httpAdmin.post('/registry/refresh', async function (req, res) {
+        try {
+            await ContractRegistryService.refreshContracts();
+            const contracts = ContractRegistryService.getAllContracts();
+            
+            res.json({ 
+                success: true, 
+                message: 'Contracts refreshed successfully',
+                count: contracts.length
+            });
+        } catch (error) {
+            console.error('[Registry API] Error refreshing contracts:', error);
+            res.json({ 
+                success: false, 
+                error: error.message 
+            });
+        }
+    });
+
+    // ============================================
+    // Seller Device API Endpoints
+    // ============================================
 
     RED.httpAdmin.get('/seller/devices', function (req, res) {
         const contract = req.query.contract || 'jetvision';
