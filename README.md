@@ -501,3 +501,23 @@ If `SDK_LOG_FOLDER` is set, check the log files for detailed error information:
 - Without `npx grunt build`, you'll see a black screen with MIME type errors
 - Always verify the `public/` directory exists before starting the application
 
+## Developer Documentation
+
+### Release Management
+
+- **[Wrapper Version Management](WRAPPER_VERSION_MANAGEMENT.md)** - Complete guide to managing neuron-wrapper dependency versions
+- **[Quick Release Guide](QUICK_RELEASE_GUIDE.md)** - Common release scenarios and quick reference
+- **[Solution Summary](SOLUTION_SUMMARY.md)** - Overview of the decoupled versioning system
+
+### Testing & CI/CD
+
+- **[Testing Guide](TESTING_GUIDE.md)** - Complete testing strategy including macOS signing and notarization
+- **[Visual Testing Overview](VISUAL_TESTING_OVERVIEW.md)** - Visual regression testing with Argos CI
+- **[Testing Checklist](TESTING_CHECKLIST.md)** - Pre-release testing checklist
+
+### Project Information
+
+- **[Build README](BUILD_README.md)** - Build system details
+- **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
+- **[Changelog](CHANGELOG.md)** - Version history and changes
+

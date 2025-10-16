@@ -1,62 +1,53 @@
 # Neuron Node Builder - Project Overview
 
 ## Purpose
-Neuron Node Builder is a **Node-RED fork** designed for machine-to-machine commerce powered by **Hedera blockchain technology**. It provides custom nodes for buyers and sellers to interact with the Neuron network for data exchange and monetization.
+Neuron Node Builder is a Node-RED fork designed for machine-to-machine commerce powered by Hedera blockchain technology. It provides custom nodes for buyers and sellers to interact with the Neuron network, enabling decentralized commerce applications.
 
 ## Key Features
-- Custom Neuron nodes for buyer/seller operations
-- Integration with Hedera blockchain (testnet/mainnet)
-- Smart contract interactions (JetVision, Chat, Challenges)
-- Device registration and management
-- P2P communication between devices
-- Visual regression testing with Argos CI
-- macOS code signing and notarization workflow
-- Cross-platform support (macOS, Windows)
+- **Buyer Nodes**: Create buyer devices, connect to sellers, consume data from the Neuron network
+- **Seller Nodes**: Create seller devices, publish data to the network, connect to buyers
+- **Hedera Integration**: Uses Hedera blockchain for account management, topics, and smart contracts
+- **Go SDK Wrapper**: Integrates with `neuron-nodered-sdk-wrapper` (compiled Go binary) for blockchain operations
+- **Visual Testing**: Comprehensive Playwright-based visual regression testing with Argos CI
+- **macOS App Packaging**: Professional code signing, notarization, and DMG creation for distribution
 
-## Tech Stack
+## Architecture
+- **Base**: Fork of Node-RED 4.x (low-code programming for event-driven applications)
+- **Custom Nodes**: Located in `neuron/nodes/` directory
+- **Services**: Core services in `neuron/services/` for environment management, health monitoring, etc.
+- **SDK Integration**: Communicates with Go wrapper via WebSocket for blockchain operations
+- **Testing**: Unit tests (Grunt/Mocha), visual tests (Playwright + Argos CI)
 
-### Core Runtime
-- **Node.js**: v18.5+ (required for Node-RED 4.x)
-- **Node-RED**: v4.x (included in package)
-- **Go**: v1.19+ (for SDK dependencies)
+## Platform Support
+- **macOS**: Intel (x64) and Apple Silicon (ARM64)
+- **Windows**: x64
+- **Linux**: No longer supported
 
-### Backend Technologies
-- **Express**: Web server framework
-- **Hedera SDK**: Blockchain interactions (@hashgraph/sdk)
-- **Ethers.js**: Ethereum/EVM interactions
-- **WebSocket**: Real-time communication
-- **MQTT**: IoT messaging protocol
+## Critical Dependencies
+- Node.js v18.5+ (required for Node-RED 4.x)
+- Go v1.19+ (for compiling SDK wrapper)
+- neuron-nodered-sdk-wrapper (Go binary for Hedera operations)
+- neuron-js-registration-sdk (NPM package for device management)
 
-### Frontend Technologies
-- **jQuery**: DOM manipulation and UI components
-- **ACE Editor**: Code editor
-- **Monaco Editor**: Advanced code editor
-- **D3.js**: Data visualization
-- **SASS**: CSS preprocessing
-- **JSONata**: Data transformation
+## Directory Structure
+```
+/
+├── neuron/                    # Custom Neuron-specific code
+│   ├── nodes/                 # Custom Node-RED nodes (buyer, seller, etc.)
+│   ├── services/              # Core services (environment, health monitoring)
+│   ├── lib/                   # Shared libraries
+│   ├── pages/                 # Custom web pages
+│   └── routes/                # Custom API routes
+├── packages/node_modules/     # Node-RED core packages
+├── tests/visual/              # Playwright visual regression tests
+├── build/                     # Build output directory
+├── public/                    # Compiled editor assets (created by grunt build)
+├── index.js                   # Main entry point
+├── neuron-settings.js         # Node-RED configuration
+└── Gruntfile.js              # Build configuration
+```
 
-### Build Tools
-- **Grunt**: Task runner and build system
-- **pkg**: Executable packaging
-- **uglify-js**: JavaScript minification
-- **sass**: CSS compilation
-
-### Testing
-- **Playwright**: Visual regression testing
-- **Mocha**: Unit testing framework
-- **Argos CI**: AI-powered visual regression
-- **nyc/Istanbul**: Code coverage
-- **JSHint**: JavaScript linting
-
-### Development Tools
-- **nodemon**: Auto-restart during development
-- **TypeScript**: Type checking for tests
-- **git**: Version control
-- **GitHub Actions**: CI/CD pipeline
-
-## Dependencies Overview
-- Blockchain: @hashgraph/sdk, ethers, cronosjs
-- Node-RED ecosystem: node-red-admin, node-red-dashboard, node-red-contrib-*
-- Authentication: passport, oauth2orize, bcryptjs
-- Data processing: jsonata, xml2js, cheerio
-- Custom: neuron-js-registration-sdk, neuron-nodered-sdk-wrapper (Go binary)
+## Environment Configuration
+- `.env` file in repository root: Hedera credentials, Argos token
+- `~/.neuron-node-builder/.env`: User-specific runtime configuration (for packaged app)
+- `tests/visual/fixtures/env/.env.visual`: Test credentials for visual tests

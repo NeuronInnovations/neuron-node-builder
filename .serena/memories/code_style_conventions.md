@@ -2,111 +2,96 @@
 
 ## JavaScript Style (JSHint Configuration)
 
-### Formatting Rules
-- **Indentation**: 4 spaces (NO tabs)
-- **Semicolons**: Optional (asi: true - automatic semicolon insertion allowed)
-- **Braces**: Required for all control structures (curly: true)
-- **Opening brace**: Same line as `if`/`for`/`function`
-- **Closing brace**: On its own line
+### Core Rules (.jshintrc)
+- **ES Version**: ES11 (ES2020)
+- **Semicolons**: Optional (asi: true) - missing semicolons allowed
+- **Braces**: Required for control structures (curly: true)
+- **Equality**: `==null` allowed (eqnull: true), but prefer `===` elsewhere
+- **Indentation**: 4 spaces (standard throughout codebase)
+- **Loop Functions**: Allowed (loopfunc: true)
+- **Variable Shadowing**: Allowed (shadow: true)
+- **Property Access**: Both dot and bracket notation accepted (sub: true)
+- **Prototype**: `__proto__` allowed for Node < v0.12 compatibility
 
-### Code Quality Rules
-- **Equality**: `== null` is allowed (eqnull: true), but prefer strict equality elsewhere
-- **For-in loops**: Must have property filtering (forin: true)
-- **Immediate functions**: Must be wrapped in parentheses (immed: true)
-- **Whitespace**: No non-breaking space characters (nonbsp: true)
-- **Functions in loops**: Allowed (loopfunc: true)
-- **Variable shadowing**: Allowed (shadow: true)
-- **Bracket notation**: Allowed - foo['bar'] is acceptable (sub: true)
-- **__proto__**: Allowed for Node.js compatibility (proto: true)
+### General Conventions
+1. **Error Handling**: Use try-catch blocks with descriptive error messages
+2. **Logging**: Use `console.log()`, `console.error()`, `console.warn()` liberally for debugging
+3. **Comments**: Single-line (`//`) for brief comments, multi-line (`/* */`) for headers
+4. **Async Operations**: Prefer async/await over callbacks or raw promises
+5. **Module Pattern**: Use `module.exports` and `require()` (CommonJS)
 
-### ECMAScript Version
-- **ES Version**: ES11 (ES2020) - esversion: 11
-- Modern JavaScript features are supported
+## File Organization
 
-### License Headers
-- All files must have the Apache 2.0 license header at the top:
+### Node Files Structure
+Each custom node (buyer.js, seller.js) follows this pattern:
+```javascript
+// 1. Environment/dependencies loading
+require('../services/NeuronEnvironment').load();
+
+// 2. Module imports
+const path = require('path');
+const fs = require('fs');
+// ...
+
+// 3. Global state/helpers (outside module.exports)
+const globalState = new Map();
+
+// 4. Main export with Node-RED registration
+module.exports = function(RED) {
+    // Node constructor
+    function NodeName(config) {
+        RED.nodes.createNode(this, config);
+        // Node logic
+    }
+    
+    // Register node type
+    RED.nodes.registerType('node-name', NodeName);
+    
+    // HTTP Admin endpoints
+    RED.httpAdmin.get('/api/endpoint', function(req, res) {
+        // Endpoint logic
+    });
+};
+```
+
+### Naming Conventions
+- **Files**: kebab-case (e.g., `process-manager.js`, `connection-monitor.js`)
+- **Classes**: PascalCase (e.g., `ProcessManager`, `HederaAccountService`)
+- **Functions**: camelCase (e.g., `startProcess`, `getConnectionStatus`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `HEDERA_OPERATOR_ID`)
+- **Private helpers**: camelCase with descriptive names (e.g., `extractPublicKeyBytes`)
+
+## TypeScript (for Playwright Tests)
+
+### Configuration (tsconfig.playwright.json)
+- **Target**: ES2022
+- **Module**: CommonJS
+- **Strict Checks**: Enabled (skipLibCheck: true for performance)
+- **Types**: Node, @playwright/test, DOM
+- **Output**: `tests/visual/.tsbuild`
+
+### Conventions
+- Use explicit types for function parameters and return values
+- Leverage Playwright fixtures and page object patterns
+- Keep test files focused and descriptive
+
+## Copyright Headers
+All source files should include Apache 2.0 license header:
 ```javascript
 /**
  * Copyright JS Foundation and other contributors, http://js.foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * ...
  **/
 ```
 
-## TypeScript Style (Playwright Tests)
-
-### Configuration (tsconfig.playwright.json)
-- **Target**: ES2022
-- **Module**: CommonJS
-- **Module Resolution**: Node
-- **Types**: Node, @playwright/test
-- **Strict**: Type checking enabled (skipLibCheck: true)
-- **Interop**: ES modules interop enabled
-
-## File Naming Conventions
-- Node files: `node-name.js` and `node-name.html` (kebab-case)
-- Services: `ServiceName.js` (PascalCase)
-- Tests: `feature.spec.ts` or `*_spec.js`
-- Config files: lowercase with hyphens or dots
-
-## Code Organization
-
-### Node-RED Custom Nodes
-Each node consists of:
-1. **JavaScript file** (.js) - Server-side logic
-2. **HTML file** (.html) - Client-side UI definition
-
-### Service Pattern
-Services in `neuron/services/` follow a module.exports pattern:
-```javascript
-module.exports = {
-    functionName: function() {
-        // implementation
-    }
-};
-```
-
-## Git Workflow
-
-### Branches
-- `master` - Main branch for latest stable release (target for bug fixes)
-- `dev` - Development branch for new features
-- `feat/*` - Feature branches
-- `fix/*` - Bug fix branches
-
-### Commit Messages
-- Concise, descriptive messages
-- Reference issue numbers when applicable
-- Use conventional commits style when possible
-
-## Testing Conventions
-
-### Unit Tests (Mocha)
-- File pattern: `*_spec.js`
-- Located in `test/unit/` and `test/nodes/`
-- Use BDD style (describe, it)
-- Timeout: 3000ms default
-
-### Visual Tests (Playwright)
-- File pattern: `*.spec.ts`
-- Located in `tests/visual/`
-- Use TypeScript
-- Support dark color scheme
-- Viewport: 1440x900
-- Projects: chromium-mac, chromium-win
-
-## Documentation Standards
-- JSDoc comments for functions and modules
-- Inline comments for complex logic
-- README files for major features
-- API documentation in separate API.md file
+## Node-RED Specific
+- **Node Status**: Use descriptive status indicators with fill/shape/text
+  - Green dot: Success/connected
+  - Yellow ring: Warning/initializing
+  - Red ring: Error/disconnected
+  - Blue dot: Processing
+- **Device Info**: Store persistent data in both context and filesystem
+- **Process Management**: Always clean up child processes in node.on('close')
+- **WebSocket Communication**: Use ports dynamically assigned by ProcessManager

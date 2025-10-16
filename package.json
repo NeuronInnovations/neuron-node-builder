@@ -155,5 +155,8 @@
     },
     "engines": {
         "node": ">=18.5"
+    },
+    "neuronConfig": {
+        "wrapperVersion": "v2.0.0-test"
     }
 }

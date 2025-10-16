@@ -39,7 +39,25 @@ async function build() {
     headers["Authorization"] = `Bearer ${process.env.GH_BUILD_TOKEN}`;
   }
 
-  const defaultWrapperTag = "v0.0.1-alpha";
+  // Read wrapper version from package.json if available
+  let defaultWrapperTag = "v0.0.1-alpha";
+  try {
+    const pkg = require("./package.json");
+    if (pkg.neuronConfig?.wrapperVersion) {
+      defaultWrapperTag = pkg.neuronConfig.wrapperVersion;
+      console.log(
+        chalk.blue(
+          `Default wrapper version from package.json: ${defaultWrapperTag}`
+        )
+      );
+    }
+  } catch (error) {
+    console.log(
+      chalk.yellow(
+        "Could not read wrapper version from package.json, using fallback"
+      )
+    );
+  }
 
   async function getLatestTag() {
     try {

@@ -86,10 +86,19 @@ jobs:
       - name: Determine neuron-wrapper tag
         id: wrapper_tag
         run: |
+          # Priority 1: Manual override from workflow input
           WRAPPER_TAG="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.wrapper_tag || '' }}"
+
+          # Priority 2: Read from package.json neuronConfig.wrapperVersion
+          if [ -z "$WRAPPER_TAG" ]; then
+            WRAPPER_TAG=$(node -p "require('./package.json').neuronConfig?.wrapperVersion || ''")
+          fi
+
+          # Priority 3: Fallback to matching node-builder version (legacy behavior)
           if [ -z "$WRAPPER_TAG" ]; then
             WRAPPER_TAG="v${{ steps.version.outputs.version }}"
           fi
+
           echo "Resolved wrapper tag: $WRAPPER_TAG"
           echo "wrapper_tag=$WRAPPER_TAG" >> $GITHUB_OUTPUT
 
