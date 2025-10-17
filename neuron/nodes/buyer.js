@@ -588,6 +588,9 @@ module.exports = function (RED) {
                             const connected = await connectionMonitor.connect();
 
                             if (connected) {
+                                // Set initial status immediately after connection
+                                node.status({ fill: "yellow", shape: "ring", text: "Connected - no peers" });
+                                
                                 // Set up status update callback to update node status
                                 connectionMonitor.onStatusUpdate((status) => {
                                     if (status.isConnected) {

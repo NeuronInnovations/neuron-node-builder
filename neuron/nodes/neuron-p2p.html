@@ -53,6 +53,10 @@
                         text-align: left;
                         border-bottom: 2px solid #ddd;
                         font-weight: bold;
+                        position: sticky;
+                        top: 0;
+                        background-color: white;
+                        z-index: 10;
                     }
                     .node-table td {
                         padding: 8px;
@@ -135,6 +139,14 @@
                     ]
                 });
 
+                // Create a scrollable container for the table
+                const tableContainer = $('<div>').css({
+                    'max-height': '320px',
+                    'overflow-y': 'auto',
+                    'overflow-x': 'hidden',
+                    'margin-bottom': '10px'
+                });
+
                 // Create a table to show available nodes
                 const table = $('<table>').addClass('node-table');
                 const thead = $('<thead>').append(
@@ -190,7 +202,8 @@
                 });
 
                 table.append(tbody);
-                dialog.append(table);
+                tableContainer.append(table);
+                dialog.append(tableContainer);
                 dialog.dialog('open'); // Open the dialog
             });
 
