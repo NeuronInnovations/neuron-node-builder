@@ -4,24 +4,13 @@ require('../services/NeuronEnvironment').load();
 const path = require('path');
 const fs = require('fs');
 const { HederaContractService } = require('neuron-js-registration-sdk');
+const ContractRegistryService = require('../services/ContractRegistryService');
 
 // --- GLOBAL CONTRACT MONITORING SERVICE (Singleton) ---
-// Separate data structures for each contract
-let globalPeerCounts = {
-    jetvision: 0,
-    chat: 0,
-    challenges: 0
-};
-let globalAllDevices = {
-    jetvision: [],
-    chat: [],
-    challenges: []
-};
-let contractLoadingStates = {
-    jetvision: false,
-    chat: false,
-    challenges: false
-};
+// Separate data structures for each contract (will be dynamically populated)
+let globalPeerCounts = {};
+let globalAllDevices = {};
+let contractLoadingStates = {};
 let contractMonitoringInterval = null;
 let isContractMonitoringActive = false;
 let contractServices = {};
@@ -31,44 +20,111 @@ const cacheDir = path.join(require('../services/NeuronUserHome').load(), 'cache'
 if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
 }
-const cacheFiles = {
-    jetvision: 'contract-data-jetvision.json',
-    chat: 'contract-data-chat.json',
-    challenges: 'contract-data-challenges.json'
-};
-for (let cacheFile in cacheFiles) {
-    const cacheFilePath = path.join(cacheDir, cacheFiles[cacheFile]);
 
-    if (!fs.existsSync(cacheFilePath)) {
-        let cacheSampleData = {};
+// Cache files will be dynamically created based on contracts from registry
+let cacheFiles = {};
 
-        if (fs.existsSync(path.join(__dirname, 'cache', cacheFiles[cacheFile]))) {
-            cacheSampleData = fs.readFileSync(path.join(__dirname, 'cache', cacheFiles[cacheFile]), 'utf-8');
-            cacheSampleData = JSON.parse(cacheSampleData);
+// Contract configuration - will be dynamically loaded from registry
+let contracts = [];
+let contractConfigs = {};
+
+/**
+ * Initialize contracts from the registry
+ * Called during initializeGlobalContractMonitoring
+ */
+async function initializeContractsFromRegistry() {
+    try {
+        // Initialize registry if needed
+        if (!ContractRegistryService.initialized) {
+            await ContractRegistryService.initialize();
         }
 
-        fs.writeFileSync(cacheFilePath, JSON.stringify(cacheSampleData, null, 2));
-    }
+        // Get all contracts from registry
+        const registryContracts = ContractRegistryService.getAllContracts();
+        
+        // Filter to only include contracts that have both ID and EVM address
+        // and are in the monitoring list (jetvision, chat, challenges)
+        const monitoredContractNames = ['jetvision', 'chat', 'challenges'];
+        const filteredContracts = registryContracts.filter(c => 
+            monitoredContractNames.includes(c.name) && c.contractId && c.contractEvm
+        );
 
-    cacheFiles[cacheFile] = cacheFilePath;
+        // Update contracts array
+        contracts = filteredContracts.map(c => c.name);
+
+        // Update contract configs
+        contractConfigs = {};
+        filteredContracts.forEach(contract => {
+            contractConfigs[contract.name] = {
+                contractId: contract.contractId,
+                contractEvm: contract.contractEvm
+            };
+
+            // Initialize data structures for this contract
+            globalPeerCounts[contract.name] = globalPeerCounts[contract.name] || 0;
+            globalAllDevices[contract.name] = globalAllDevices[contract.name] || [];
+            contractLoadingStates[contract.name] = contractLoadingStates[contract.name] || false;
+
+            // Setup cache file for this contract
+            const cacheFileName = `contract-data-${contract.name}.json`;
+            const cacheFilePath = path.join(cacheDir, cacheFileName);
+            
+            if (!fs.existsSync(cacheFilePath)) {
+                let cacheSampleData = {};
+                const sampleCachePath = path.join(__dirname, 'cache', cacheFileName);
+                
+                if (fs.existsSync(sampleCachePath)) {
+                    cacheSampleData = JSON.parse(fs.readFileSync(sampleCachePath, 'utf-8'));
+                }
+                
+                fs.writeFileSync(cacheFilePath, JSON.stringify(cacheSampleData, null, 2));
+            }
+            
+            cacheFiles[contract.name] = cacheFilePath;
+        });
+
+        console.log(`[GlobalContractMonitor] Initialized ${contracts.length} contracts from registry:`, contracts);
+        return true;
+    } catch (error) {
+        console.error('[GlobalContractMonitor] Failed to initialize contracts from registry:', error);
+        
+        // Fallback to hardcoded contracts if registry fails
+        console.warn('[GlobalContractMonitor] Falling back to environment variable contracts');
+        contracts = ['jetvision', 'chat', 'challenges'];
+        contractConfigs = {
+            jetvision: {
+                contractId: process.env.JETVISION_CONTRACT_ID,
+                contractEvm: process.env.JETVISION_CONTRACT_EVM
+            },
+            chat: {
+                contractId: process.env.CHAT_CONTRACT_ID,
+                contractEvm: process.env.CHAT_CONTRACT_EVM
+            },
+            challenges: {
+                contractId: process.env.CHALLENGES_CONTRACT_ID,
+                contractEvm: process.env.CHALLENGES_CONTRACT_EVM
+            }
+        };
+        
+        // Initialize data structures for fallback contracts
+        contracts.forEach(contractName => {
+            globalPeerCounts[contractName] = 0;
+            globalAllDevices[contractName] = [];
+            contractLoadingStates[contractName] = false;
+            
+            const cacheFileName = `contract-data-${contractName}.json`;
+            const cacheFilePath = path.join(cacheDir, cacheFileName);
+            
+            if (!fs.existsSync(cacheFilePath)) {
+                fs.writeFileSync(cacheFilePath, JSON.stringify({}, null, 2));
+            }
+            
+            cacheFiles[contractName] = cacheFilePath;
+        });
+        
+        return false;
+    }
 }
-
-// Contract configuration
-const contracts = ['jetvision', 'chat', 'challenges'];
-const contractConfigs = {
-    jetvision: {
-        contractId: process.env.JETVISION_CONTRACT_ID,
-        contractEvm: process.env.JETVISION_CONTRACT_EVM
-    },
-    chat: {
-        contractId: process.env.CHAT_CONTRACT_ID,
-        contractEvm: process.env.CHAT_CONTRACT_EVM
-    },
-    challenges: {
-        contractId: process.env.CHALLENGES_CONTRACT_ID,
-        contractEvm: process.env.CHALLENGES_CONTRACT_EVM
-    }
-};
 
 // Load cached contract data for a specific contract
 function loadCachedContractData(contract) {
@@ -189,6 +245,9 @@ async function initializeGlobalContractMonitoring() {
     }
 
     console.log('Initializing global contract monitoring service for all contracts...');
+    
+    // Step 0: Initialize contracts from registry
+    await initializeContractsFromRegistry();
     
     // Step 1: Load cached data immediately for fast startup
     const hasCachedData = {};

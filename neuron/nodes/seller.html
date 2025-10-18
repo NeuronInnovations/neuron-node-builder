@@ -114,22 +114,26 @@
 
         <div class="form-row">
             <label for="node-input-evmAddress"><span>EVM Address</span></label>
-            <div style="display: flex; align-items: center; gap: 5px; width: 75%;">
-                <input type="text" id="node-input-evmAddress" placeholder="EVM address will appear here after initialization" readonly style="flex: 1;">
-                <button type="button" id="copy-evm-address-btn" class="red-ui-button" style="padding: 4px 8px; font-size: 12px; min-width: auto;" title="Copy EVM Address">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </button>
-            </div>
+            <input type="text" id="node-input-evmAddress" placeholder="EVM address will appear here after initialization" readonly style="font-family: monospace; font-size: 11px;">
+            <button type="button" id="copy-evm-address-btn" class="red-ui-button" style="padding: 4px 8px; font-size: 12px; min-width: auto; margin-left: 5px;" title="Copy EVM Address">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
         </div>
 
         <div class="form-row">
             <label for="node-input-balance"><span>Balance</span></label>
             <input type="text" id="node-input-balance" placeholder="Account balance will appear here after initialization" readonly>
-            <small><a href="https://portal.hedera.com/faucet" target="_blank" style="color:#4d90fe; text-decoration: underline;"> Top up account</a></small>
-
+            <a href="https://portal.hedera.com/faucet" target="_blank" class="red-ui-button" style="padding: 4px 8px; font-size: 12px; min-width: auto; margin-left: 5px; text-decoration: none;" title="Top up account">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+                    <line x1="12" y1="12" x2="12" y2="18"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+            </a>
         </div>
 
         <!-- Add PublicKey field here -->
@@ -196,9 +200,9 @@
                            <thead>
                                <tr>
                                    <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">EVM Address</th>
-                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Shared Account</th>
-                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Status</th>
-                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd;">Last Seen</th>
+                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd; width: 140px;">Shared Account</th>
+                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd; width: 100px;">Status</th>
+                                   <th style="text-align: center; padding: 5px; border-bottom: 1px solid #ddd; width: 100px;">Last Seen</th>
                                </tr>
                            </thead>
                            <tbody id="peers-table-body">
@@ -264,6 +268,10 @@
     RED.nodes.registerType('seller config', {
         category: 'Neuron',
         color: '#b3e6ff',
+        editDialogSize: {
+            width: '600px',
+            height: 'auto'
+        },
         defaults: {
             name: { value: "Seller" },
             deviceRole: { value: null, required: true },
@@ -2135,6 +2143,35 @@
 </script>
 
 <style>
+    .neuron-seller-config .form-row {
+        display: flex;
+        margin-bottom: 8px;
+        align-items: center;
+        min-width: 430px;
+    }
+
+    .neuron-seller-config #peers-list {
+        padding: 8px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: visible;
+        min-width: 700px;
+    }
+
+    .neuron-seller-config #peers-table {
+        table-layout: auto;
+        width: 100%;
+    }
+
+    .neuron-seller-config #peers-table th {
+        padding: 5px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .neuron-seller-config #peers-table td {
+        padding: 5px;
+    }
+
 .neuron-seller-config .connection-status-connected {
     background-color: #4CAF50 !important;
 }
