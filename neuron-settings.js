@@ -530,15 +530,15 @@ module.exports = {
     externalModules: {
         // autoInstall: false,   /** Whether the runtime will attempt to automatically install missing modules */
         // autoInstallRetry: 30, /** Interval, in seconds, between reinstall attempts */
-        // palette: {              /** Configuration for the Palette Manager */
-        //     allowInstall: true, /** Enable the Palette Manager in the editor */
-        //     allowUpdate: true,  /** Allow modules to be updated in the Palette Manager */
-        //     allowUpload: true,  /** Allow module tgz files to be uploaded and installed */
-        //     allowList: ['*'],
-        //     denyList: [],
-        //     allowUpdateList: ['*'],
-        //     denyUpdateList: []
-        // },
+         palette: {              /** Configuration for the Palette Manager */
+             allowInstall: true, /** Enable the Palette Manager in the editor */
+             allowUpdate: true,  /** Allow modules to be updated in the Palette Manager */
+             allowUpload: true,  /** Allow module tgz files to be uploaded and installed */
+             allowList: ['*'],
+             denyList: [],
+             allowUpdateList: ['*'],
+             denyUpdateList: []
+         },
         // modules: {              /** Configuration for node-specified modules */
         //     allowInstall: true,
         //     allowList: [],

@@ -383,7 +383,7 @@ These entitlements allow:
 - Dynamic code execution
 
 #### Environment Configuration
-
+   
 The packaged application uses:
 - Port 1880 for Node-RED (configurable in `neuron-settings.js`)
 - Automatic browser opening after startup
