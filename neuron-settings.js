@@ -76,7 +76,12 @@ module.exports = {
     /** Node-RED scans the `nodes` directory in the userDir to find local node files.
      * The following property can be used to specify an additional directory to scan.
      */
-    nodesDir: require('path').resolve(__dirname, "neuron/nodes"),
+    //nodesDir: require('path').resolve(__dirname, "neuron/nodes"),
+
+    nodesDir: [
+        path.resolve(__dirname, "neuron/nodes"),
+        path.dirname(require.resolve("@node-red/nodes/package.json"))
+    ],
 
     /*******************************************************************************
      * Security
