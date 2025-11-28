@@ -528,17 +528,50 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          ZIP_PATH: ${{ env.ZIP_PATH }}
         run: |
+          # Validate Apple API credentials
           if [ -z "$APPLE_API_KEY_ID" ] || [ -z "$APPLE_API_ISSUER_ID" ] || [ -z "$APPLE_API_KEY_BASE64" ]; then
             echo "ERROR: Missing Apple API credentials"
+            echo "  APPLE_API_KEY_ID: $([ -n "$APPLE_API_KEY_ID" ] && echo 'set' || echo 'MISSING')"
+            echo "  APPLE_API_ISSUER_ID: $([ -n "$APPLE_API_ISSUER_ID" ] && echo 'set' || echo 'MISSING')"
+            echo "  APPLE_API_KEY_BASE64: $([ -n "$APPLE_API_KEY_BASE64" ] && echo 'set' || echo 'MISSING')"
             exit 1
           fi
 
+          # Validate ZIP_PATH is set and file exists
+          echo "Validating notarization package..."
+          echo "  ZIP_PATH: $ZIP_PATH"
+
+          if [ -z "$ZIP_PATH" ]; then
+            echo "ERROR: ZIP_PATH environment variable is not set"
+            exit 1
+          fi
+
+          if [ ! -f "$ZIP_PATH" ]; then
+            echo "ERROR: ZIP file does not exist at: $ZIP_PATH"
+            echo "Available files in build/releases:"
+            ls -la build/releases/ || echo "  (directory not found)"
+            exit 1
+          fi
+
+          echo "  File size: $(du -h "$ZIP_PATH" | cut -f1)"
+
+          # Create API key file from base64-encoded secret
           API_KEY_PATH="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
+
+          if [ ! -s "$API_KEY_PATH" ]; then
+            echo "ERROR: Failed to decode API key - file is empty or not created"
+            exit 1
+          fi
           chmod 600 "$API_KEY_PATH"
+          echo "  API key file created successfully"
 
           echo "Submitting for notarization..."
+
+          # Run notarytool and capture both output and exit code
+          set +e
           SUBMIT_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
             --key "$API_KEY_PATH" \
             --key-id "$APPLE_API_KEY_ID" \
@@ -546,9 +579,23 @@ jobs:
             --wait \
             --timeout 2700 \
             --verbose 2>&1)
+          NOTARY_EXIT_CODE=$?
+          set -e
 
           echo "$SUBMIT_OUTPUT"
+          echo ""
+          echo "Notarytool exit code: $NOTARY_EXIT_CODE"
 
+          # Clean up API key before checking results
+          rm -f "$API_KEY_PATH"
+
+          # Check notarytool exit code first
+          if [ $NOTARY_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: notarytool command failed with exit code $NOTARY_EXIT_CODE"
+            exit 1
+          fi
+
+          # Parse output for status
           if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
             echo "SUCCESS: Notarization successful"
           elif echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
@@ -558,8 +605,6 @@ jobs:
             echo "ERROR: Notarization failed or timed out"
             exit 1
           fi
-
-          rm -f "$API_KEY_PATH"
 
       - name: Staple notarization
         env:
