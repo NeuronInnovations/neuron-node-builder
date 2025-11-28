@@ -80,6 +80,15 @@ module.exports = {
    * The following property can be used to specify an additional directory to scan.
    */
   nodesDir: require("path").resolve(__dirname, "neuron/nodes"),
+  /** Node-RED scans the `nodes` directory in the userDir to find local node files.
+   * The following property can be used to specify an additional directory to scan.
+   */
+  //nodesDir: require('path').resolve(__dirname, "neuron/nodes"),
+
+  nodesDir: [
+    path.resolve(__dirname, "neuron/nodes"),
+    path.dirname(require.resolve("@node-red/nodes/package.json")),
+  ],
 
   /*******************************************************************************
    * Security
@@ -593,6 +602,33 @@ module.exports = {
     //     allowUpdateList: ['*'],
     //     denyUpdateList: []
     // },
+    // modules: {              /** Configuration for node-specified modules */
+    //     allowInstall: true,
+    //     allowList: [],
+    //     denyList: []
+    // }
+  },
+  /** Configure how the runtime will handle external npm modules.
+   * This covers:
+   *  - whether the editor will allow new node modules to be installed
+   *  - whether nodes, such as the Function node are allowed to have their
+   *own dynamically configured dependencies.
+   * The allow/denyList options can be used to limit what modules the runtime
+   * will install/load. It can use '*' as a wildcard that matches anything.
+   */
+  externalModules: {
+    // autoInstall: false,   /** Whether the runtime will attempt to automatically install missing modules */
+    // autoInstallRetry: 30, /** Interval, in seconds, between reinstall attempts */
+    palette: {
+      /** Configuration for the Palette Manager */
+      allowInstall: true /** Enable the Palette Manager in the editor */,
+      allowUpdate: true /** Allow modules to be updated in the Palette Manager */,
+      allowUpload: true /** Allow module tgz files to be uploaded and installed */,
+      allowList: ["*"],
+      denyList: [],
+      allowUpdateList: ["*"],
+      denyUpdateList: [],
+    },
     // modules: {              /** Configuration for node-specified modules */
     //     allowInstall: true,
     //     allowList: [],

@@ -5,6 +5,7 @@ const { HederaAccountService } = require('neuron-js-registration-sdk');
 const fs = require('fs');
 const path = require('path');
 const waitForEnvReady = require('../services/WaitForEnvReady');
+const ContractRegistryService = require('../services/ContractRegistryService');
 
 module.exports = function (RED) {
     function StdinNode(config) {
@@ -14,19 +15,22 @@ module.exports = function (RED) {
 
         // Initialize Hedera service
         try {
-            waitForEnvReady(() => {
-            hederaService = new HederaAccountService({
-                network: process.env.HEDERA_NETWORK || 'testnet',
-                operatorId: process.env.HEDERA_OPERATOR_ID,
-                operatorKey: process.env.HEDERA_OPERATOR_KEY,
-                contracts: {
-                    "adsb": process.env.CONTRACT_ID,
-                    "mcp": process.env.MCP_CONTRACT_ID,
-                    "weather": process.env.WEATHER_CONTRACT_ID,
-                    "radiation": process.env.RADIATION_CONTRACT_ID
+            waitForEnvReady(async () => {
+                // Initialize contract registry
+                if (!ContractRegistryService.initialized) {
+                    await ContractRegistryService.initialize();
                 }
+                
+                // Get contracts from registry
+                const contractsMap = ContractRegistryService.getContractsMapForHedera();
+                
+                hederaService = new HederaAccountService({
+                    network: process.env.HEDERA_NETWORK || 'testnet',
+                    operatorId: process.env.HEDERA_OPERATOR_ID,
+                    operatorKey: process.env.HEDERA_OPERATOR_KEY,
+                    contracts: contractsMap
+                });
             });
-        });
             let targetNode = null;
             RED.nodes.eachNode(function(n) {
                 if (n.id === config.selectedNode) {

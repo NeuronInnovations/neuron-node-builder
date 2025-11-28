@@ -404,14 +404,24 @@ class ProcessManager {
 
             const args = [
                 `--port=${port}`,
-               // '--use-local-address',
-              // '--enable-upnp',
                 '--mode=peer',
                 `--buyer-or-seller=${nodeType}`,
                 nodeType === 'seller' ? '--list-of-buyers-source=env' : '--list-of-sellers-source=env',
                 `--envFile=${envFilePath}`,
                 `--ws-port=${port}`
             ];
+            
+            // Add --use-local-address flag if enabled in .env
+            if (process.env.USE_LOCAL_ADDRESS === 'true' || process.env.USE_LOCAL_ADDRESS === '1') {
+                args.splice(1, 0, '--use-local-address');
+                console.log('✅ Using local address mode (USE_LOCAL_ADDRESS=true)');
+            }
+            
+            // Add --enable-upnp flag if enabled in .env
+            if (process.env.ENABLE_UPNP === 'true' || process.env.ENABLE_UPNP === '1') {
+                args.splice(1, 0, '--enable-upnp');
+                console.log('✅ UPNP enabled (ENABLE_UPNP=true)');
+            }
 
 
             console.log(`🔍 Spawning process with executable: ${executablePath}`);
